@@ -13,7 +13,7 @@ ok Crow::HTTP::RequestParser.produces === Crow::HTTP::Request,
 sub test-request-to-tcp-message($req) {
     # We replace \n with \r\n in the request headers here, so the tests can
     # look pretty.
-    my ($headers, $body) = $req.split("\n\n");
+    my ($headers, $body) = $req.split(/<!before ^>\n\n/);
     $headers .= subst("\n", "\r\n", :g);
     my $data = "$headers\r\n\r\n$body".encode('latin-1');
     return Crow::TCP::Message.new(:$data);
@@ -200,5 +200,40 @@ refuses 'PUT when it is not included in the allowed methods',
 
     REQUEST
     *.status == 501;
+
+parses 'An empty line before the header',
+    q:to/REQUEST/,
+
+    GET / HTTP/1.1
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+parses 'A few empty lines before the header',
+    q:to/REQUEST/,
+
+
+    GET / HTTP/1.1
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+# XXX Test these security checks (allow configuration of them):
+#
+# HTTP does not place a predefined limit on the length of a
+# request-line, as described in Section 2.5.  A server that receives a
+# method longer than any that it implements SHOULD respond with a 501
+# (Not Implemented) status code.  A server that receives a
+# request-target longer than any URI it wishes to parse MUST respond
+# with a 414 (URI Too Long) status code (see Section 6.5.12 of
+# [RFC7231]).
+#
+# Various ad hoc limitations on request-line length are found in
+# practice.  It is RECOMMENDED that all HTTP senders and recipients
+# support, at a minimum, request-line lengths of 8000 octets.
 
 done-testing;
