@@ -49,7 +49,7 @@ sub refuses($desc, $test-request, *@checks, *%config) {
     my $fake-in = Supplier.new;
     $testee.processor($fake-in.Supply).tap:
         -> $request {
-            diag "Request parsing unexpected succeeded";
+            diag "Request parsing unexpectedly succeeded";
             flunk $desc;
             skip 'Incorrectly parsed header', @checks.elems;
             return;
@@ -130,5 +130,75 @@ parses 'Simple GET request with no headers', q:to/REQUEST/,
     *.method eq 'GET',
     *.target eq '/',
     *.http-version eq '1.1';
+
+parses 'Simple HEAD request with no headers', q:to/REQUEST/,
+    HEAD / HTTP/1.1
+
+    REQUEST
+    *.method eq 'HEAD',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+parses 'Simple POST request with no headers', q:to/REQUEST/,
+    POST / HTTP/1.1
+
+    REQUEST
+    *.method eq 'POST',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+parses 'Simple PUT request with no headers', q:to/REQUEST/,
+    PUT / HTTP/1.1
+
+    REQUEST
+    *.method eq 'PUT',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+parses 'Simple DELETE request with no headers', q:to/REQUEST/,
+    DELETE / HTTP/1.1
+
+    REQUEST
+    *.method eq 'DELETE',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+parses 'Simple OPTIONS request with no headers', q:to/REQUEST/,
+    OPTIONS / HTTP/1.1
+
+    REQUEST
+    *.method eq 'OPTIONS',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+refuses 'The TRACE method, as it is not implemented by default', q:to/REQUEST/,
+    TRACE / HTTP/1.1
+
+    REQUEST
+    *.status == 501;
+
+refuses 'The PATCH method, as it is not implemented by default', q:to/REQUEST/,
+    PATCH / HTTP/1.1
+
+    REQUEST
+    *.status == 501;
+
+parses 'The PATCH method if included in allowed-methods',
+    allowed-methods => <GET PUT POST DELETE PATCH>,
+    q:to/REQUEST/,
+    PATCH / HTTP/1.1
+
+    REQUEST
+    *.method eq 'PATCH',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
+refuses 'PUT when it is not included in the allowed methods',
+    allowed-methods => <GET HEAD OPTIONS>,
+    q:to/REQUEST/,
+    PUT / HTTP/1.1
+
+    REQUEST
+    *.status == 501;
 
 done-testing;
