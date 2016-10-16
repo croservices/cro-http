@@ -105,6 +105,18 @@ refuses 'Malformed HTTP version (3)', q:to/REQUEST/,
     REQUEST
     *.status == 400;
 
+refuses 'Malformed HTTP version (4)', q:to/REQUEST/,
+    GET / HTTP/10.1
+
+    REQUEST
+    *.status == 400;
+
+refuses 'Malformed HTTP version (5)', q:to/REQUEST/,
+    GET / HTTP/1.10
+
+    REQUEST
+    *.status == 400;
+
 refuses 'Unimplemented HTTP version', q:to/REQUEST/,
     GET / HTTP/2.0
 
