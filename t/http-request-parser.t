@@ -201,7 +201,7 @@ refuses 'PUT when it is not included in the allowed methods',
     REQUEST
     *.status == 501;
 
-parses 'An empty line before the header',
+parses 'An empty line before the request line',
     q:to/REQUEST/,
 
     GET / HTTP/1.1
@@ -211,7 +211,7 @@ parses 'An empty line before the header',
     *.target eq '/',
     *.http-version eq '1.1';
 
-parses 'A few empty lines before the header',
+parses 'A few empty lines before the request line',
     q:to/REQUEST/,
 
 
@@ -221,6 +221,62 @@ parses 'A few empty lines before the header',
     *.method eq 'GET',
     *.target eq '/',
     *.http-version eq '1.1';
+
+parses 'Host header',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    Host: www.xkcd.com
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'Host',
+    *.headers[0].value eq 'www.xkcd.com';
+
+parses 'Host header with no whitespace',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    Host:www.badgerbadgerbadger.com
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'Host',
+    *.headers[0].value eq 'www.badgerbadgerbadger.com';
+
+parses 'Host header with trailing whitespace',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    Host:www.jnthn.net  
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'Host',
+    *.headers[0].value eq 'www.jnthn.net';
+
+parses 'Host header with tab before and after value',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    Host:	www.jnthn.net	
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'Host',
+    *.headers[0].value eq 'www.jnthn.net';
 
 # XXX Test these security checks (allow configuration of them):
 #
