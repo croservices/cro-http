@@ -302,6 +302,58 @@ for <" ( ) [ ] { } @ \ / \< \> , ;> -> $nope {
 	    *.status == 400;
 }
 
+parses 'Field value can be any printable char including latin-1 range',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    X-Something: oh!"foo'<>%^&*()[]{}424242aaáâãäåæµ¥
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'X-Something',
+    *.headers[0].value eq Q/oh!"foo'<>%^&*()[]{}424242aaáâãäåæµ¥/;
+
+parses 'Field values may have whitespace in them',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    X-Men: this is a	sentence
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'X-Men',
+    *.headers[0].value eq Q/this is a	sentence/;
+
+parses 'Whitespace after field name ignored',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    X-Men: spaces inside but not		
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'X-Men',
+    *.headers[0].value eq Q/spaces inside but not/;
+
+for << \b \0 >>.kv -> $i, $cc {
+    refuses "Control chars other than space/tab not allowed ($i)",
+        qq:to/REQUEST/,
+        GET / HTTP/1.1
+        X-Something: oh{$cc}no
+
+        REQUEST
+        *.status == 400;
+}
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
