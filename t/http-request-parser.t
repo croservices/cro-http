@@ -278,6 +278,30 @@ parses 'Host header with tab before and after value',
     *.headers[0].name eq 'Host',
     *.headers[0].value eq 'www.jnthn.net';
 
+parses 'Header with insane but actually totally legit name',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    !#42$%omg&'*+-.wtf^_`~|ReAlLy!!!: wow
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq Q/!#42$%omg&'*+-.wtf^_`~|ReAlLy!!!/,
+    *.headers[0].value eq 'wow';
+
+for <" ( ) [ ] { } @ \ / \< \> , ;> -> $nope {
+	refuses "Not allowed $nope in header",
+	    qq:to/REQUEST/,
+	    GET / HTTP/1.1
+	    um{$nope}no: ne
+
+	    REQUEST
+	    *.status == 400;
+}
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
