@@ -354,6 +354,28 @@ for << \b \0 >>.kv -> $i, $cc {
         *.status == 400;
 }
 
+parses 'Request with multiple headers (example from RFC)',
+    q:to/REQUEST/,
+    GET /hello.txt HTTP/1.1
+    User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3
+    Host: www.example.com
+    Accept-Language: en, mi
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/hello.txt',
+    *.http-version eq '1.1',
+    *.headers == 3,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'User-Agent',
+    *.headers[0].value eq 'curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3',
+    *.headers[1].isa(Crow::HTTP::Header),
+    *.headers[1].name eq 'Host',
+    *.headers[1].value eq 'www.example.com',
+    *.headers[2].isa(Crow::HTTP::Header),
+    *.headers[2].name eq 'Accept-Language',
+    *.headers[2].value eq 'en, mi';
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
