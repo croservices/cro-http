@@ -146,5 +146,122 @@ for << \b \f \0 >>.kv -> $i, $cc {
         RESPONSE
 }
 
-# TODO:
-# * Tests for header parsing
+parses 'Single simple header', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Server: Apache
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 1,
+    *.headers[0].name eq 'Server',
+    *.headers[0].value eq 'Apache';
+
+parses 'Single header without whitespace', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Server:Apache
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 1,
+    *.headers[0].name eq 'Server',
+    *.headers[0].value eq 'Apache';
+
+parses 'Single header with trailing whitespace', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Server: Apache  
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 1,
+    *.headers[0].name eq 'Server',
+    *.headers[0].value eq 'Apache';
+
+parses 'Host header with tab before and after value', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Server:	Apache	
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 1,
+    *.headers[0].name eq 'Server',
+    *.headers[0].value eq 'Apache';
+
+parses 'Header with insane but actually totally legit name', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    !#42$%omg&'*+-.wtf^_`~|ReAlLy!!!: wow
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 1,
+    *.headers[0].name eq Q/!#42$%omg&'*+-.wtf^_`~|ReAlLy!!!/,
+    *.headers[0].value eq 'wow';
+
+for <" ( ) [ ] { } @ \ / \< \> , ;> -> $nope {
+	refuses "Not allowed $nope in header name",
+	    qq:to/RESPONSE/;
+	    HTTP/1.1 200 OK
+	    um{$nope}no: ne
+
+	    RESPONSE
+}
+
+parses 'Header field value can be any printable char including latin-1 range',
+    q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    X-Something: oh!"foo'<>%^&*()[]{}424242aaáâãäåæµ¥
+
+    RESPONSE
+    *.status == 200,
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].name eq 'X-Something',
+    *.headers[0].value eq Q/oh!"foo'<>%^&*()[]{}424242aaáâãäåæµ¥/;
+
+parses 'Single header with whitespace in value', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Date: Mon, 27 Jul 2009 12:28:53 GMT
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 1,
+    *.headers[0].name eq 'Date',
+    *.headers[0].value eq 'Mon, 27 Jul 2009 12:28:53 GMT';
+
+parses 'Response with multiple headers (example from RFC)', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Date: Mon, 27 Jul 2009 12:28:53 GMT
+    Server: Apache
+    Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
+    ETag: "34aa387-d-1568eb00"
+    Accept-Ranges: bytes
+    Content-Length: 51
+    Vary: Accept-Encoding
+    Content-Type: text/plain
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 8,
+    *.headers[0].name eq 'Date',
+    *.headers[0].value eq 'Mon, 27 Jul 2009 12:28:53 GMT',
+    *.headers[1].name eq 'Server',
+    *.headers[1].value eq 'Apache',
+    *.headers[2].name eq 'Last-Modified',
+    *.headers[2].value eq 'Wed, 22 Jul 2009 19:15:56 GMT',
+    *.headers[3].name eq 'ETag',
+    *.headers[3].value eq '"34aa387-d-1568eb00"',
+    *.headers[4].name eq 'Accept-Ranges',
+    *.headers[4].value eq 'bytes',
+    *.headers[5].name eq 'Content-Length',
+    *.headers[5].value eq '51',
+    *.headers[6].name eq 'Vary',
+    *.headers[6].value eq 'Accept-Encoding',
+    *.headers[7].name eq 'Content-Type',
+    *.headers[7].value eq 'text/plain';
