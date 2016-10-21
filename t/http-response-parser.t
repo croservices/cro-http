@@ -132,6 +132,19 @@ refuses 'Double-digit minor version', q:to/RESPONSE/;
 
     RESPONSE
 
+parses 'All non-controls allowed in reason', q:to/RESPONSE/,
+    HTTP/1.1 204 WOW! V3RY 'C@@L"! Æãåñ/
+
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 204;
+
+for << \b \f \0 >>.kv -> $i, $cc {
+    refuses "Control chars in reason ($i)", qq:to/RESPONSE/;
+        HTTP/1.1 204 Can't $cc here
+
+        RESPONSE
+}
+
 # TODO:
-# * Tests for what chars are valid in reason (no controls!)
 # * Tests for header parsing
