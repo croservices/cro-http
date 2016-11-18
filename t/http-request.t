@@ -115,4 +115,17 @@ use Test;
     is $req.has-header('Host'), False, 'has-header returns False on header we do not have';
 }
 
+{
+    my $req = Crow::HTTP::Request.new(method => 'GET', target => '/');
+    $req.append-header('Host', 'www.moarvm.org');
+    $req.append-header('Accept-Language', 'en');
+    $req.append-header('Accept-Language', 'mi');
+    is $req.header('Host'), 'www.moarvm.org', 'header method fetches a header';
+    is $req.header('host'), 'www.moarvm.org', 'header method is not case sensitive (1)';
+    is $req.header('HOSt'), 'www.moarvm.org', 'header method is not case sensitive (2)';
+    is $req.header('Accept-Language'), 'en,mi',
+        'when there are multiple headers with the name, the value comma-joins them';
+    is $req.header('Content-type'), Nil, 'header we do not have returns Nil';
+}
+
 done-testing;
