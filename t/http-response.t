@@ -36,6 +36,37 @@ use Test;
     is $res.Str,
         "HTTP/1.1 200 OK\r\nContent-type: text/html\r\nConnection: close\r\n\r\n",
         "Headers are included in the response";
+
+    for "\b\n\0\r".comb -> $cc {
+        dies-ok { $res.append-header("X-Something: oh{$cc}no") },
+            'Refuses to add response header with illegal control char in value (single-arg)';
+    }
+    for "\b\n\0\r".comb -> $cc {
+        dies-ok { $res.append-header("X-Something", "oh{$cc}no") },
+            'Refuses to add response header with illegal control char in value (two-arg)';
+    }
+
+    for <" ( ) [ ] { } @ \ / \< \> , ;> -> $nope {
+        dies-ok { $res.append-header("um{$nope}no: ne") },
+            "Refuses to add response header with illegal name containing $nope (single-arg)";
+    }
+
+    for <" ( ) [ ] { } @ \ / \< \> , ;> -> $nope {
+        dies-ok { $res.append-header("um{$nope}no", "ne") },
+            "Refuses to add response header with illegal name containing $nope (two-arg)";
+    }
+
+    $res = Crow::HTTP::Response.new;
+    $res.append-header('!#42$%omg&\'*+-.wtf^_`~|ReAlLy!!!: oh!"foo\'<>%^&*()[]424242aaáâãäåæµ¥');
+    is $res.Str,
+        "HTTP/1.1 204 No Content\r\n!#42\$\%omg&'*+-.wtf^_`~|ReAlLy!!!: oh!\"foo'<>%^&*()[]424242aaáâãäåæµ¥\r\n\r\n",
+        'Utterly crazy but valid header can be added (single-arg)';
+
+    $res = Crow::HTTP::Response.new;
+    $res.append-header('!#42$%omg&\'*+-.wtf^_`~|ReAlLy!!!', 'oh!"foo\'<>%^&*()[]424242aaáâãäåæµ¥');
+    is $res.Str,
+        "HTTP/1.1 204 No Content\r\n!#42\$\%omg&'*+-.wtf^_`~|ReAlLy!!!: oh!\"foo'<>%^&*()[]424242aaáâãäåæµ¥\r\n\r\n",
+        'Utterly crazy but valid header can be added (two-arg)';
 }
 
 done-testing;
