@@ -29,4 +29,13 @@ use Test;
     dies-ok { $res.status = 4004 }, 'Status of 4004 is invalid';
 }
 
+{
+    my $res = Crow::HTTP::Response.new(status => 200);
+    $res.append-header('Content-type: text/html');
+    $res.append-header('Connection', 'close');
+    is $res.Str,
+        "HTTP/1.1 200 OK\r\nContent-type: text/html\r\nConnection: close\r\n\r\n",
+        "Headers are included in the response";
+}
+
 done-testing;
