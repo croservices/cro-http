@@ -37,6 +37,15 @@ use Test;
         "HTTP/1.1 200 OK\r\nContent-type: text/html\r\nConnection: close\r\n\r\n",
         "Headers are included in the response";
 
+    is $res.has-header('Content-type'), True, 'has-header returns True on header we have';
+    is $res.has-header('content-type'), True, 'has-header is not case-sensitive (1)';
+    is $res.has-header('CONTENT-TYPE'), True, 'has-header is not case-sensitive (2)';
+    is $res.has-header('Server'), False, 'has-header returns False on header we do not have';
+    is $res.header('Content-type'), 'text/html', 'header method fetches a header';
+    is $res.header('content-type'), 'text/html', 'header method is not case sensitive (1)';
+    is $res.header('CONTENT-TYPE'), 'text/html', 'header method is not case sensitive (2)';
+    is $res.header('Server'), Nil, 'header method returns Nil on header we do not have';
+
     for "\b\n\0\r".comb -> $cc {
         dies-ok { $res.append-header("X-Something: oh{$cc}no") },
             'Refuses to add response header with illegal control char in value (single-arg)';
