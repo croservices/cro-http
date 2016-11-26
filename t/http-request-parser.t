@@ -3,8 +3,8 @@ use Crow::HTTP::Request;
 use Crow::TCP;
 use Test;
 
-ok Crow::HTTP::RequestParser ~~ Crow::Processor,
-    'HTTP request parser is a processor';
+ok Crow::HTTP::RequestParser ~~ Crow::Transform,
+    'HTTP request parser is a transform';
 ok Crow::HTTP::RequestParser.consumes === Crow::TCP::Message,
     'HTTP request parser consumes TCP messages';
 ok Crow::HTTP::RequestParser.produces === Crow::HTTP::Request,
@@ -22,7 +22,7 @@ sub test-request-to-tcp-message($req) {
 sub parses($desc, $test-request, *@checks, *%config) {
     my $testee = Crow::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
-    $testee.processor($fake-in.Supply).tap:
+    $testee.transformer($fake-in.Supply).tap:
         -> $request {
             pass $desc;
             for @checks.kv -> $i, $check {
@@ -47,7 +47,7 @@ sub parses($desc, $test-request, *@checks, *%config) {
 sub refuses($desc, $test-request, *@checks, *%config) {
     my $testee = Crow::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
-    $testee.processor($fake-in.Supply).tap:
+    $testee.transformer($fake-in.Supply).tap:
         -> $request {
             diag "Request parsing unexpectedly succeeded";
             flunk $desc;
