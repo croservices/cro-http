@@ -60,7 +60,7 @@ is-response
         13\r\nThe first response
         \r\n20\r\nThe second
         with a newline in it
-        \r\n0\r\n
+        \r\n0\r\n\r\n
         RESPONSE
 
 is-response
@@ -82,7 +82,7 @@ is-response
         Transfer-encoding: chunked
 
         D\r\nNot confused \r\nD\r\nby emptiness
-        \r\n0\r\n
+        \r\n0\r\n\r\n
         RESPONSE
 
 done-testing;
