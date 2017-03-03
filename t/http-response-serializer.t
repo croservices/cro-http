@@ -24,4 +24,20 @@ is-response
 
         RESPONSE
 
+is-response
+    supply {
+        given Crow::HTTP::Response.new(:200status) {
+            .append-header('Content-type', 'text/plain');
+            .set-body("Wow it's like, plain text!\n".encode('utf-8'));
+            .emit;
+        }
+    },
+    q:to/RESPONSE/, '200 response with body readily available emits Content-length';
+        HTTP/1.1 200 OK
+        Content-type: text/plain
+        Content-length: 27
+
+        Wow it's like, plain text!
+        RESPONSE
+
 done-testing;
