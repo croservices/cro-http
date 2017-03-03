@@ -63,4 +63,26 @@ is-response
         \r\n0\r\n
         RESPONSE
 
+is-response
+    supply {
+        given Crow::HTTP::Response.new(:200status) {
+            my $body-stream = supply {
+                emit "Not confused ".encode('utf-8');
+                emit Blob.new;
+                emit "by emptiness\n".encode('utf-8');
+            }
+            .append-header('Content-type', 'text/plain');
+            .set-body($body-stream);
+            .emit;
+        }
+    },
+    q:b:to/RESPONSE/.chop, 'Chunked encoding not messed up by empty blobs';
+        HTTP/1.1 200 OK
+        Content-type: text/plain
+        Transfer-encoding: chunked
+
+        D\r\nNot confused \r\nD\r\nby emptiness
+        \r\n0\r\n
+        RESPONSE
+
 done-testing;
