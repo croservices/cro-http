@@ -78,4 +78,47 @@ use Test;
         'Utterly crazy but valid header can be added (two-arg)';
 }
 
+{
+    my $res = Crow::HTTP::Response.new();
+    nok $res.has-streaming-body,
+        'Fresh response object does not have a streaming body';
+
+    lives-ok
+        { $res.set-body('This is my body, given for you'.encode('utf-8')) },
+        'Can set body as a Blob';
+    nok $res.has-streaming-body,
+        'Response with a blob body is not a streaming body';
+    is $res.Str, "HTTP/1.1 200 OK\r\n\r\n",
+        'Default status code when blob body set is 200, not 204';
+
+    throws-like
+        { $res.set-body('One body is enough'.encode('utf-8')) },
+        X::Crow::HTTP::Response::AlreadyHasBody,
+        'Can only set body once (Blob + Blob case)';
+    throws-like
+        { $res.set-body(supply { }) },
+        X::Crow::HTTP::Response::AlreadyHasBody,
+        'Can only set body once (Blob + Supply case)';
+}
+
+{
+    my $res = Crow::HTTP::Response.new();
+    lives-ok
+        { $res.set-body(supply { emit 'Body'.encode('utf-8') }) },
+        'Can set body as a Supply';
+    ok $res.has-streaming-body,
+        'Response with a supply body is a streaming body';
+    is $res.Str, "HTTP/1.1 200 OK\r\n\r\n",
+        'Default status code when supply body set is 200, not 204';
+
+    throws-like
+        { $res.set-body('One body is enough'.encode('utf-8')) },
+        X::Crow::HTTP::Response::AlreadyHasBody,
+        'Can only set body once (Supply + Blob case)';
+    throws-like
+        { $res.set-body(supply { }) },
+        X::Crow::HTTP::Response::AlreadyHasBody,
+        'Can only set body once (Supply + Supply case)';
+}
+
 done-testing;
