@@ -12,7 +12,7 @@ sub is-response(Supply $source, Str $expected-output, $desc) {
     my ($header, $body) = $expected-output.split("\n\n", 2);
     $header .= subst("\n", "\r\n", :g);
     my $expected-buf = "$header\r\n\r\n".encode('latin-1') ~ $body.encode('utf-8');
-    is-deeply $joined-output, $expected-buf, $desc;
+    is $joined-output.decode('utf-8'), $expected-buf.decode('utf-8'), $desc;
 }
 
 is-response
@@ -38,6 +38,29 @@ is-response
         Content-length: 27
 
         Wow it's like, plain text!
+        RESPONSE
+
+is-response
+    supply {
+        given Crow::HTTP::Response.new(:200status) {
+            my $body-stream = supply {
+                emit "The first response\n".encode('utf-8');
+                emit "The second\nwith a newline in it\n".encode('utf-8');
+            }
+            .append-header('Content-type', 'text/plain');
+            .set-body($body-stream);
+            .emit;
+        }
+    },
+    q:b:to/RESPONSE/.chop, '200 response with streaming body does chunked encoding';
+        HTTP/1.1 200 OK
+        Content-type: text/plain
+        Transfer-encoding: chunked
+
+        13\r\nThe first response
+        \r\n20\r\nThe second
+        with a newline in it
+        \r\n0\r\n
         RESPONSE
 
 done-testing;
