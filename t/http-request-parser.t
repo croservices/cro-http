@@ -376,6 +376,22 @@ parses 'Request with multiple headers (example from RFC)',
     *.headers[2].name eq 'Accept-Language',
     *.headers[2].value eq 'en, mi';
 
+parses 'Request path and path segments for /hello.txt',
+    q:to/REQUEST/,
+    GET /hello.txt HTTP/1.1
+
+    REQUEST
+    *.path eq '/hello.txt',
+    *.path-segments eqv ('hello.txt',);
+
+parses 'Request path and path segments for /oh/my/path',
+    q:to/REQUEST/,
+    GET /oh/my/path HTTP/1.1
+
+    REQUEST
+    *.path eq '/oh/my/path',
+    *.path-segments eqv <oh my path>;
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
