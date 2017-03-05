@@ -34,14 +34,14 @@ parses-request-target 'A single / request target',
     !*.scheme.defined,
     !*.authority.defined,
     *.path eq '/',
-    *.path-segments.list eqv ("",),
+    *.path-segments eqv ("",),
     !*.query.defined,
     !*.fragment.defined;
 
 parses-request-target 'A single /foo/bar.html request target',
     '/foo/bar.html',
     *.path eq '/foo/bar.html',
-    *.path-segments.list eqv <foo bar.html>,
+    *.path-segments eqv <foo bar.html>,
     !*.query.defined;
 
 done-testing;
