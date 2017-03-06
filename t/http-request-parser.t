@@ -392,6 +392,19 @@ parses 'Request path and path segments for /oh/my/path',
     *.path eq '/oh/my/path',
     *.path-segments eqv <oh my path>;
 
+parses 'Query strings are parsed and accessible',
+    q:to/REQUEST/,
+    GET /foo/bar.baz?a=1&bc=2&def=lol HTTP/1.1
+
+    REQUEST
+    *.path eq '/foo/bar.baz',
+    *.path-segments eqv <foo bar.baz>,
+    *.query eq 'a=1&bc=2&def=lol',
+    *.query-hash eqv { a => '1', bc => '2', def => 'lol' },
+    *.query-value('a') eqv '1',
+    *.query-value('bc') eqv '2',
+    *.query-value('def') eqv 'lol';
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
