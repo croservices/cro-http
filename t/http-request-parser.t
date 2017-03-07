@@ -431,6 +431,25 @@ parses 'Query string keys and values that are encoded',
     *.query-value('love') eqv '♥',
     *.query-value('ΩΩ') eqv '2omega';
 
+parses 'Query strings with multiple values for the same key',
+    q:to/REQUEST/,
+    GET /foo?x=foo&y=bar&y=baz&x=%E2%99%A5&z=one HTTP/1.1
+
+    REQUEST
+    *.path eq '/foo',
+    *.path-segments eqv ('foo',),
+    *.query eq 'x=foo&y=bar&y=baz&x=%E2%99%A5&z=one',
+    *.query-hash eqv {
+        x => Crow::HTTP::MultiValue.new('foo', '♥'),
+        y => Crow::HTTP::MultiValue.new('bar', 'baz'),
+        z => 'one'
+    },
+    *.query-value('x') eqv Crow::HTTP::MultiValue.new('foo', '♥'),
+    *.query-value('x').Str eqv 'foo,♥',
+    *.query-value('y') eqv Crow::HTTP::MultiValue.new('bar', 'baz'),
+    *.query-value('y').Str eqv 'bar,baz',
+    *.query-value('z') eqv 'one';
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
