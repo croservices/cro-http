@@ -405,6 +405,32 @@ parses 'Query strings are parsed and accessible',
     *.query-value('bc') eqv '2',
     *.query-value('def') eqv 'lol';
 
+parses 'Query strings with empty values',
+    q:to/REQUEST/,
+    GET /foo/bar.baz?foo&bar=&baz=42 HTTP/1.1
+
+    REQUEST
+    *.path eq '/foo/bar.baz',
+    *.path-segments eqv <foo bar.baz>,
+    *.query eq 'foo&bar=&baz=42',
+    *.query-hash eqv { foo => '', bar => '', baz => '42' },
+    *.query-value('foo') eqv '',
+    *.query-value('bar') eqv '',
+    *.query-value('baz') eqv '42';
+
+parses 'Query string keys and values that are encoded',
+    q:to/REQUEST/,
+    GET /foo/bar.baz?a%2Fb=2%203&love=%E2%99%A5&%E2%84%A6%E2%84%A6=2omega HTTP/1.1
+
+    REQUEST
+    *.path eq '/foo/bar.baz',
+    *.path-segments eqv <foo bar.baz>,
+    *.query eq 'a%2Fb=2%203&love=%E2%99%A5&%E2%84%A6%E2%84%A6=2omega',
+    *.query-hash eqv { 'a/b' => '2 3', love => '♥', ΩΩ => '2omega' },
+    *.query-value('a/b') eqv '2 3',
+    *.query-value('love') eqv '♥',
+    *.query-value('ΩΩ') eqv '2omega';
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
