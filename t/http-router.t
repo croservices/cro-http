@@ -31,6 +31,18 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.append-header('Content-type', 'text/html');
             response.set-body('Hello, world'.encode('ascii'));
         }
+
+        get -> 'about' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body('We are the awesome'.encode('ascii'));
+        }
+
+        get -> 'company', 'careers' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body('No jobs, kthxbai'.encode('ascii'));
+        }
     }
     ok $app ~~ Crow::Transform, 'Route block with routes gives back a Crow::Transform';
     my $source = Supplier.new;
@@ -38,10 +50,32 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
 
     $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set with single route gives response';
+        ok $r ~~ Crow::HTTP::Response, 'Route set routes / correctly';
         is $r.status, 200, 'Got 200 response';
         is $r.header('Content-type'), 'text/html', 'Got expected header';
         is-deeply body-text($r), 'Hello, world', 'Got expected body';
+    }
+
+    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</about>));
+    given $responses.receive -> $r {
+        ok $r ~~ Crow::HTTP::Response, 'Route set routes /about correctly';
+        is $r.status, 200, 'Got 200 response';
+        is $r.header('Content-type'), 'text/html', 'Got expected header';
+        is-deeply body-text($r), 'We are the awesome', 'Got expected body';
+    }
+
+    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</company/careers>));
+    given $responses.receive -> $r {
+        ok $r ~~ Crow::HTTP::Response, 'Route set routes /company/careers correctly';
+        is $r.status, 200, 'Got 200 response';
+        is $r.header('Content-type'), 'text/html', 'Got expected header';
+        is-deeply body-text($r), 'No jobs, kthxbai', 'Got expected body';
+    }
+
+    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</wat>));
+    given $responses.receive -> $r {
+        ok $r ~~ Crow::HTTP::Response, 'No matching route gets a HTTP response';
+        is $r.status, '404', 'Status code when no matching route is 404';
     }
 }
 
