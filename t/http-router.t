@@ -15,4 +15,9 @@ use Test;
     }
 }
 
+throws-like { request }, X::Crow::HTTP::Router::OnlyInHandler, what => 'request',
+    'Can only use request term inside of a handler';
+throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'response',
+    'Can only use response term inside of a handler';
+
 done-testing;
