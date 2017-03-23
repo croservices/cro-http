@@ -79,4 +79,62 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my $app = route {
+        get -> 'product' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body('A GET request'.encode('ascii'));
+        }
+
+        post -> 'product' {
+            response.status = 201;
+            response.append-header('Content-type', 'text/html');
+            response.set-body('A POST request'.encode('ascii'));
+        }
+
+        put -> 'product' {
+            response.status = 204;
+        }
+
+        delete -> 'product' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body('A DELETE request'.encode('ascii'));
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</product>));
+    given $responses.receive -> $r {
+        ok $r ~~ Crow::HTTP::Response, 'Route set routes GET';
+        is $r.status, 200, 'Got 200 response';
+        is $r.header('Content-type'), 'text/html', 'Got expected header';
+        is-deeply body-text($r), 'A GET request', 'Got expected body';
+    }
+
+    $source.emit(Crow::HTTP::Request.new(:method<POST>, :target</product>));
+    given $responses.receive -> $r {
+        ok $r ~~ Crow::HTTP::Response, 'Route set routes POST';
+        is $r.status, 201, 'Got 201 response';
+        is $r.header('Content-type'), 'text/html', 'Got expected header';
+        is-deeply body-text($r), 'A POST request', 'Got expected body';
+    }
+
+    $source.emit(Crow::HTTP::Request.new(:method<PUT>, :target</product>));
+    given $responses.receive -> $r {
+        ok $r ~~ Crow::HTTP::Response, 'Route set routes PUT';
+        is $r.status, 204, 'Got 204 response';
+    }
+
+    $source.emit(Crow::HTTP::Request.new(:method<DELETE>, :target</product>));
+    given $responses.receive -> $r {
+        ok $r ~~ Crow::HTTP::Response, 'Route set routes DELETE';
+        is $r.status, 200, 'Got 200 response';
+        is $r.header('Content-type'), 'text/html', 'Got expected header';
+        is-deeply body-text($r), 'A DELETE request', 'Got expected body';
+    }
+}
+
 done-testing;
