@@ -137,4 +137,68 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my $app = route {
+        get -> 'product', $uuid {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("product $uuid".encode('ascii'));
+        }
+
+        get -> 'category', Any $uuid {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("category $uuid".encode('ascii'));
+        }
+
+        get -> 'user', Str $uuid {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("user $uuid".encode('ascii'));
+        }
+
+        get -> 'user', 'posts' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("user posts".encode('ascii'));
+        }
+
+        get -> 'product', Str $uuid, 'reviews' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reviews $uuid".encode('ascii'));
+        }
+
+        get -> 'product', Str $uuid, 'reviews', Int $page {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reviews $uuid page $page".encode('ascii'));
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    my @cases =
+        '/product/123.456', 'product 123.456',
+            'Mu variable at end handled correctly',
+        '/category/124.556', 'category 124.556',
+            'Any variable at end handled correctly',
+        '/user/128.856', 'user 128.856',
+            'Str variable at end handled correctly',
+        '/user/posts', 'user posts',
+            'Longest literal prefix wins',
+        '/product/123.456/reviews', 'reviews 123.456',
+            'Str variable in middle of literals handled correctly',
+        '/product/123.456/reviews/21', 'reviews 123.456 page 21',
+            'Having both Str and Int variables handled correctly',
+        '/product/123.456/reviews/-21', 'reviews 123.456 page -21',
+            'Int may have a sign';
+    for @cases -> $target, $expected-output, $desc {
+        $source.emit(Crow::HTTP::Request.new(:method<GET>, :$target));
+        given $responses.receive -> $r {
+            is-deeply body-text($r), $expected-output, $desc;
+        }
+    }
+}
+
 done-testing;
