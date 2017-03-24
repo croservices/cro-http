@@ -174,6 +174,12 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.append-header('Content-type', 'text/html');
             response.set-body("reviews $uuid page $page".encode('ascii'));
         }
+
+        get -> 'tree', *@path {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body(@path.join(",").encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -192,7 +198,15 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/product/123.456/reviews/21', 'reviews 123.456 page 21',
             'Having both Str and Int variables handled correctly',
         '/product/123.456/reviews/-21', 'reviews 123.456 page -21',
-            'Int may have a sign';
+            'Int may have a sign',
+        '/tree', '',
+            'Slurpy handled correctly (empty case)',
+        '/tree/foo', 'foo',
+            'Slurpy handled correctly (one segment case)',
+        '/tree/bar/baz', 'bar,baz',
+            'Slurpy handled correctly (two segment case)',
+        '/tree/gee/wizz/fizz', 'gee,wizz,fizz',
+            'Slurpy handled correctly (three segment case)';
     for @cases -> $target, $expected-output, $desc {
         $source.emit(Crow::HTTP::Request.new(:method<GET>, :$target));
         given $responses.receive -> $r {
