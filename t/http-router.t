@@ -244,6 +244,24 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.append-header('Content-type', 'text/html');
             response.set-body("search $min-price .. $max-price".encode('ascii'));
         }
+
+        get -> 'headertest1', :$x-custom1 is header = 'x', :$x-custom3 is header = 'x' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("headertest1 $x-custom1 $x-custom3".encode('ascii'));
+        }
+
+        get -> 'headertest2', :$x-custom2 is header = 'x', :$x-custom1 is header = 'x' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("headertest2 $x-custom1 $x-custom2".encode('ascii'));
+        }
+
+        get -> 'headertest3', :$X-CUSTOM1 is header = 'x', :$X-cusTom2 is header = 'x' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("headertest3 $X-CUSTOM1 $X-cusTom2".encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -256,9 +274,18 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/search?max-price=100', 'search 0 .. 100',
             'Two query string parameters, second passed (explicit is query)',
         '/search?max-price=60&min-price=20', 'search 20 .. 60',
-            'Two query string parameters, both passed (explicit is query)';
+            'Two query string parameters, both passed (explicit is query)',
+        '/headertest1', 'headertest1 c1 x',
+            'Two header parameters, one for a non-present header',
+        '/headertest2', 'headertest2 c1 c2',
+            'Two header parameters, both present',
+        '/headertest3', 'headertest3 c1 c2',
+            'Header parameters are case-insensitive';
     for @cases -> $target, $expected-output, $desc {
-        $source.emit(Crow::HTTP::Request.new(:method<GET>, :$target));
+        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        $req.append-header('X-Custom1', 'c1');
+        $req.append-header('X-Custom2', 'c2');
+        $source.emit($req);
         given $responses.receive -> $r {
             is-deeply body-text($r), $expected-output, $desc;
         }
