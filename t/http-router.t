@@ -237,4 +237,32 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my $app = route {
+        get -> 'search', :$min-price is query = 0, :$max-price is query = Inf {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("search $min-price .. $max-price".encode('ascii'));
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    my @cases =
+        '/search', 'search 0 .. Inf',
+            'Two query string parameters, neither passed (explicit is query)',
+        '/search?min-price=50', 'search 50 .. Inf',
+            'Two query string parameters, first passed (explicit is query)',
+        '/search?max-price=100', 'search 0 .. 100',
+            'Two query string parameters, second passed (explicit is query)',
+        '/search?max-price=60&min-price=20', 'search 20 .. 60',
+            'Two query string parameters, both passed (explicit is query)';
+    for @cases -> $target, $expected-output, $desc {
+        $source.emit(Crow::HTTP::Request.new(:method<GET>, :$target));
+        given $responses.receive -> $r {
+            is-deeply body-text($r), $expected-output, $desc;
+        }
+    }
+}
+
 done-testing;
