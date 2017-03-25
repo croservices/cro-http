@@ -180,6 +180,18 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.append-header('Content-type', 'text/html');
             response.set-body(@path.join(",").encode('ascii'));
         }
+
+        get -> 'orders', 'history', Int $page? {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("order history ({$page // 'no page'})".encode('ascii'));
+        }
+
+        get -> 'category', 'tree', $leval-a = 'none-a', $level-b = 'none-b' {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("category tree $leval-a $level-b".encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -206,7 +218,17 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/tree/bar/baz', 'bar,baz',
             'Slurpy handled correctly (two segment case)',
         '/tree/gee/wizz/fizz', 'gee,wizz,fizz',
-            'Slurpy handled correctly (three segment case)';
+            'Slurpy handled correctly (three segment case)',
+        '/orders/history', 'order history (no page)',
+            'Optional segment handled correctly (no argument)',
+        '/orders/history/2', 'order history (2)',
+            'Optional segment handled correctly (argument)',
+        '/category/tree', 'category tree none-a none-b',
+            'Two optional segments handled correctly (none passed)',
+        '/category/tree/foo', 'category tree foo none-b',
+            'Two optional segments handled correctly (one passed)',
+        '/category/tree/bar/baz', 'category tree bar baz',
+            'Two optional segments handled correctly (two passed)';
     for @cases -> $target, $expected-output, $desc {
         $source.emit(Crow::HTTP::Request.new(:method<GET>, :$target));
         given $responses.receive -> $r {
