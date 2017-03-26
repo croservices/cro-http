@@ -262,6 +262,30 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.append-header('Content-type', 'text/html');
             response.set-body("headertest3 $X-CUSTOM1 $X-cusTom2".encode('ascii'));
         }
+
+        get -> 'reqquery', :$field1! is query {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reqquery field1".encode('ascii'));
+        }
+
+        get -> 'reqquery', :$field2! is query {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reqquery field2".encode('ascii'));
+        }
+
+        get -> 'reqheader', :$unknown! is header {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reqheader unknown".encode('ascii'));
+        }
+
+        get -> 'reqheader', :$x-custom1! is header {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reqheader x-custom1".encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -280,7 +304,15 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/headertest2', 'headertest2 c1 c2',
             'Two header parameters, both present',
         '/headertest3', 'headertest3 c1 c2',
-            'Header parameters are case-insensitive';
+            'Header parameters are case-insensitive',
+        '/reqquery?field1=x', 'reqquery field1',
+            'Required query parameter selects correct route (1)',
+        '/reqquery?field2=x', 'reqquery field2',
+            'Required query parameter selects correct route (2)',
+        '/reqquery?field1=x&field2=x', 'reqquery field1',
+            'First winning route with required query items wins',
+        '/reqheader', 'reqheader x-custom1',
+            'Correct route picked when there are required headers';
     for @cases -> $target, $expected-output, $desc {
         my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
         $req.append-header('X-Custom1', 'c1');
