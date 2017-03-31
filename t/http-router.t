@@ -324,4 +324,52 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my subset UUIDv4 of Str where /^
+        <[0..9a..f]> ** 12
+        4 <[0..9a..f]> ** 3
+        <[89ab]> <[0..9a..f]> ** 15
+        $/;
+    my subset Percent of Int where 1..100;
+    my $app = route {
+        get -> 'product', UUIDv4 $id {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("product $id".encode('ascii'));
+        }
+
+        get -> 'chart', Percent $complete {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("percent $complete".encode('ascii'));
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    my @good-cases =
+        '/product/673c748325a3411d871ccf969751f0de', 'product 673c748325a3411d871ccf969751f0de',
+            'Segment constrained by Str-base subset type matches when it should',
+        '/chart/50', 'percent 50',
+            'Segment constrained by Int-base subset type matches when it should';
+    for @good-cases -> $target, $expected-output, $desc {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is-deeply body-text($r), $expected-output, $desc;
+        }
+    }
+
+    my @bad-cases =
+        '/product/not-a-uuid', 404, 'Non-matching segment gives 404 error (subset, Str)',
+        '/percent/1000', 404, 'Non-matching segment gives 404 error (subset, Int)';
+    for @bad-cases -> $target, $expected-status, $desc {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, $expected-status, $desc;
+        }
+    }
+}
+
 done-testing;
