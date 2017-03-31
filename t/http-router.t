@@ -343,6 +343,18 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.append-header('Content-type', 'text/html');
             response.set-body("percent $complete".encode('ascii'));
         }
+
+        get -> 'tag', $tag where /^\w+$/ {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("tag $tag".encode('ascii'));
+        }
+
+        get -> 'advent', Int $day where * <= 24 {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("advent $day".encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -351,7 +363,11 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/product/673c748325a3411d871ccf969751f0de', 'product 673c748325a3411d871ccf969751f0de',
             'Segment constrained by Str-base subset type matches when it should',
         '/chart/50', 'percent 50',
-            'Segment constrained by Int-base subset type matches when it should';
+            'Segment constrained by Int-base subset type matches when it should',
+        '/tag/pizza', 'tag pizza',
+            'Segment constrained by where clause matches when it should',
+        '/advent/13', 'advent 13',
+            'Segment of type Int constrained by where clause matches when it should';
     for @good-cases -> $target, $expected-output, $desc {
         my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
@@ -362,7 +378,9 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
 
     my @bad-cases =
         '/product/not-a-uuid', 404, 'Non-matching segment gives 404 error (subset, Str)',
-        '/percent/1000', 404, 'Non-matching segment gives 404 error (subset, Int)';
+        '/percent/1000', 404, 'Non-matching segment gives 404 error (subset, Int)',
+        '/tag/not-valid', 404, 'Non-matching segment gives 404 error (where, Str)',
+        '/advent/25', 404, 'Non-matching segment gives 404 error (where, Int)';
     for @bad-cases -> $target, $expected-status, $desc {
         my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
