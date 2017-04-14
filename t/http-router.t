@@ -286,6 +286,18 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.append-header('Content-type', 'text/html');
             response.set-body("reqheader x-custom1".encode('ascii'));
         }
+
+        get -> 'reqintarg', Int :$page! is query {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reqintarg $page".encode('ascii'));
+        }
+
+        get -> 'optintarg', Int :$page is query = 1 {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("optintarg $page".encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -312,7 +324,13 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/reqquery?field1=x&field2=x', 'reqquery field1',
             'First winning route with required query items wins',
         '/reqheader', 'reqheader x-custom1',
-            'Correct route picked when there are required headers';
+            'Correct route picked when there are required headers',
+        '/reqintarg?page=42', 'reqintarg 42',
+            'Route with required Int named arg for query parameter works',
+        '/optintarg?page=100', 'optintarg 100',
+            'Route with optional Int named arg for query parameter works when passed',
+        '/optintarg', 'optintarg 1',
+            'Route with optional Int named arg for query parameter works when not passed';
     for @cases -> $target, $expected-output, $desc {
         my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
         $req.append-header('X-Custom1', 'c1');
