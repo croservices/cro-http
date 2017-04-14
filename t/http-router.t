@@ -408,4 +408,117 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my subset UUIDv4 of Str where /^
+        <[0..9a..f]> ** 12
+        4 <[0..9a..f]> ** 3
+        <[89ab]> <[0..9a..f]> ** 15
+        $/;
+    my subset Percent of Int where 1..100;
+    my $app = route {
+        get -> 'orders', UUIDv4 :$id! is query {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("order $id".encode('ascii'));
+        }
+
+        my constant DEFAULT_SESSION = '6419c8383038446bb3e95d0302dd4942';
+        get -> 'home', UUIDv4 :$session is query = DEFAULT_SESSION {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("home $session".encode('ascii'));
+        }
+
+        get -> 'chart', Percent :$percent! is query {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("chart $percent".encode('ascii'));
+        }
+
+        get -> 'loan', Percent :$deposit is query = 15 {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("loan $deposit".encode('ascii'));
+        }
+
+        get -> 'tag', :$tag! is query where /^\w+$/ {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("tag $tag".encode('ascii'));
+        }
+
+        get -> 'advent', Int :$day! is query where * <= 24 {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("advent $day".encode('ascii'));
+        }
+    };
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    my @good-cases =
+        '/orders?id=673c748325a3411d871ccf969751f0de', 'order 673c748325a3411d871ccf969751f0de',
+            'Required unpack constrained by Str-base subset type works',
+        '/home?session=673c748325a3411d871ccf969751f0de', 'home 673c748325a3411d871ccf969751f0de',
+            'Optional unpack constrained by Str-base subset type works (provided)',
+        '/home', 'home 6419c8383038446bb3e95d0302dd4942',
+            'Optional unpack constrained by Str-base subset type works (not provided)',
+        '/chart?percent=50', 'chart 50',
+            'Required unpack constrained by Int-base subset type works',
+        '/loan?deposit=10', 'loan 10',
+            'Optional unpack constrained by Int-base subset type works (provided)',
+        '/loan', 'loan 15',
+            'Optional unpack constrained by Int-base subset type works (not provided)',
+        '/tag?tag=soup', 'tag soup',
+            'Required unpack untyped with where constraint works',
+        '/advent?day=10', 'advent 10',
+            'Required unpack of type Int with where constraint works';
+    for @good-cases -> $target, $expected-output, $desc {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is-deeply body-text($r), $expected-output, $desc;
+        }
+    }
+
+    my @bad-cases =
+        '/orders', 400, 'Missing unpack gives 400 error (subset, Str)',
+        '/orders?id=lol', 400, 'Non-matching unpack gives 400 error (subset, Str)',
+        '/home?session=lol', 400, 'Non-matching optional unpack gives 400 error (subset, Str)',
+        '/chart', 400, 'Missing unpack gives 400 error (subset, Int)',
+        '/chart?percent=200', 400, 'Non-matching unpack gives 400 error (subset, Int)',
+        '/loan?deposit=1000', 400, 'Non-matching optional unpack gives 400 error (subset, Int)',
+        '/tag', 400, 'Missing unpack gives 400 error (where, Str)',
+        '/tag?tag=abc-def', 400, 'Non-matching unpack gives 400 error (where, Str)',
+        '/advent', 400, 'Missing unpack gives 400 error (where, Int)',
+        '/tag?day=26', 400, 'Non-matching unpack gives 400 error (where, Int)';
+    for @bad-cases -> $target, $expected-status, $desc {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, $expected-status, $desc;
+        }
+    }
+}
+
+{
+    my $app = route {
+        get -> {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body('Hello, world'.encode('ascii'));
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    for <PUT POST DELETE> -> $method {
+        my $req = Crow::HTTP::Request.new(:$method, :target</>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, 405, 'URL that matches on segments but not method is 405';
+        }
+    }
+}
+
 done-testing;
