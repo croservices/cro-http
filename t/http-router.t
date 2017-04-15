@@ -725,4 +725,60 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my $app = route {
+        get -> 'redir', 'temp-1' {
+            redirect '/to/temp-1';
+            content 'text/html', '<a href="/to/temp-1">Click here</a>';
+        }
+
+        get -> 'redir', 'temp-2' {
+            redirect '/to/temp-2', 'text/html',
+                '<a href="/to/temp-2">Click here</a>'
+        }
+
+        get -> 'redir', 'perm-1' {
+            redirect :permanent, '/to/perm-1';
+            content 'text/html', '<a href="/to/perm-1">Click here</a>';
+        }
+
+        get -> 'redir', 'perm-2' {
+            redirect :permanent, '/to/perm-2', 'text/html',
+                '<a href="/to/perm-2">Click here</a>'
+        }
+
+        get -> 'redir', 'see-other-1' {
+            redirect :see-other, '/to/see-other-1';
+            content 'text/html', '<a href="/to/see-other-1">Click here</a>';
+        }
+
+        get -> 'redir', 'see-other-2' {
+            redirect :see-other, '/to/see-other-2', 'text/html',
+                '<a href="/to/see-other-2">Click here</a>'
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    my @cases =
+        '/redir/temp-1', 307, '/to/temp-1', 'Temporary redirect (1)',
+        '/redir/temp-2', 307, '/to/temp-2', 'Temporary redirect (2)',
+        '/redir/perm-1', 308, '/to/perm-1', 'Permanent redirect (1)',
+        '/redir/perm-2', 308, '/to/perm-2', 'Permanent redirect (2)',
+        '/redir/see-other-1', 303, '/to/see-other-1', 'See other redirect (1)',
+        '/redir/see-other-2', 303, '/to/see-other-2', 'See other redirect (2)';
+    for @cases -> $target, $status, $location, $desc {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, $status, "$desc - status";
+            is $r.header('Content-type'), 'text/html; charset=utf-8',
+                "$desc - content type";
+            is $r.header('Location'), $location, "$desc - location";
+            is body-text($r), q:s{<a href="$location">Click here</a>},
+                "$desc - body";
+        }
+    }
+}
+
 done-testing;
