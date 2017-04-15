@@ -545,6 +545,10 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         get -> 'shopping-list', :$product! is query {
             created '/shopping-list/1', 'text/plain', $product;
         }
+
+        get -> 'latin-1' {
+            content 'text/plain', 'wow not utf-8', :enc<ISO-8859-1>;
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -611,6 +615,17 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             is $r.header('Content-type'), 'text/plain; charset=utf-8',
                 'Correct content-type set including charset';
             is body-text($r), 'beef', 'Got expected body';
+        }
+    }
+
+    {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :target</latin-1>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, 200, 'Str content with :enc<ISO-8859-1> has 200 response';
+            is $r.header('Content-type'), 'text/plain; charset=ISO-8859-1',
+                'Correct content-type with charset=ISO-8859-1';
+            is body-text($r), 'wow not utf-8', 'Got expected body';
         }
     }
 }
