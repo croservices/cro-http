@@ -615,4 +615,114 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my $app = route {
+        get -> 'not-found-1', $id {
+            if $id == 1 {
+                content 'text/plain', 'found ok';
+            }
+            else {
+                not-found;
+                content 'text/plain', '404 not found';
+            }
+        }
+
+        get -> 'not-found-2', $id {
+            if $id == 1 {
+                content 'text/plain', 'found ok!';
+            }
+            else {
+                not-found 'text/plain', '404 not found!';
+            }
+        }
+
+        get -> 'bad-request-1', $id {
+            if $id == 1 {
+                content 'text/plain', 'request ok';
+            }
+            else {
+                bad-request;
+                content 'text/plain', '400 bad request';
+            }
+        }
+
+        get -> 'bad-request-2', $id {
+            if $id == 1 {
+                content 'text/plain', 'request ok!';
+            }
+            else {
+                bad-request 'text/plain', '400 bad request!';
+            }
+        }
+
+        get -> 'forbidden-1', $id {
+            if $id == 1 {
+                content 'text/plain', 'request allowed';
+            }
+            else {
+                forbidden;
+                content 'text/plain', '403 forbidden';
+            }
+        }
+
+        get -> 'forbidden-2', $id {
+            if $id == 1 {
+                content 'text/plain', 'request allowed!';
+            }
+            else {
+                forbidden 'text/plain', '403 forbidden!';
+            }
+        }
+
+        get -> 'conflict-1', $id {
+            if $id == 1 {
+                content 'text/plain', 'request timely';
+            }
+            else {
+                conflict;
+                content 'text/plain', '409 conflict';
+            }
+        }
+
+        get -> 'conflict-2', $id {
+            if $id == 1 {
+                content 'text/plain', 'request timely!';
+            }
+            else {
+                conflict 'text/plain', '409 conflict!';
+            }
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    my @cases =
+        '/not-found-1/1', 200, 'found ok', 'not found sanity (1)',
+        '/not-found-1/6', 404, '404 not found', 'not found (1)',
+        '/not-found-2/1', 200, 'found ok!', 'not found sanity (2)',
+        '/not-found-2/6', 404, '404 not found!', 'not found (2)',
+        '/bad-request-1/1', 200, 'request ok', 'bad request sanity (1)',
+        '/bad-request-1/6', 400, '400 bad request', 'bad request (1)',
+        '/bad-request-2/1', 200, 'request ok!', 'bad request sanity (2)',
+        '/bad-request-2/6', 400, '400 bad request!', 'bad request (2)',
+        '/forbidden-1/1', 200, 'request allowed', 'forbidden sanity (1)',
+        '/forbidden-1/6', 403, '403 forbidden', 'forbidden (1)',
+        '/forbidden-2/1', 200, 'request allowed!', 'forbidden sanity (2)',
+        '/forbidden-2/6', 403, '403 forbidden!', 'forbidden (2)',
+        '/conflict-1/1', 200, 'request timely', 'conflict sanity (1)',
+        '/conflict-1/6', 409, '409 conflict', 'conflict (1)',
+        '/conflict-2/1', 200, 'request timely!', 'conflict sanity (2)',
+        '/conflict-2/6', 409, '409 conflict!', 'conflict (2)';
+    for @cases -> $target, $status, $body, $desc {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, $status, "Error routine $desc - status";
+            is $r.header('Content-type'), 'text/plain; charset=utf-8',
+                "Error routine $desc - content type";
+            is body-text($r), $body, "Error routine $desc - body";
+        }
+    }
+}
+
 done-testing;
