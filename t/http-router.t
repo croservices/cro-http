@@ -521,4 +521,63 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my $app = route {
+        get -> 'blob-body' {
+            content 'application/octet-stream', Blob.new(103, 114, 114);
+        }
+
+        get -> 'str-body-no-accept-charset' {
+            content 'text/html', '<strong>Bears!</strong>';
+        }
+
+        get -> 'headers' {
+            header 'Link', '/honey; rel=food';
+            header 'Link: /den; rel=hibernate';
+            content 'application/json', '{ "bear": "grr" }';
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :target</blob-body>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, 200, 'Simple binary content response has 200 status';
+            is $r.header('Content-type'), 'application/octet-stream',
+                'Correct content-type set';
+            is body-text($r), 'grr', 'Got expected body';
+        }
+    }
+
+    {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :target</str-body-no-accept-charset>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, 200, 'Simple text content response has 200 status';
+            is $r.header('Content-type'), 'text/html; charset=utf-8',
+                'Correct content-type set including charset';
+            is body-text($r), '<strong>Bears!</strong>', 'Got expected body';
+        }
+    }
+
+    {
+        my $req = Crow::HTTP::Request.new(:method<GET>, :target</headers>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, 200, 'Simple JSON content response has 200 status';
+            my @link = $r.headers.grep(*.name.lc eq 'link');
+            is @link.elems, 2, 'Got two Link headers';
+            is @link.grep(*.value eq '/honey; rel=food').elems, 1,
+                'Got expected link header value (1)';
+            is @link.grep(*.value eq '/den; rel=hibernate').elems, 1,
+                'Got expected link header value (2)';
+            is $r.header('Content-type'), 'application/json; charset=utf-8',
+                'Correct content-type set including charset';
+            is body-text($r), '{ "bear": "grr" }', 'Got expected body';
+        }
+    }
+}
+
 done-testing;
