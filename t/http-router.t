@@ -536,6 +536,15 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             header 'Link: /den; rel=hibernate';
             content 'application/json', '{ "bear": "grr" }';
         }
+
+        get -> 'reminders', :$task! is query {
+            created '/reminders/1';
+            content 'text/plain', $task;
+        }
+
+        get -> 'shopping-list', :$product! is query {
+            created '/shopping-list/1', 'text/plain', $product;
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -576,6 +585,32 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             is $r.header('Content-type'), 'application/json; charset=utf-8',
                 'Correct content-type set including charset';
             is body-text($r), '{ "bear": "grr" }', 'Got expected body';
+        }
+    }
+
+    {
+        my $req = Crow::HTTP::Request.new(:method<GET>,
+            :target</reminders?task=shave>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, 201, 'created + content response has 201 status';
+            is $r.header('Location'), '/reminders/1', 'Location header is set';
+            is $r.header('Content-type'), 'text/plain; charset=utf-8',
+                'Correct content-type set including charset';
+            is body-text($r), 'shave', 'Got expected body';
+        }
+    }
+
+    {
+        my $req = Crow::HTTP::Request.new(:method<GET>,
+            :target</shopping-list?product=beef>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, 201, 'created response has 201 status';
+            is $r.header('Location'), '/shopping-list/1', 'Location header is set';
+            is $r.header('Content-type'), 'text/plain; charset=utf-8',
+                'Correct content-type set including charset';
+            is body-text($r), 'beef', 'Got expected body';
         }
     }
 }
