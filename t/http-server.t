@@ -1,3 +1,4 @@
+use Crow;
 use Crow::HTTP::Request;
 use Crow::HTTP::Response;
 use Crow::HTTP::Server;
@@ -28,6 +29,7 @@ class TestHttpApp does Crow::Transform {
         port => TEST_PORT,
         application => TestHttpApp
     );
+    ok $service ~~ Crow::Service, 'Service does Crow::Service';
     dies-ok { await IO::Socket::Async.connect('localhost', TEST_PORT) },
         'Server not listening until started';
     lives-ok { $service.start }, 'Can start service';
