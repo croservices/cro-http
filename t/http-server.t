@@ -3,6 +3,7 @@ use Crow::HTTP::Request;
 use Crow::HTTP::Response;
 use Crow::HTTP::Server;
 use Crow::Transform;
+use IO::Socket::Async::SSL;
 use Test;
 
 constant TEST_PORT = 31314;
@@ -60,6 +61,51 @@ class TestHttpApp does Crow::Transform {
     lives-ok { $service.stop }, 'Can stop service';
     dies-ok { await IO::Socket::Async.connect('localhost', TEST_PORT) },
         'Server not listening after stopped';
+}
+
+{
+    constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
+    constant %key-cert := {
+        private-key-file => 't/certs-and-keys/server-key.pem',
+        certificate-file => 't/certs-and-keys/server-crt.pem'
+    };
+
+    my $service = Crow::HTTP::Server.new(
+        port => TEST_PORT,
+        ssl => %key-cert,
+        application => TestHttpApp
+    );
+    ok $service ~~ Crow::Service, 'Service does Crow::Service (HTTPS)';
+    dies-ok { await IO::Socket::Async::SSL.connect('localhost', TEST_PORT, |%ca) },
+        'Server not listening until started (HTTPS)';
+    lives-ok { $service.start }, 'Can start service (HTTPS)';
+
+    my $conn;
+    lives-ok { $conn = await IO::Socket::Async::SSL.connect('localhost', TEST_PORT, |%ca) },
+        'Can connect once service is started (HTTPS)';
+    await $conn.print("GET / HTTP/1.0\r\n\r\n");
+    my $response = '';
+    my $timed-out = False;
+    react {
+        whenever $conn {
+            $response ~= $_;
+            LAST done;
+        }
+        whenever Promise.in(5) {
+            $timed-out = True;
+            done;
+        }
+    }
+    $conn.close;
+    nok $timed-out, 'Got a response from the server (HTTPS)';
+    like $response, /^ HTTP \N+ 200/,
+        'Response has 200 status in it (HTTPS)';
+    like $response, /"<strong>Hello from Crow!</strong>"/,
+        'Response contains expected body (HTTPS)';
+
+    lives-ok { $service.stop }, 'Can stop service (HTTPS)';
+    dies-ok { await IO::Socket::Async::SSL.connect('localhost', TEST_PORT, |%ca) },
+        'Server not listening after stopped (HTTPS)';
 }
 
 done-testing;
