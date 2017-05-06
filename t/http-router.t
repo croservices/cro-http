@@ -4,7 +4,7 @@ use Crow::HTTP::Router;
 use Test;
 
 sub body-text(Crow::HTTP::Response $r) {
-    $r.get-body-stream.list.map(*.decode('utf-8')).join
+    $r.body-stream.list.map(*.decode('utf-8')).join
 }
 
 {
