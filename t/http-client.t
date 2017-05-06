@@ -19,6 +19,15 @@ constant %key-cert := {
         get -> {
             content 'text/plain', 'Home';
         }
+        post -> {
+            content 'text/plain', 'Updated';
+        }
+        put -> {
+            content 'text/plain', 'Saved';
+        }
+        delete -> {
+            content 'text/plain', 'Gone';
+        }
     }
 
     my $http-server = Crow::HTTP::Server.new(
@@ -39,10 +48,33 @@ constant %key-cert := {
 
 {
     my $base = "http://localhost:{HTTP_TEST_PORT}";
+
     given await Crow::HTTP::Client.get("$base/") -> $resp {
-        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from /';
+        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from GET /';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'Home', 'Body text is correct';
+    }
+
+    given await Crow::HTTP::Client.post("$base/") -> $resp {
+        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from POST /';
+        is $resp.status, 200, 'Status is 200';
+        like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'Updated', 'Body text is correct';
+    }
+
+    given await Crow::HTTP::Client.put("$base/") -> $resp {
+        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from PUT /';
+        is $resp.status, 200, 'Status is 200';
+        like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'Saved', 'Body text is correct';
+    }
+
+    given await Crow::HTTP::Client.delete("$base/") -> $resp {
+        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from DELETE /';
+        is $resp.status, 200, 'Status is 200';
+        like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'Gone', 'Body text is correct';
     }
 }
 
