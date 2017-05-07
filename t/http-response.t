@@ -93,11 +93,11 @@ use Test;
 
     throws-like
         { $res.set-body('One body is enough'.encode('utf-8')) },
-        X::Crow::HTTP::Response::AlreadyHasBody,
+        X::Crow::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Blob + Blob case)';
     throws-like
         { $res.set-body(supply { }) },
-        X::Crow::HTTP::Response::AlreadyHasBody,
+        X::Crow::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Blob + Supply case)';
 }
 
@@ -113,11 +113,11 @@ use Test;
 
     throws-like
         { $res.set-body('One body is enough'.encode('utf-8')) },
-        X::Crow::HTTP::Response::AlreadyHasBody,
+        X::Crow::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Supply + Blob case)';
     throws-like
         { $res.set-body(supply { }) },
-        X::Crow::HTTP::Response::AlreadyHasBody,
+        X::Crow::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Supply + Supply case)';
 }
 
