@@ -22,26 +22,33 @@ sub test-response-to-tcp-message($res) {
 sub parses($desc, $test-response, *@checks, *%config) {
     my $testee = Crow::HTTP::ResponseParser.new(|%config);
     my $fake-in = Supplier.new;
-    $testee.transformer($fake-in.Supply).tap:
+    my $test-completed = Promise.new;
+    $testee.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap:
         -> $response {
             pass $desc;
             for @checks.kv -> $i, $check {
                 ok $check($response), "check {$i + 1 }";
             }
-            return;
+            $test-completed.keep(True);
         },
         quit => {
             diag "Response parsing failed: $_";
             flunk $desc;
             skip 'Failed to parse', @checks.elems;
-            return;
+            $test-completed.keep(True);
         };
-    $fake-in.emit(test-response-to-tcp-message($test-response));
+    start {
+        $fake-in.emit(test-response-to-tcp-message($test-response));
+        $fake-in.done();
+    }
 
-    # We only reach here if we fail emit a HTTP message (see `return`s above).
-    diag 'Response parser failed to emit a HTTP response';
-    flunk $desc;
-    skip 'Did not get response', @checks.elems;
+    await Promise.anyof($test-completed, Promise.in(10));
+    unless $test-completed {
+        # We only reach here if we fail emit a HTTP message (see `return`s above).
+        diag 'Response parser failed to emit a HTTP response';
+        flunk $desc;
+        skip 'Did not get response', @checks.elems;
+    }
 }
 
 sub refuses($desc, $test-response, *%config) {
@@ -234,7 +241,8 @@ parses 'Single header with whitespace in value', q:to/RESPONSE/,
     *.headers[0].name eq 'Date',
     *.headers[0].value eq 'Mon, 27 Jul 2009 12:28:53 GMT';
 
-parses 'Response with multiple headers (example from RFC)', q:to/RESPONSE/,
+parses 'Response with multiple headers and content-length body (example from RFC)',
+    q:to/RESPONSE/,
     HTTP/1.1 200 OK
     Date: Mon, 27 Jul 2009 12:28:53 GMT
     Server: Apache
@@ -245,6 +253,7 @@ parses 'Response with multiple headers (example from RFC)', q:to/RESPONSE/,
     Vary: Accept-Encoding
     Content-Type: text/plain
 
+    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
     RESPONSE
     *.http-version eq '1.1',
     *.status == 200,
@@ -264,6 +273,37 @@ parses 'Response with multiple headers (example from RFC)', q:to/RESPONSE/,
     *.headers[6].name eq 'Vary',
     *.headers[6].value eq 'Accept-Encoding',
     *.headers[7].name eq 'Content-Type',
-    *.headers[7].value eq 'text/plain';
+    *.headers[7].value eq 'text/plain',
+    *.body-text.result eq "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\n";
+
+parses 'Response with body terminated by close of connection',
+    q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+
+    This is a poem,
+    And it's length? Heck knows!
+    It will ramble on,
+    'til connection close.
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 0,
+    *.body-text.result eq "This is a poem,\nAnd it's length? Heck knows!\n" ~
+                          "It will ramble on,\n'til connection close.\n";
+
+parses 'Connection close with incomplete body throws',
+    q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-length: 1000
+
+    Far too short
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 1,
+    {
+        try await .body-text;
+        $!.isa(X::Crow::HTTP::RawBodyParser::ContentLength::TooShort)
+    }
 
 done-testing;
