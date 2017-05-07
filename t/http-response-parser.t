@@ -13,7 +13,7 @@ ok Crow::HTTP::ResponseParser.produces === Crow::HTTP::Response,
 sub test-response-to-tcp-message($res) {
     # We replace \n with \r\n in the response headers here, so the tests can
     # look pretty.
-    my ($headers, $body) = $res.split(/\n\n/);
+    my ($headers, $body) = $res.split(/\n\n/, 2);
     $headers .= subst("\n", "\r\n", :g);
     my $data = "$headers\r\n\r\n$body".encode('latin-1');
     return Crow::TCP::Message.new(:$data);
@@ -305,5 +305,20 @@ parses 'Connection close with incomplete body throws',
         try await .body-text;
         $!.isa(X::Crow::HTTP::RawBodyParser::ContentLength::TooShort)
     }
+
+parses 'Response with chunked encoding', q:b:to/RESPONSE/.chop,
+    HTTP/1.1 200 OK
+    Content-type: text/plain
+    Transfer-encoding: chunked
+
+    13\r\nThe first response
+    \r\n20\r\nThe second
+    with a newline in it
+    \r\n0\r\n\r\n
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 2,
+    *.body-text.result eq "The first response\nThe second\nwith a newline in it\n";
 
 done-testing;
