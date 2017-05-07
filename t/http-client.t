@@ -76,6 +76,11 @@ constant %key-cert := {
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Gone', 'Body text is correct';
     }
+
+    given await Crow::HTTP::Client.get("$base/") -> $resp {
+        is await($resp.body-blob).list, 'Home'.encode('ascii').list,
+            'Can also get body back as a blob';
+    }
 }
 
 done-testing;
