@@ -44,7 +44,7 @@ sub parses($desc, $test-response, *@checks, *%config) {
 
     await Promise.anyof($test-completed, Promise.in(10));
     unless $test-completed {
-        # We only reach here if we fail emit a HTTP message (see `return`s above).
+        # We only reach here if we fail emit a HTTP message.
         diag 'Response parser failed to emit a HTTP response';
         flunk $desc;
         skip 'Did not get response', @checks.elems;
@@ -320,5 +320,29 @@ parses 'Response with chunked encoding', q:b:to/RESPONSE/.chop,
     *.status == 200,
     *.headers == 2,
     *.body-text.result eq "The first response\nThe second\nwith a newline in it\n";
+
+parses 'A text/whatever response has Str .body', q:b:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: text/plain
+    Content-Length: 51
+
+    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
+    RESPONSE
+    {
+        my $body = .body.result;
+        $body ~~ Str && $body eq "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\n"
+    };
+
+parses 'A unknown/foo response has Blob .body', q:b:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: unknown/foo
+    Content-Length: 11
+
+    abcdefghij
+    RESPONSE
+    {
+        my $body = .body.result;
+        $body ~~ Blob && $body.decode('ascii') eq "abcdefghij\n"
+    };
 
 done-testing;
