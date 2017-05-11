@@ -13,7 +13,7 @@ ok Crow::HTTP::RequestParser.produces === Crow::HTTP::Request,
 sub test-request-to-tcp-message($req) {
     # We replace \n with \r\n in the request headers here, so the tests can
     # look pretty.
-    my ($headers, $body) = $req.split(/<!before ^>\n\n/);
+    my ($headers, $body) = $req.split(/\n\n/, 2);
     $headers .= subst("\n", "\r\n", :g);
     my $data = "$headers\r\n\r\n$body".encode('latin-1');
     return Crow::TCP::Message.new(:$data);
@@ -22,26 +22,33 @@ sub test-request-to-tcp-message($req) {
 sub parses($desc, $test-request, *@checks, *%config) {
     my $testee = Crow::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
-    $testee.transformer($fake-in.Supply).tap:
+    my $test-completed = Promise.new;
+    $testee.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap:
         -> $request {
             pass $desc;
             for @checks.kv -> $i, $check {
                 ok $check($request), "check {$i + 1 }";
             }
-            return;
+            $test-completed.keep(True);
         },
         quit => {
             diag "Request parsing failed: $_";
             flunk $desc;
             skip 'Failed to parse', @checks.elems;
-            return;
+            $test-completed.keep(True);
         };
-    $fake-in.emit(test-request-to-tcp-message($test-request));
+    start {
+        $fake-in.emit(test-request-to-tcp-message($test-request));
+        $fake-in.done();
+    }
 
-    # We only reach here if we fail emit a HTTP message (see `return`s above).
-    diag 'Request parser failed to emit a HTTP request';
-    flunk $desc;
-    skip 'Did not get request', @checks.elems;
+    await Promise.anyof($test-completed, Promise.in(10));
+    unless $test-completed {
+        # We only reach here if we fail emit a HTTP message.
+        diag 'Request parser failed to emit a HTTP request';
+        flunk $desc;
+        skip 'Did not get request', @checks.elems;
+    }
 }
 
 sub refuses($desc, $test-request, *@checks, *%config) {
@@ -449,6 +456,34 @@ parses 'Query strings with multiple values for the same key',
     *.query-value('y') eqv Crow::HTTP::MultiValue.new('bar', 'baz'),
     *.query-value('y').Str eqv 'bar,baz',
     *.query-value('z') eqv 'one';
+
+
+parses 'Request with body, length specified by content-length',
+    q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-Type: text/plain
+    Content-Length: 51
+
+    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
+    REQUEST
+    *.method eq 'POST',
+    *.target eq '/bar',
+    *.body-text.result eq "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\n";
+
+parses 'Request with body, sent with chunked encoding',
+    q:b:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-Type: text/plain
+    Transfer-encoding: chunked
+
+    13\r\nThe first response
+    \r\n20\r\nThe second
+    with a newline in it
+    \r\n0\r\n\r\n
+    REQUEST
+    *.method eq 'POST',
+    *.target eq '/bar',
+    *.body-text.result eq "The first response\nThe second\nwith a newline in it\n";
 
 # XXX Test these security checks (allow configuration of them):
 #
