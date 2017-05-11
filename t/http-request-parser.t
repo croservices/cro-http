@@ -485,6 +485,32 @@ parses 'Request with body, sent with chunked encoding',
     *.target eq '/bar',
     *.body-text.result eq "The first response\nThe second\nwith a newline in it\n";
 
+parses 'A text/whatever request has Str .body',
+    q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-Type: text/whatever
+    Content-Length: 51
+
+    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
+    REQUEST
+    {
+        my $body = .body.result;
+        $body ~~ Str && $body eq "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\n"
+    };
+
+parses 'A unknown/foo request has Blob .body',
+    q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-type: unknown/foo
+    Content-Length: 11
+
+    abcdefghij
+    REQUEST
+    {
+        my $body = .body.result;
+        $body ~~ Blob && $body.decode('ascii') eq "abcdefghij\n"
+    };
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
