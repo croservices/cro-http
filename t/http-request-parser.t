@@ -19,7 +19,7 @@ sub test-request-to-tcp-message($req) {
     return Crow::TCP::Message.new(:$data);
 }
 
-sub parses($desc, $test-request, *@checks, *%config) {
+sub parses($desc, $test-request, *@checks, :$tests, *%config) {
     my $testee = Crow::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
     my $test-completed = Promise.new;
@@ -29,6 +29,7 @@ sub parses($desc, $test-request, *@checks, *%config) {
             for @checks.kv -> $i, $check {
                 ok $check($request), "check {$i + 1 }";
             }
+            .($request) with $tests;
             $test-completed.keep(True);
         },
         quit => {
@@ -485,7 +486,7 @@ parses 'Request with body, sent with chunked encoding',
     *.target eq '/bar',
     *.body-text.result eq "The first response\nThe second\nwith a newline in it\n";
 
-parses 'A text/whatever request has Str .body',
+parses 'A text/whatever request with body',
     q:to/REQUEST/,
     POST /bar HTTP/1.1
     Content-Type: text/whatever
@@ -493,12 +494,14 @@ parses 'A text/whatever request has Str .body',
 
     abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
     REQUEST
-    {
+    tests => {
         my $body = .body.result;
-        $body ~~ Str && $body eq "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\n"
+        isa-ok $body, Str, 'text/whatever gives string body';
+        is $body, "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\n",
+            'Body contains the correct value';
     };
 
-parses 'A unknown/foo request has Blob .body',
+parses 'A unknown/foo request with body',
     q:to/REQUEST/,
     POST /bar HTTP/1.1
     Content-type: unknown/foo
@@ -506,9 +509,34 @@ parses 'A unknown/foo request has Blob .body',
 
     abcdefghij
     REQUEST
-    {
+    tests => {
         my $body = .body.result;
-        $body ~~ Blob && $body.decode('ascii') eq "abcdefghij\n"
+        ok $body ~~ Blob, 'unknown/foo .body gives Blob';
+        is $body.decode('ascii'), "abcdefghij\n", 'Blob has correct content';
+    };
+
+parses 'Basic case of application/x-www-form-urlencoded',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded
+    Content-length: 33
+
+    rooms=2&balcony=true&area=Praha+3
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        is-deeply $body.pairs.list, (rooms => '2', balcony => 'true', area => 'Praha 3'),
+            '.pairs returns ordered pairs from the decoded body';
+        is-deeply $body.list, (rooms => '2', balcony => 'true', area => 'Praha 3'),
+            '.list returns ordered pairs from the decoded body';
+        is-deeply $body.hash, {rooms => '2', balcony => 'true', area => 'Praha 3'},
+            '.hash returns hash of the decoded body';
+        is $body<rooms>, '2', 'Can index associatively (1)';
+        is $body<balcony>, 'true', 'Can index associatively (2)';
+        is $body<area>, 'Praha 3', 'Can index associatively (3)';
+        is $body<rooms>:exists, True, 'Can index associatively with :exists (1)';
+        is $body<balcony>:exists, True, 'Can index associatively with :exists (2)';
+        is $body<area>:exists, True, 'Can index associatively with :exists (3)';
     };
 
 # XXX Test these security checks (allow configuration of them):
