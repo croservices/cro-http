@@ -15,7 +15,7 @@ sub test-response-to-tcp-message($res) {
     # look pretty.
     my ($headers, $body) = $res.split(/\n\n/, 2);
     $headers .= subst("\n", "\r\n", :g);
-    my $data = "$headers\r\n\r\n$body".encode('latin-1');
+    my $data = "$headers\r\n\r\n".encode('latin-1') ~ $body.encode('utf-8');
     return Crow::TCP::Message.new(:$data);
 }
 
@@ -344,5 +344,17 @@ parses 'A unknown/foo response has Blob .body', q:b:to/RESPONSE/,
         my $body = .body.result;
         $body ~~ Blob && $body.decode('ascii') eq "abcdefghij\n"
     };
+
+parses 'charset in content-type is respected by body-text', q:to/RESPONSE/.chop,
+    HTTP/1.1 200 OK
+    Content-type: text/plain; charset=windows-1252
+    Content-length: 9
+
+    文字化
+    RESPONSE
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 2,
+    *.body-text.result eq "æ–‡å­—åŒ–";
 
 done-testing;
