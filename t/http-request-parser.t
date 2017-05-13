@@ -622,6 +622,43 @@ parses 'Can pick default encoding for application/x-www-form-urlencoded',
             '%-encoded values handled correctly when default set to latin-1';
     };
 
+parses 'Respects encoding set by _charset_ in application/x-www-form-urlencoded',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded
+    Content-length: 35
+
+    x=%C0%C1&%D5%D6=1&_charset_=latin-1
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        is-deeply $body.list, (x => "ÀÁ", "ÕÖ" => '1', '_charset_' => 'latin-1'),
+            '%-encoded values decoded as latin-1 as set in _charset_';
+    };
+
+parses 'A _charset_ in application/x-www-form-urlencoded overrides configured default',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded
+    Content-length: 46
+
+    x=%C3%80b&%E3%82%A2%E3%82%A2=1&_charset_=utf-8
+    REQUEST
+    tests => {
+        .body-parser-selector = Crow::HTTP::BodyParserSelector::List.new(:parsers[
+            Crow::HTTP::BodyParser::WWWFormUrlEncoded.new(
+                default-encoding => 'latin-1'
+            )
+        ]);
+        my $body = .body.result;
+        is-deeply $body.list, (
+                x => "\c[LATIN CAPITAL LETTER A WITH GRAVE]b",
+                "\c[KATAKANA LETTER A]\c[KATAKANA LETTER A]" => '1',
+                '_charset_' => 'utf-8'
+            ),
+            'Values were decoded as utf-8, not latin-1 default, due to _charset_';
+    };
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
