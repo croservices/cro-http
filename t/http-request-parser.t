@@ -539,6 +539,37 @@ parses 'Basic case of application/x-www-form-urlencoded',
         is $body<area>:exists, True, 'Can index associatively with :exists (3)';
     };
 
+parses 'Multiple entries with same name in application/x-www-form-urlencoded',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded
+    Content-length: 23
+
+    a=1&b=2&a=3&a=4&b=5&c=6
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        is-deeply $body.pairs.list, (a => '1', b => '2', a => '3', a => '4', b => '5', c => '6'),
+            '.pairs returns ordered pairs, with multiple values in place';
+        is-deeply $body.list, (a => '1', b => '2', a => '3', a => '4', b => '5', c => '6'),
+            '.list returns ordered pairs, with muliplte values in place';
+
+        my %hash = $body.hash;
+        is %hash.elems, 3, '.hash gives back Hash with 3 elements';
+        isa-ok %hash<a>, Crow::HTTP::MultiValue, 'Get back a HTTP multi-value (1)';
+        isa-ok %hash<b>, Crow::HTTP::MultiValue, 'Get back a HTTP multi-value (2)';
+        is %hash<a>, '1,3,4', 'Stringifying multi-value is correct (1)';
+        is %hash<b>, '2,5', 'Stringifying multi-value is correct (2)';
+        is-deeply %hash<a>[*], ('1', '3', '4'), 'Indexing multi-value is correct (1)';
+        is-deeply %hash<b>[*], ('2', '5'), 'Indexing multi-value is correct (2)';
+        isa-ok %hash<c>, Str, 'When only one value with the name, get back a Str';
+        is %hash<c>, '6', 'Value is correct';
+
+        isa-ok $body<a>, Crow::HTTP::MultiValue, 'Hash-indexing body gives HTTP multi-value (1)';
+        isa-ok $body<b>, Crow::HTTP::MultiValue, 'Hash-indexing body gives HTTP multi-value (2)';
+        isa-ok $body<c>, Str, 'Except when only one value for the name, then it is Str';
+    };
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
