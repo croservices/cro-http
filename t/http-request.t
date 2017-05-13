@@ -1,4 +1,5 @@
 use Crow::HTTP::Request;
+use Crow::MediaType;
 use Test;
 
 {
@@ -150,6 +151,20 @@ use Test;
     is $req.remove-header($req.headers.tail), 1,
         'Removing an exact header returns 1';
     is $req.header('Accept-Language'), 'en', 'Headers really removed';
+}
+
+{
+    my $req = Crow::HTTP::Request.new(method => 'GET', target => '/');
+    $req.append-header('Content-type', 'text/html; charset=UTF-8');
+    ok $req.content-type ~~ Crow::MediaType,
+        'content-type method returns a Crow::MediaType when there is a content-type header';
+    is $req.content-type.type, 'text', 'Correct type';
+    is $req.content-type.subtype, 'html', 'Correct subtype';
+    is-deeply $req.content-type.parameters.List, ('charset' => 'UTF-8',),
+        'Correct parameters list';
+
+    my $req2 = Crow::HTTP::Request.new(method => 'GET', target => '/');
+    is $req2.content-type, Nil, 'content-type returns Nil when no header';
 }
 
 done-testing;
