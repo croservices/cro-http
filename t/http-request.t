@@ -126,6 +126,14 @@ use Test;
     is $req.header('Accept-Language'), 'en,mi',
         'when there are multiple headers with the name, the value comma-joins them';
     is $req.header('Content-type'), Nil, 'header we do not have returns Nil';
+    is-deeply $req.header-list('Host'), ('www.moarvm.org',),
+        'header-list method returns a List of one header for Host';
+    is-deeply $req.header-list('HOST'), ('www.moarvm.org',),
+        'header-list method works case-insensitively';
+    is-deeply $req.header-list('Accept-language'), ('en', 'mi'),
+        'header-list method returns a list of values when there are multiple headers';
+    is-deeply $req.header-list('Content-type'), (),
+        'header-list methods returns an empty list when no header of the requested name';
 }
 
 done-testing;
