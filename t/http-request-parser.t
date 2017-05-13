@@ -584,6 +584,23 @@ parses 'Basic %-encoded things in an application/x-www-form-urlencoded',
             '%-encoded values in ASCII range handled correctly';
     };
 
+parses '%-encoded non-ASCII is utf-8 by default in  application/x-www-form-urlencoded',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded
+    Content-length: 30
+
+    x=%C3%80b&%E3%82%A2%E3%82%A2=1
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        is-deeply $body.list, (
+                x => "\c[LATIN CAPITAL LETTER A WITH GRAVE]b",
+                "\c[KATAKANA LETTER A]\c[KATAKANA LETTER A]" => '1'
+            ),
+            '%-encoded values default to UTF-8 decoding';
+    };
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
