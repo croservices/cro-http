@@ -1,3 +1,5 @@
+use Crow::HTTP::BodyParser;
+use Crow::HTTP::BodyParserSelector;
 use Crow::HTTP::RequestParser;
 use Crow::HTTP::Request;
 use Crow::TCP;
@@ -599,6 +601,25 @@ parses '%-encoded non-ASCII is utf-8 by default in  application/x-www-form-urlen
                 "\c[KATAKANA LETTER A]\c[KATAKANA LETTER A]" => '1'
             ),
             '%-encoded values default to UTF-8 decoding';
+    };
+
+parses 'Can pick default encoding for application/x-www-form-urlencoded',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded
+    Content-length: 17
+
+    x=%C0%C1&%D5%D6=1
+    REQUEST
+    tests => {
+        .body-parser-selector = Crow::HTTP::BodyParserSelector::List.new(:parsers[
+            Crow::HTTP::BodyParser::WWWFormUrlEncoded.new(
+                default-encoding => 'latin-1'
+            )
+        ]);
+        my $body = .body.result;
+        is-deeply $body.list, (x => "ÀÁ", "ÕÖ" => '1'),
+            '%-encoded values handled correctly when default set to latin-1';
     };
 
 # XXX Test these security checks (allow configuration of them):
