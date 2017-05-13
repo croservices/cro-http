@@ -134,6 +134,22 @@ use Test;
         'header-list method returns a list of values when there are multiple headers';
     is-deeply $req.header-list('Content-type'), (),
         'header-list methods returns an empty list when no header of the requested name';
+
+    is $req.remove-header('Host'), 1, 'Removing single Host header returns 1';
+    is $req.header('Host'), Nil, 'Host header was really removed';
+    is $req.remove-header('accept-language'), 2,
+        'Removing 2 accept-language headers returns 2';
+    is $req.header('Accept-Language'), Nil, 'Headers really removed';
+
+    $req.append-header('Host', 'www.moarvm.org');
+    $req.append-header('Accept-Language', 'en');
+    $req.append-header('Accept-Language', 'mi');
+    is $req.remove-header(*.name.uc eq 'HOST'), 1,
+        'Removing single header matched by predicate works';
+    is $req.header('Host'), Nil, 'Header identified by predicate was really removed';
+    is $req.remove-header($req.headers.tail), 1,
+        'Removing an exact header returns 1';
+    is $req.header('Accept-Language'), 'en', 'Headers really removed';
 }
 
 done-testing;
