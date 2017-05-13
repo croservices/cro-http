@@ -570,6 +570,20 @@ parses 'Multiple entries with same name in application/x-www-form-urlencoded',
         isa-ok $body<c>, Str, 'Except when only one value for the name, then it is Str';
     };
 
+parses 'Basic %-encoded things in an application/x-www-form-urlencoded',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded
+    Content-length: 43
+
+    x=A%2BC&y=100%25AA%21&A%2BC=1&100%25AA%21=2
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        is-deeply $body.list, (x => 'A+C', y => '100%AA!', 'A+C' => '1', '100%AA!' => '2'),
+            '%-encoded values in ASCII range handled correctly';
+    };
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a
