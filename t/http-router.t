@@ -808,4 +808,21 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 }
 
+{
+    my $app = route {
+        get -> 'use-request' {
+            content 'text/plain', request.header('X-Testing');
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    my $req = Crow::HTTP::Request.new(:method<GET>, :target</use-request>);
+    $req.append-header('X-Testing', 'Yes it works');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is body-text($r), 'Yes it works', 'Can use request inside of a handler';
+    }
+}
+
 done-testing;
