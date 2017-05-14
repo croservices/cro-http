@@ -394,4 +394,16 @@ parses 'A UTF-16 BE BOM is respected and stripped', q:to/RESPONSE/,
     *.headers == 2,
     *.body-text.result eq "文";
 
+parses 'With not other indications, and it utf-8 fails, decode as latin-1', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: text/plain
+    Content-length: 4
+
+    RESPONSE
+    body-blob => Blob.new(0xD0, 0xD1, 0xD2, 0xD3),
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 2,
+    *.body-text.result eq "ÐÑÒÓ";
+
 done-testing;
