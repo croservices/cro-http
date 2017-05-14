@@ -10,16 +10,17 @@ ok Crow::HTTP::ResponseParser.consumes === Crow::TCP::Message,
 ok Crow::HTTP::ResponseParser.produces === Crow::HTTP::Response,
     'HTTP respose parser produces HTTP responses';
 
-sub test-response-to-tcp-message($res) {
+sub test-response-to-tcp-message($res, :$body-blob) {
     # We replace \n with \r\n in the response headers here, so the tests can
     # look pretty.
     my ($headers, $body) = $res.split(/\n\n/, 2);
     $headers .= subst("\n", "\r\n", :g);
     my $data = "$headers\r\n\r\n".encode('latin-1') ~ $body.encode('utf-8');
+    $data ~= $body-blob if $body-blob;
     return Crow::TCP::Message.new(:$data);
 }
 
-sub parses($desc, $test-response, *@checks, *%config) {
+sub parses($desc, $test-response, :$body-blob, *@checks, *%config) {
     my $testee = Crow::HTTP::ResponseParser.new(|%config);
     my $fake-in = Supplier.new;
     my $test-completed = Promise.new;
@@ -38,7 +39,7 @@ sub parses($desc, $test-response, *@checks, *%config) {
             $test-completed.keep(True);
         };
     start {
-        $fake-in.emit(test-response-to-tcp-message($test-response));
+        $fake-in.emit(test-response-to-tcp-message($test-response, :$body-blob));
         $fake-in.done();
     }
 
@@ -356,5 +357,41 @@ parses 'charset in content-type is respected by body-text', q:to/RESPONSE/.chop,
     *.status == 200,
     *.headers == 2,
     *.body-text.result eq "æ–‡å­—åŒ–";
+
+parses 'A UTF-8 BOM is respected and stripped', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: text/plain
+    Content-length: 6
+
+    RESPONSE
+    body-blob => Blob.new(0xEF, 0xBB, 0xBF, 0xE6, 0x96, 0x87),
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 2,
+    *.body-text.result eq "文";
+
+parses 'A UTF-16 LE BOM is respected and stripped', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: text/plain
+    Content-length: 4
+
+    RESPONSE
+    body-blob => Blob.new(0xFF, 0xFE, 0x87, 0x65),
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 2,
+    *.body-text.result eq "文";
+
+parses 'A UTF-16 BE BOM is respected and stripped', q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: text/plain
+    Content-length: 4
+
+    RESPONSE
+    body-blob => Blob.new(0xFE, 0xFF, 0x65, 0x87),
+    *.http-version eq '1.1',
+    *.status == 200,
+    *.headers == 2,
+    *.body-text.result eq "文";
 
 done-testing;
