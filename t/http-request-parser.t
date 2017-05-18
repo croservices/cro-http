@@ -12,16 +12,17 @@ ok Crow::HTTP::RequestParser.consumes === Crow::TCP::Message,
 ok Crow::HTTP::RequestParser.produces === Crow::HTTP::Request,
     'HTTP request parser produces HTTP requests';
 
-sub test-request-to-tcp-message($req) {
+sub test-request-to-tcp-message($req, :$body-crlf) {
     # We replace \n with \r\n in the request headers here, so the tests can
     # look pretty.
     my ($headers, $body) = $req.split(/\n\n/, 2);
     $headers .= subst("\n", "\r\n", :g);
+    $body .= subst("\n", "\r\n", :g) if $body-crlf;
     my $data = "$headers\r\n\r\n$body".encode('latin-1');
     return Crow::TCP::Message.new(:$data);
 }
 
-sub parses($desc, $test-request, *@checks, :$tests, *%config) {
+sub parses($desc, $test-request, *@checks, :$tests, :$body-crlf, *%config) {
     my $testee = Crow::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
     my $test-completed = Promise.new;
@@ -41,7 +42,7 @@ sub parses($desc, $test-request, *@checks, :$tests, *%config) {
             $test-completed.keep(True);
         };
     start {
-        $fake-in.emit(test-request-to-tcp-message($test-request));
+        $fake-in.emit(test-request-to-tcp-message($test-request, :$body-crlf));
         $fake-in.done();
     }
 
@@ -658,6 +659,33 @@ parses 'A _charset_ in application/x-www-form-urlencoded overrides configured de
             ),
             'Values were decoded as utf-8, not latin-1 default, due to _charset_';
     };
+
+parses 'Simple multipart/form-data',
+    q:to/REQUEST/, :body-crlf,
+    POST /bar HTTP/1.1
+    Content-type: multipart/form-data; boundary="---------------------------20445073621891389863245745954"
+    Content-length: 307
+
+    -----------------------------20445073621891389863245745954
+    Content-Disposition: form-data; name="a"
+
+    3555555555555555551
+    -----------------------------20445073621891389863245745954
+    Content-Disposition: form-data; name="b"
+
+    53399393939222
+    -----------------------------20445073621891389863245745954--
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        my @parts = $body.parts;
+        is @parts[0].headers.elems, 1, 'First part has 1 header';
+        is @parts[0].headers[0].name, 'Content-Disposition', 'First part header name correct';
+        is @parts[0].headers[0].value, 'form-data; name="a"', 'First part header value correct';
+        is @parts[1].headers.elems, 1, 'Second part has 1 header';
+        is @parts[1].headers[0].name, 'Content-Disposition', 'Second part header name correct';
+        is @parts[1].headers[0].value, 'form-data; name="b"', 'Second part header value correct';
+    }
 
 # XXX Test these security checks (allow configuration of them):
 #
