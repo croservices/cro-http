@@ -682,9 +682,11 @@ parses 'Simple multipart/form-data',
         is @parts[0].headers.elems, 1, 'First part has 1 header';
         is @parts[0].headers[0].name, 'Content-Disposition', 'First part header name correct';
         is @parts[0].headers[0].value, 'form-data; name="a"', 'First part header value correct';
+        is @parts[0].field-name, 'a', 'First part has correct field name';
         is @parts[1].headers.elems, 1, 'Second part has 1 header';
         is @parts[1].headers[0].name, 'Content-Disposition', 'Second part header name correct';
         is @parts[1].headers[0].value, 'form-data; name="b"', 'Second part header value correct';
+        is @parts[1].field-name, 'b', 'Second part has correct field name';
     }
 
 # XXX Test these security checks (allow configuration of them):
