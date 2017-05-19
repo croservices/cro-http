@@ -1,20 +1,20 @@
-use Crow::HTTP::Response;
+use Cro::HTTP::Response;
 use Test;
 
 {
-    my $res = Crow::HTTP::Response.new;
+    my $res = Cro::HTTP::Response.new;
     is $res.Str, "HTTP/1.1 204 No Content\r\n\r\n",
         "Unconfigured HTTP response is HTTP/1.1 and 204 status";
 
-    $res = Crow::HTTP::Response.new(status => 404);
+    $res = Cro::HTTP::Response.new(status => 404);
     is $res.Str, "HTTP/1.1 404 Not Found\r\n\r\n",
         "Setting status in constructor includes it in the response";
 
-    $res = Crow::HTTP::Response.new(status => 500, http-version => '1.0');
+    $res = Cro::HTTP::Response.new(status => 500, http-version => '1.0');
     is $res.Str, "HTTP/1.0 500 Internal Server Error\r\n\r\n",
         "Setting status and version in constructor includes it in the response";
 
-    $res = Crow::HTTP::Response.new;
+    $res = Cro::HTTP::Response.new;
     $res.status = 400;
     $res.http-version = '1.0';
     is $res.Str, "HTTP/1.0 400 Bad Request\r\n\r\n",
@@ -22,7 +22,7 @@ use Test;
 }
 
 {
-    my $res = Crow::HTTP::Response.new;
+    my $res = Cro::HTTP::Response.new;
     dies-ok { $res.status = 10 }, 'Status of 10 is invalid';
     dies-ok { $res.status = 99 }, 'Status of 99 is invalid';
     dies-ok { $res.status = 1000 }, 'Status of 1000 is invalid';
@@ -30,7 +30,7 @@ use Test;
 }
 
 {
-    my $res = Crow::HTTP::Response.new(status => 200);
+    my $res = Cro::HTTP::Response.new(status => 200);
     $res.append-header('Content-type: text/html');
     $res.append-header('Connection', 'close');
     is $res.Str,
@@ -65,13 +65,13 @@ use Test;
             "Refuses to add response header with illegal name containing $nope (two-arg)";
     }
 
-    $res = Crow::HTTP::Response.new;
+    $res = Cro::HTTP::Response.new;
     $res.append-header('!#42$%omg&\'*+-.wtf^_`~|ReAlLy!!!: oh!"foo\'<>%^&*()[]424242aaáâãäåæµ¥');
     is $res.Str,
         "HTTP/1.1 204 No Content\r\n!#42\$\%omg&'*+-.wtf^_`~|ReAlLy!!!: oh!\"foo'<>%^&*()[]424242aaáâãäåæµ¥\r\n\r\n",
         'Utterly crazy but valid header can be added (single-arg)';
 
-    $res = Crow::HTTP::Response.new;
+    $res = Cro::HTTP::Response.new;
     $res.append-header('!#42$%omg&\'*+-.wtf^_`~|ReAlLy!!!', 'oh!"foo\'<>%^&*()[]424242aaáâãäåæµ¥');
     is $res.Str,
         "HTTP/1.1 204 No Content\r\n!#42\$\%omg&'*+-.wtf^_`~|ReAlLy!!!: oh!\"foo'<>%^&*()[]424242aaáâãäåæµ¥\r\n\r\n",
@@ -79,7 +79,7 @@ use Test;
 }
 
 {
-    my $res = Crow::HTTP::Response.new();
+    my $res = Cro::HTTP::Response.new();
     nok $res.has-streaming-body,
         'Fresh response object does not have a streaming body';
 
@@ -93,16 +93,16 @@ use Test;
 
     throws-like
         { $res.set-body('One body is enough'.encode('utf-8')) },
-        X::Crow::HTTP::Message::AlreadyHasBody,
+        X::Cro::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Blob + Blob case)';
     throws-like
         { $res.set-body(supply { }) },
-        X::Crow::HTTP::Message::AlreadyHasBody,
+        X::Cro::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Blob + Supply case)';
 }
 
 {
-    my $res = Crow::HTTP::Response.new();
+    my $res = Cro::HTTP::Response.new();
     lives-ok
         { $res.set-body(supply { emit 'Body'.encode('utf-8') }) },
         'Can set body as a Supply';
@@ -113,11 +113,11 @@ use Test;
 
     throws-like
         { $res.set-body('One body is enough'.encode('utf-8')) },
-        X::Crow::HTTP::Message::AlreadyHasBody,
+        X::Cro::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Supply + Blob case)';
     throws-like
         { $res.set-body(supply { }) },
-        X::Crow::HTTP::Message::AlreadyHasBody,
+        X::Cro::HTTP::Message::AlreadyHasBody,
         'Can only set body once (Supply + Supply case)';
 }
 

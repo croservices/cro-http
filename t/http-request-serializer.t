@@ -1,10 +1,10 @@
 use Test;
-use Crow::HTTP::Request;
-use Crow::HTTP::RequestSerializer;
-use Crow::TCP;
+use Cro::HTTP::Request;
+use Cro::HTTP::RequestSerializer;
+use Cro::TCP;
 
 sub is-request(Supply $source, Str $expected-output, $desc) {
-    my $rs = Crow::HTTP::RequestSerializer.new();
+    my $rs = Cro::HTTP::RequestSerializer.new();
     my $joined-output = Blob.new;
     $rs.transformer($source).tap: -> $tcp-message {
         $joined-output ~= $tcp-message.data;
@@ -17,7 +17,7 @@ sub is-request(Supply $source, Str $expected-output, $desc) {
 
 is-request
     supply {
-        emit Crow::HTTP::Request.new(:method<GET>, :target</>);
+        emit Cro::HTTP::Request.new(:method<GET>, :target</>);
     },
     q:to/REQUEST/, 'Basic request with no Host header uses HTTP/1.0';
         GET / HTTP/1.0
@@ -26,7 +26,7 @@ is-request
 
 is-request
     supply {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :target</>);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</>);
         $req.append-header('Host', 'www.perl6.org');
         emit $req;
     },

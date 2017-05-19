@@ -1,10 +1,10 @@
 use Test;
-use Crow::HTTP::Response;
-use Crow::HTTP::ResponseSerializer;
-use Crow::TCP;
+use Cro::HTTP::Response;
+use Cro::HTTP::ResponseSerializer;
+use Cro::TCP;
 
 sub is-response(Supply $source, Str $expected-output, $desc) {
-    my $rs = Crow::HTTP::ResponseSerializer.new();
+    my $rs = Cro::HTTP::ResponseSerializer.new();
     my $joined-output = Blob.new;
     $rs.transformer($source).tap: -> $tcp-message {
         $joined-output ~= $tcp-message.data;
@@ -17,7 +17,7 @@ sub is-response(Supply $source, Str $expected-output, $desc) {
 
 is-response
     supply {
-        emit Crow::HTTP::Response.new(:204status);
+        emit Cro::HTTP::Response.new(:204status);
     },
     q:to/RESPONSE/, 'Basic 204 status response serialized correctly';
         HTTP/1.1 204 No Content
@@ -26,7 +26,7 @@ is-response
 
 is-response
     supply {
-        given Crow::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status) {
             .append-header('Content-type', 'text/plain');
             .set-body("Wow it's like, plain text!\n".encode('utf-8'));
             .emit;
@@ -42,7 +42,7 @@ is-response
 
 is-response
     supply {
-        given Crow::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status) {
             my $body-stream = supply {
                 emit "The first response\n".encode('utf-8');
                 emit "The second\nwith a newline in it\n".encode('utf-8');
@@ -65,7 +65,7 @@ is-response
 
 is-response
     supply {
-        given Crow::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status) {
             my $body-stream = supply {
                 emit "Not confused ".encode('utf-8');
                 emit Blob.new;

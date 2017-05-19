@@ -1,27 +1,27 @@
-use Crow;
-use Crow::HTTP::Request;
-use Crow::HTTP::Router;
+use Cro;
+use Cro::HTTP::Request;
+use Cro::HTTP::Router;
 use Test;
 
-sub body-text(Crow::HTTP::Response $r) {
+sub body-text(Cro::HTTP::Response $r) {
     $r.body-stream.list.map(*.decode('utf-8')).join
 }
 
 {
     my $app = route -> { }
-    ok $app ~~ Crow::Transform, 'Route block with no routes gives back a Crow::Transform';
+    ok $app ~~ Cro::Transform, 'Route block with no routes gives back a Cro::Transform';
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
-    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</>));
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Empty route set gives a response';
+        ok $r ~~ Cro::HTTP::Response, 'Empty route set gives a response';
         is $r.status, '404', 'Status code from empty route set is 404';
     }
 }
 
-throws-like { request }, X::Crow::HTTP::Router::OnlyInHandler, what => 'request',
+throws-like { request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'request',
     'Can only use request term inside of a handler';
-throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'response',
+throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response',
     'Can only use response term inside of a handler';
 
 {
@@ -44,37 +44,37 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
             response.set-body('No jobs, kthxbai'.encode('ascii'));
         }
     }
-    ok $app ~~ Crow::Transform, 'Route block with routes gives back a Crow::Transform';
+    ok $app ~~ Cro::Transform, 'Route block with routes gives back a Cro::Transform';
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
 
-    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</>));
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set routes / correctly';
+        ok $r ~~ Cro::HTTP::Response, 'Route set routes / correctly';
         is $r.status, 200, 'Got 200 response';
         is $r.header('Content-type'), 'text/html', 'Got expected header';
         is-deeply body-text($r), 'Hello, world', 'Got expected body';
     }
 
-    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</about>));
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</about>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set routes /about correctly';
+        ok $r ~~ Cro::HTTP::Response, 'Route set routes /about correctly';
         is $r.status, 200, 'Got 200 response';
         is $r.header('Content-type'), 'text/html', 'Got expected header';
         is-deeply body-text($r), 'We are the awesome', 'Got expected body';
     }
 
-    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</company/careers>));
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</company/careers>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set routes /company/careers correctly';
+        ok $r ~~ Cro::HTTP::Response, 'Route set routes /company/careers correctly';
         is $r.status, 200, 'Got 200 response';
         is $r.header('Content-type'), 'text/html', 'Got expected header';
         is-deeply body-text($r), 'No jobs, kthxbai', 'Got expected body';
     }
 
-    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</wat>));
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</wat>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'No matching route gets a HTTP response';
+        ok $r ~~ Cro::HTTP::Response, 'No matching route gets a HTTP response';
         is $r.status, '404', 'Status code when no matching route is 404';
     }
 }
@@ -106,31 +106,31 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
 
-    $source.emit(Crow::HTTP::Request.new(:method<GET>, :target</product>));
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</product>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set routes GET';
+        ok $r ~~ Cro::HTTP::Response, 'Route set routes GET';
         is $r.status, 200, 'Got 200 response';
         is $r.header('Content-type'), 'text/html', 'Got expected header';
         is-deeply body-text($r), 'A GET request', 'Got expected body';
     }
 
-    $source.emit(Crow::HTTP::Request.new(:method<POST>, :target</product>));
+    $source.emit(Cro::HTTP::Request.new(:method<POST>, :target</product>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set routes POST';
+        ok $r ~~ Cro::HTTP::Response, 'Route set routes POST';
         is $r.status, 201, 'Got 201 response';
         is $r.header('Content-type'), 'text/html', 'Got expected header';
         is-deeply body-text($r), 'A POST request', 'Got expected body';
     }
 
-    $source.emit(Crow::HTTP::Request.new(:method<PUT>, :target</product>));
+    $source.emit(Cro::HTTP::Request.new(:method<PUT>, :target</product>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set routes PUT';
+        ok $r ~~ Cro::HTTP::Response, 'Route set routes PUT';
         is $r.status, 204, 'Got 204 response';
     }
 
-    $source.emit(Crow::HTTP::Request.new(:method<DELETE>, :target</product>));
+    $source.emit(Cro::HTTP::Request.new(:method<DELETE>, :target</product>));
     given $responses.receive -> $r {
-        ok $r ~~ Crow::HTTP::Response, 'Route set routes DELETE';
+        ok $r ~~ Cro::HTTP::Response, 'Route set routes DELETE';
         is $r.status, 200, 'Got 200 response';
         is $r.header('Content-type'), 'text/html', 'Got expected header';
         is-deeply body-text($r), 'A DELETE request', 'Got expected body';
@@ -230,7 +230,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/category/tree/bar/baz', 'category tree bar baz',
             'Two optional segments handled correctly (two passed)';
     for @cases -> $target, $expected-output, $desc {
-        $source.emit(Crow::HTTP::Request.new(:method<GET>, :$target));
+        $source.emit(Cro::HTTP::Request.new(:method<GET>, :$target));
         given $responses.receive -> $r {
             is-deeply body-text($r), $expected-output, $desc;
         }
@@ -332,7 +332,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/optintarg', 'optintarg 1',
             'Route with optional Int named arg for query parameter works when not passed';
     for @cases -> $target, $expected-output, $desc {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $req.append-header('X-Custom1', 'c1');
         $req.append-header('X-Custom2', 'c2');
         $source.emit($req);
@@ -387,7 +387,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/advent/13', 'advent 13',
             'Segment of type Int constrained by where clause matches when it should';
     for @good-cases -> $target, $expected-output, $desc {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
         given $responses.receive -> $r {
             is-deeply body-text($r), $expected-output, $desc;
@@ -400,7 +400,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/tag/not-valid', 404, 'Non-matching segment gives 404 error (where, Str)',
         '/advent/25', 404, 'Non-matching segment gives 404 error (where, Int)';
     for @bad-cases -> $target, $expected-status, $desc {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, $expected-status, $desc;
@@ -474,7 +474,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/advent?day=10', 'advent 10',
             'Required unpack of type Int with where constraint works';
     for @good-cases -> $target, $expected-output, $desc {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
         given $responses.receive -> $r {
             is-deeply body-text($r), $expected-output, $desc;
@@ -493,7 +493,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/advent', 400, 'Missing unpack gives 400 error (where, Int)',
         '/tag?day=26', 400, 'Non-matching unpack gives 400 error (where, Int)';
     for @bad-cases -> $target, $expected-status, $desc {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, $expected-status, $desc;
@@ -513,7 +513,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     my $responses = $app.transformer($source.Supply).Channel;
 
     for <PUT POST DELETE> -> $method {
-        my $req = Crow::HTTP::Request.new(:$method, :target</>);
+        my $req = Cro::HTTP::Request.new(:$method, :target</>);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, 405, 'URL that matches on segments but not method is 405';
@@ -554,7 +554,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     my $responses = $app.transformer($source.Supply).Channel;
 
     {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :target</blob-body>);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</blob-body>);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, 200, 'Simple binary content response has 200 status';
@@ -565,7 +565,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 
     {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :target</str-body-no-accept-charset>);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</str-body-no-accept-charset>);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, 200, 'Simple text content response has 200 status';
@@ -576,7 +576,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 
     {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :target</headers>);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</headers>);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, 200, 'Simple JSON content response has 200 status';
@@ -593,7 +593,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 
     {
-        my $req = Crow::HTTP::Request.new(:method<GET>,
+        my $req = Cro::HTTP::Request.new(:method<GET>,
             :target</reminders?task=shave>);
         $source.emit($req);
         given $responses.receive -> $r {
@@ -606,7 +606,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 
     {
-        my $req = Crow::HTTP::Request.new(:method<GET>,
+        my $req = Cro::HTTP::Request.new(:method<GET>,
             :target</shopping-list?product=beef>);
         $source.emit($req);
         given $responses.receive -> $r {
@@ -619,7 +619,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     }
 
     {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :target</latin-1>);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</latin-1>);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, 200, 'Str content with :enc<ISO-8859-1> has 200 response';
@@ -729,7 +729,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/conflict-2/1', 200, 'request timely!', 'conflict sanity (2)',
         '/conflict-2/6', 409, '409 conflict!', 'conflict (2)';
     for @cases -> $target, $status, $body, $desc {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, $status, "Error routine $desc - status";
@@ -795,7 +795,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
         '/redir/see-other-1', 303, '/to/see-other-1', 'See other redirect (1)',
         '/redir/see-other-2', 303, '/to/see-other-2', 'See other redirect (2)';
     for @cases -> $target, $status, $location, $desc {
-        my $req = Crow::HTTP::Request.new(:method<GET>, :$target);
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, $status, "$desc - status";
@@ -817,7 +817,7 @@ throws-like { response }, X::Crow::HTTP::Router::OnlyInHandler, what => 'respons
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
 
-    my $req = Crow::HTTP::Request.new(:method<GET>, :target</use-request>);
+    my $req = Cro::HTTP::Request.new(:method<GET>, :target</use-request>);
     $req.append-header('X-Testing', 'Yes it works');
     $source.emit($req);
     given $responses.receive -> $r {

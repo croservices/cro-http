@@ -1,13 +1,13 @@
-use Crow::HTTP::ResponseParser;
-use Crow::HTTP::Response;
-use Crow::TCP;
+use Cro::HTTP::ResponseParser;
+use Cro::HTTP::Response;
+use Cro::TCP;
 use Test;
 
-ok Crow::HTTP::ResponseParser ~~ Crow::Transform,
+ok Cro::HTTP::ResponseParser ~~ Cro::Transform,
     'HTTP response parser is a transform';
-ok Crow::HTTP::ResponseParser.consumes === Crow::TCP::Message,
+ok Cro::HTTP::ResponseParser.consumes === Cro::TCP::Message,
     'HTTP response parser consumes TCP messages';
-ok Crow::HTTP::ResponseParser.produces === Crow::HTTP::Response,
+ok Cro::HTTP::ResponseParser.produces === Cro::HTTP::Response,
     'HTTP respose parser produces HTTP responses';
 
 sub test-response-to-tcp-message($res, :$body-blob) {
@@ -17,11 +17,11 @@ sub test-response-to-tcp-message($res, :$body-blob) {
     $headers .= subst("\n", "\r\n", :g);
     my $data = "$headers\r\n\r\n".encode('latin-1') ~ $body.encode('utf-8');
     $data ~= $body-blob if $body-blob;
-    return Crow::TCP::Message.new(:$data);
+    return Cro::TCP::Message.new(:$data);
 }
 
 sub parses($desc, $test-response, :$body-blob, *@checks, *%config) {
-    my $testee = Crow::HTTP::ResponseParser.new(|%config);
+    my $testee = Cro::HTTP::ResponseParser.new(|%config);
     my $fake-in = Supplier.new;
     my $test-completed = Promise.new;
     $testee.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap:
@@ -53,7 +53,7 @@ sub parses($desc, $test-response, :$body-blob, *@checks, *%config) {
 }
 
 sub refuses($desc, $test-response, *%config) {
-    my $testee = Crow::HTTP::ResponseParser.new(|%config);
+    my $testee = Cro::HTTP::ResponseParser.new(|%config);
     my $fake-in = Supplier.new;
     $testee.transformer($fake-in.Supply).tap:
         -> $response {
@@ -227,7 +227,7 @@ parses 'Header field value can be any printable char including latin-1 range',
     *.status == 200,
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'X-Something',
     *.headers[0].value eq Q/oh!"foo'<>%^&*()[]{}424242aaáâãäåæµ¥/;
 
@@ -304,7 +304,7 @@ parses 'Connection close with incomplete body throws',
     *.headers == 1,
     {
         try await .body-text;
-        $!.isa(X::Crow::HTTP::RawBodyParser::ContentLength::TooShort)
+        $!.isa(X::Cro::HTTP::RawBodyParser::ContentLength::TooShort)
     }
 
 parses 'Response with chunked encoding', q:b:to/RESPONSE/.chop,

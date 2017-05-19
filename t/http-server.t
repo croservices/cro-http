@@ -1,23 +1,23 @@
-use Crow;
-use Crow::HTTP::Request;
-use Crow::HTTP::Response;
-use Crow::HTTP::Server;
-use Crow::Transform;
+use Cro;
+use Cro::HTTP::Request;
+use Cro::HTTP::Response;
+use Cro::HTTP::Server;
+use Cro::Transform;
 use IO::Socket::Async::SSL;
 use Test;
 
 constant TEST_PORT = 31314;
 
-class TestHttpApp does Crow::Transform {
-    method consumes() { Crow::HTTP::Request }
-    method produces() { Crow::HTTP::Response }
+class TestHttpApp does Cro::Transform {
+    method consumes() { Cro::HTTP::Request }
+    method produces() { Cro::HTTP::Response }
 
     method transformer($request-stream) {
         supply {
             whenever $request-stream -> $request {
-                given Crow::HTTP::Response.new(:200status) {
+                given Cro::HTTP::Response.new(:200status) {
                     .append-header('Content-type', 'text/html');
-                    .set-body("<strong>Hello from Crow!</strong>".encode('ascii'));
+                    .set-body("<strong>Hello from Cro!</strong>".encode('ascii'));
                     .emit;
                 }
             }
@@ -26,11 +26,11 @@ class TestHttpApp does Crow::Transform {
 }
 
 {
-    my $service = Crow::HTTP::Server.new(
+    my $service = Cro::HTTP::Server.new(
         port => TEST_PORT,
         application => TestHttpApp
     );
-    ok $service ~~ Crow::Service, 'Service does Crow::Service';
+    ok $service ~~ Cro::Service, 'Service does Cro::Service';
     dies-ok { await IO::Socket::Async.connect('localhost', TEST_PORT) },
         'Server not listening until started';
     lives-ok { $service.start }, 'Can start service';
@@ -55,7 +55,7 @@ class TestHttpApp does Crow::Transform {
     nok $timed-out, 'Got a response from the server';
     like $response, /^ HTTP \N+ 200/,
         'Response has 200 status in it';
-    like $response, /"<strong>Hello from Crow!</strong>"/,
+    like $response, /"<strong>Hello from Cro!</strong>"/,
         'Response contains expected body';
 
     lives-ok { $service.stop }, 'Can stop service';
@@ -70,12 +70,12 @@ class TestHttpApp does Crow::Transform {
         certificate-file => 't/certs-and-keys/server-crt.pem'
     };
 
-    my $service = Crow::HTTP::Server.new(
+    my $service = Cro::HTTP::Server.new(
         port => TEST_PORT,
         ssl => %key-cert,
         application => TestHttpApp
     );
-    ok $service ~~ Crow::Service, 'Service does Crow::Service (HTTPS)';
+    ok $service ~~ Cro::Service, 'Service does Cro::Service (HTTPS)';
     dies-ok { await IO::Socket::Async::SSL.connect('localhost', TEST_PORT, |%ca) },
         'Server not listening until started (HTTPS)';
     lives-ok { $service.start }, 'Can start service (HTTPS)';
@@ -100,7 +100,7 @@ class TestHttpApp does Crow::Transform {
     nok $timed-out, 'Got a response from the server (HTTPS)';
     like $response, /^ HTTP \N+ 200/,
         'Response has 200 status in it (HTTPS)';
-    like $response, /"<strong>Hello from Crow!</strong>"/,
+    like $response, /"<strong>Hello from Cro!</strong>"/,
         'Response contains expected body (HTTPS)';
 
     lives-ok { $service.stop }, 'Can stop service (HTTPS)';

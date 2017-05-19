@@ -1,8 +1,8 @@
-use Crow::Uri::HTTP;
+use Cro::Uri::HTTP;
 use Test;
 
 sub parses-request-target($desc, $target, *@checks) {
-    with try Crow::Uri::HTTP.parse-request-target($target) -> $parsed {
+    with try Cro::Uri::HTTP.parse-request-target($target) -> $parsed {
         pass $desc;
         for @checks.kv -> $i, $check {
             ok $check($parsed), "Check {$i + 1}";
@@ -16,11 +16,11 @@ sub parses-request-target($desc, $target, *@checks) {
 }
 
 sub refuses-request-target($desc, $target) {
-    with try Crow::Uri::HTTP.parse-request-target($target) {
+    with try Cro::Uri::HTTP.parse-request-target($target) {
         diag "Incorrectly parsed $target";
         flunk $desc;
     }
-    elsif $! ~~ X::Crow::Uri::ParseError {
+    elsif $! ~~ X::Cro::Uri::ParseError {
         pass $desc;
     }
     else {

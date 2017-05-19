@@ -1,15 +1,15 @@
-use Crow::HTTP::BodyParser;
-use Crow::HTTP::BodyParserSelector;
-use Crow::HTTP::RequestParser;
-use Crow::HTTP::Request;
-use Crow::TCP;
+use Cro::HTTP::BodyParser;
+use Cro::HTTP::BodyParserSelector;
+use Cro::HTTP::RequestParser;
+use Cro::HTTP::Request;
+use Cro::TCP;
 use Test;
 
-ok Crow::HTTP::RequestParser ~~ Crow::Transform,
+ok Cro::HTTP::RequestParser ~~ Cro::Transform,
     'HTTP request parser is a transform';
-ok Crow::HTTP::RequestParser.consumes === Crow::TCP::Message,
+ok Cro::HTTP::RequestParser.consumes === Cro::TCP::Message,
     'HTTP request parser consumes TCP messages';
-ok Crow::HTTP::RequestParser.produces === Crow::HTTP::Request,
+ok Cro::HTTP::RequestParser.produces === Cro::HTTP::Request,
     'HTTP request parser produces HTTP requests';
 
 sub test-request-to-tcp-message($req, :$body-crlf) {
@@ -19,11 +19,11 @@ sub test-request-to-tcp-message($req, :$body-crlf) {
     $headers .= subst("\n", "\r\n", :g);
     $body .= subst("\n", "\r\n", :g) if $body-crlf;
     my $data = "$headers\r\n\r\n$body".encode('latin-1');
-    return Crow::TCP::Message.new(:$data);
+    return Cro::TCP::Message.new(:$data);
 }
 
 sub parses($desc, $test-request, *@checks, :$tests, :$body-crlf, *%config) {
-    my $testee = Crow::HTTP::RequestParser.new(|%config);
+    my $testee = Cro::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
     my $test-completed = Promise.new;
     $testee.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap:
@@ -56,7 +56,7 @@ sub parses($desc, $test-request, *@checks, :$tests, :$body-crlf, *%config) {
 }
 
 sub refuses($desc, $test-request, *@checks, *%config) {
-    my $testee = Crow::HTTP::RequestParser.new(|%config);
+    my $testee = Cro::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
     $testee.transformer($fake-in.Supply).tap:
         -> $request {
@@ -243,7 +243,7 @@ parses 'Host header',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'Host',
     *.headers[0].value eq 'www.xkcd.com';
 
@@ -257,7 +257,7 @@ parses 'Host header with no whitespace',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'Host',
     *.headers[0].value eq 'www.badgerbadgerbadger.com';
 
@@ -271,7 +271,7 @@ parses 'Host header with trailing whitespace',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'Host',
     *.headers[0].value eq 'www.jnthn.net';
 
@@ -285,7 +285,7 @@ parses 'Host header with tab before and after value',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'Host',
     *.headers[0].value eq 'www.jnthn.net';
 
@@ -299,7 +299,7 @@ parses 'Header with insane but actually totally legit name',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq Q/!#42$%omg&'*+-.wtf^_`~|ReAlLy!!!/,
     *.headers[0].value eq 'wow';
 
@@ -323,7 +323,7 @@ parses 'Field value can be any printable char including latin-1 range',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'X-Something',
     *.headers[0].value eq Q/oh!"foo'<>%^&*()[]{}424242aaáâãäåæµ¥/;
 
@@ -337,7 +337,7 @@ parses 'Field values may have whitespace in them',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'X-Men',
     *.headers[0].value eq Q/this is a	sentence/;
 
@@ -351,7 +351,7 @@ parses 'Whitespace after field name ignored',
     *.target eq '/',
     *.http-version eq '1.1',
     *.headers == 1,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'X-Men',
     *.headers[0].value eq Q/spaces inside but not/;
 
@@ -377,13 +377,13 @@ parses 'Request with multiple headers (example from RFC)',
     *.target eq '/hello.txt',
     *.http-version eq '1.1',
     *.headers == 3,
-    *.headers[0].isa(Crow::HTTP::Header),
+    *.headers[0].isa(Cro::HTTP::Header),
     *.headers[0].name eq 'User-Agent',
     *.headers[0].value eq 'curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3',
-    *.headers[1].isa(Crow::HTTP::Header),
+    *.headers[1].isa(Cro::HTTP::Header),
     *.headers[1].name eq 'Host',
     *.headers[1].value eq 'www.example.com',
-    *.headers[2].isa(Crow::HTTP::Header),
+    *.headers[2].isa(Cro::HTTP::Header),
     *.headers[2].name eq 'Accept-Language',
     *.headers[2].value eq 'en, mi';
 
@@ -451,13 +451,13 @@ parses 'Query strings with multiple values for the same key',
     *.path-segments eqv ('foo',),
     *.query eq 'x=foo&y=bar&y=baz&x=%E2%99%A5&z=one',
     *.query-hash eqv {
-        x => Crow::HTTP::MultiValue.new('foo', '♥'),
-        y => Crow::HTTP::MultiValue.new('bar', 'baz'),
+        x => Cro::HTTP::MultiValue.new('foo', '♥'),
+        y => Cro::HTTP::MultiValue.new('bar', 'baz'),
         z => 'one'
     },
-    *.query-value('x') eqv Crow::HTTP::MultiValue.new('foo', '♥'),
+    *.query-value('x') eqv Cro::HTTP::MultiValue.new('foo', '♥'),
     *.query-value('x').Str eqv 'foo,♥',
-    *.query-value('y') eqv Crow::HTTP::MultiValue.new('bar', 'baz'),
+    *.query-value('y') eqv Cro::HTTP::MultiValue.new('bar', 'baz'),
     *.query-value('y').Str eqv 'bar,baz',
     *.query-value('z') eqv 'one';
 
@@ -559,8 +559,8 @@ parses 'Multiple entries with same name in application/x-www-form-urlencoded',
 
         my %hash = $body.hash;
         is %hash.elems, 3, '.hash gives back Hash with 3 elements';
-        isa-ok %hash<a>, Crow::HTTP::MultiValue, 'Get back a HTTP multi-value (1)';
-        isa-ok %hash<b>, Crow::HTTP::MultiValue, 'Get back a HTTP multi-value (2)';
+        isa-ok %hash<a>, Cro::HTTP::MultiValue, 'Get back a HTTP multi-value (1)';
+        isa-ok %hash<b>, Cro::HTTP::MultiValue, 'Get back a HTTP multi-value (2)';
         is %hash<a>, '1,3,4', 'Stringifying multi-value is correct (1)';
         is %hash<b>, '2,5', 'Stringifying multi-value is correct (2)';
         is-deeply %hash<a>[*], ('1', '3', '4'), 'Indexing multi-value is correct (1)';
@@ -568,8 +568,8 @@ parses 'Multiple entries with same name in application/x-www-form-urlencoded',
         isa-ok %hash<c>, Str, 'When only one value with the name, get back a Str';
         is %hash<c>, '6', 'Value is correct';
 
-        isa-ok $body<a>, Crow::HTTP::MultiValue, 'Hash-indexing body gives HTTP multi-value (1)';
-        isa-ok $body<b>, Crow::HTTP::MultiValue, 'Hash-indexing body gives HTTP multi-value (2)';
+        isa-ok $body<a>, Cro::HTTP::MultiValue, 'Hash-indexing body gives HTTP multi-value (1)';
+        isa-ok $body<b>, Cro::HTTP::MultiValue, 'Hash-indexing body gives HTTP multi-value (2)';
         isa-ok $body<c>, Str, 'Except when only one value for the name, then it is Str';
     };
 
@@ -613,8 +613,8 @@ parses 'Can pick default encoding for application/x-www-form-urlencoded',
     x=%C0%C1&%D5%D6=1
     REQUEST
     tests => {
-        .body-parser-selector = Crow::HTTP::BodyParserSelector::List.new(:parsers[
-            Crow::HTTP::BodyParser::WWWFormUrlEncoded.new(
+        .body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(:parsers[
+            Cro::HTTP::BodyParser::WWWFormUrlEncoded.new(
                 default-encoding => 'latin-1'
             )
         ]);
@@ -646,8 +646,8 @@ parses 'A _charset_ in application/x-www-form-urlencoded overrides configured de
     x=%C3%80b&%E3%82%A2%E3%82%A2=1&_charset_=utf-8
     REQUEST
     tests => {
-        .body-parser-selector = Crow::HTTP::BodyParserSelector::List.new(:parsers[
-            Crow::HTTP::BodyParser::WWWFormUrlEncoded.new(
+        .body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(:parsers[
+            Cro::HTTP::BodyParser::WWWFormUrlEncoded.new(
                 default-encoding => 'latin-1'
             )
         ]);
@@ -683,10 +683,12 @@ parses 'Simple multipart/form-data',
         is @parts[0].headers[0].name, 'Content-Disposition', 'First part header name correct';
         is @parts[0].headers[0].value, 'form-data; name="a"', 'First part header value correct';
         is @parts[0].field-name, 'a', 'First part has correct field name';
+        is @parts[0].body-text, '3555555555555555551', 'First part has correct body text';
         is @parts[1].headers.elems, 1, 'Second part has 1 header';
         is @parts[1].headers[0].name, 'Content-Disposition', 'Second part header name correct';
         is @parts[1].headers[0].value, 'form-data; name="b"', 'Second part header value correct';
         is @parts[1].field-name, 'b', 'Second part has correct field name';
+        is @parts[1].body-text, '53399393939222', 'First part has correct body text';
     }
 
 # XXX Test these security checks (allow configuration of them):

@@ -1,5 +1,5 @@
-use Crow::HTTP::Client;
-use Crow::HTTP::Response;
+use Cro::HTTP::Client;
+use Cro::HTTP::Response;
 use Test;
 
 constant HTTP_TEST_PORT = 31316;
@@ -12,8 +12,8 @@ constant %key-cert := {
 
 # Test application.
 {
-    use Crow::HTTP::Router;
-    use Crow::HTTP::Server;
+    use Cro::HTTP::Router;
+    use Cro::HTTP::Server;
 
     my $app = route {
         get -> {
@@ -30,14 +30,14 @@ constant %key-cert := {
         }
     }
 
-    my $http-server = Crow::HTTP::Server.new(
+    my $http-server = Cro::HTTP::Server.new(
         port => HTTP_TEST_PORT,
         application => $app
     );
     $http-server.start();
     END $http-server.stop();
 
-    my $https-server = Crow::HTTP::Server.new(
+    my $https-server = Cro::HTTP::Server.new(
         port => HTTPS_TEST_PORT,
         application => $app,
         ssl => %key-cert
@@ -49,35 +49,35 @@ constant %key-cert := {
 {
     my $base = "http://localhost:{HTTP_TEST_PORT}";
 
-    given await Crow::HTTP::Client.get("$base/") -> $resp {
-        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from GET /';
+    given await Cro::HTTP::Client.get("$base/") -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Home', 'Body text is correct';
     }
 
-    given await Crow::HTTP::Client.post("$base/") -> $resp {
-        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from POST /';
+    given await Cro::HTTP::Client.post("$base/") -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from POST /';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Updated', 'Body text is correct';
     }
 
-    given await Crow::HTTP::Client.put("$base/") -> $resp {
-        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from PUT /';
+    given await Cro::HTTP::Client.put("$base/") -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from PUT /';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Saved', 'Body text is correct';
     }
 
-    given await Crow::HTTP::Client.delete("$base/") -> $resp {
-        ok $resp ~~ Crow::HTTP::Response, 'Got a response back from DELETE /';
+    given await Cro::HTTP::Client.delete("$base/") -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from DELETE /';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Gone', 'Body text is correct';
     }
 
-    given await Crow::HTTP::Client.get("$base/") -> $resp {
+    given await Cro::HTTP::Client.get("$base/") -> $resp {
         is await($resp.body-blob).list, 'Home'.encode('ascii').list,
             'Can also get body back as a blob';
     }
