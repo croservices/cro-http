@@ -687,6 +687,8 @@ parses 'Simple multipart/form-data',
         is @parts[0].content-type.type, 'text', 'First part has default text type';
         is @parts[0].content-type.subtype, 'plain', 'First part has default plain subtype';
         is @parts[0].field-name, 'a', 'First part has correct field name';
+        is-deeply @parts[0].body-blob, '3555555555555555551'.encode('ascii'),
+            'First part has correct body blob';
         is @parts[0].body-text, '3555555555555555551', 'First part has correct body text';
         is @parts[1].headers.elems, 1, 'Second part has 1 header';
         is @parts[1].headers[0].name, 'Content-Disposition', 'Second part header name correct';
@@ -696,6 +698,8 @@ parses 'Simple multipart/form-data',
             'Second part has a content-type that is a Crow::MediaType';
         is @parts[1].content-type.type, 'text', 'Second part has default text type';
         is @parts[1].content-type.subtype, 'plain', 'Second part has default plain subtype';
+        is-deeply @parts[1].body-blob, '53399393939222'.encode('ascii'),
+            'Second part has correct body blob';
         is @parts[1].body-text, '53399393939222', 'Second part has correct body text';
     }
 
