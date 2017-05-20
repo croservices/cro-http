@@ -166,6 +166,10 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
             method body-text() {
                 (try $!body-blob.decode('utf-8')) // $!body-blob.decode('latin-1')
             }
+
+            method content-type() {
+                BEGIN Cro::MediaType.new(type => 'text', subtype-name => 'plain') 
+            }
         }
 
         has Part @.parts;
