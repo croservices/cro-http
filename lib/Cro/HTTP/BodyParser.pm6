@@ -161,6 +161,7 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
         class Part {
             has Cro::HTTP::Header @.headers;
             has Str $.field-name;
+            has Str $.filename;
             has Blob $.body-blob;
 
             method body-text() {
@@ -168,11 +169,18 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
             }
 
             method body() {
-                self.body-text()
+                self.content-type.type eq 'text'
+                    ?? self.body-text
+                    !! self.body-blob
             }
 
             method content-type() {
-                BEGIN Cro::MediaType.new(type => 'text', subtype-name => 'plain') 
+                with @!headers.first(*.name.lc eq 'content-type') {
+                    Cro::MediaType.parse(.value)
+                }
+                else {
+                    BEGIN Cro::MediaType.new(type => 'text', subtype-name => 'plain') 
+                }
             }
         }
 
@@ -253,13 +261,16 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
                         without $param-parse {
                             die "Could not parse content-disposition parameters in multipart/formdata";
                         }
-                        my $name-param = $param-parse.ast.first(*.key.lc eq 'name');
+                        my @params := $param-parse.ast.list;
+                        my $name-param = @params.first(*.key.lc eq 'name');
                         without $name-param {
                             die "Missing name parameter in content-disposition of multipart/formdata";
                         }
                         my $field-name = $name-param.value;
+                        my $filename-param = @params.first(*.key.lc eq 'filename');
+                        my $filename = $filename-param ?? $filename-param.value !! Str;
                         my $body-blob = $body-str.encode('latin-1');
-                        push @parts, Value::Part.new(:@headers, :$field-name, :$body-blob);
+                        push @parts, Value::Part.new(:@headers, :$field-name, :$filename, :$body-blob);
                     }
                     else {
                         die "Missing content-disposition header in multipart/form-data part";

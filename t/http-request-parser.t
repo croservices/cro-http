@@ -12,17 +12,18 @@ ok Cro::HTTP::RequestParser.consumes === Cro::TCP::Message,
 ok Cro::HTTP::RequestParser.produces === Cro::HTTP::Request,
     'HTTP request parser produces HTTP requests';
 
-sub test-request-to-tcp-message($req, :$body-crlf) {
+sub test-request-to-tcp-message($req, :$body-crlf, :$body-blob) {
     # We replace \n with \r\n in the request headers here, so the tests can
     # look pretty.
     my ($headers, $body) = $req.split(/\n\n/, 2);
     $headers .= subst("\n", "\r\n", :g);
     $body .= subst("\n", "\r\n", :g) if $body-crlf;
     my $data = "$headers\r\n\r\n$body".encode('latin-1');
+    $data ~= $body-blob if $body-blob;
     return Cro::TCP::Message.new(:$data);
 }
 
-sub parses($desc, $test-request, *@checks, :$tests, :$body-crlf, *%config) {
+sub parses($desc, $test-request, *@checks, :$tests, :$body-crlf, :$body-blob, *%config) {
     my $testee = Cro::HTTP::RequestParser.new(|%config);
     my $fake-in = Supplier.new;
     my $test-completed = Promise.new;
@@ -42,7 +43,8 @@ sub parses($desc, $test-request, *@checks, :$tests, :$body-crlf, *%config) {
             $test-completed.keep(True);
         };
     start {
-        $fake-in.emit(test-request-to-tcp-message($test-request, :$body-crlf));
+        my $req-blob = test-request-to-tcp-message($test-request, :$body-crlf, :$body-blob);
+        $fake-in.emit($req-blob);
         $fake-in.done();
     }
 
@@ -704,6 +706,72 @@ parses 'Simple multipart/form-data',
         is @parts[1].body-text, '53399393939222', 'Second part has correct body text';
         is-deeply @parts[1].body-text, '53399393939222', 'Second part has correct body';
     }
+
+parses 'A multipart/form-data with a file upload',
+    q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-type: multipart/form-data; boundary="---------------------------20544114801586259283507660231"
+    Content-length: 405
+
+    REQUEST
+    body-blob => Buf.new(45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,
+        45,45,45,45,45,45,45,45,50,48,53,52,52,49,49,52,56,48,49,53,56,54,50,53,57,50,56,
+        51,53,48,55,54,54,48,50,51,49,13,10,67,111,110,116,101,110,116,45,68,105,115,112,
+        111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,
+        109,101,61,34,116,105,116,108,101,34,13,10,13,10,73,32,99,97,110,32,115,101,101,
+        32,114,105,103,104,116,32,116,104,114,111,117,103,104,32,116,104,105,115,13,10,45,
+        45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,
+        45,50,48,53,52,52,49,49,52,56,48,49,53,56,54,50,53,57,50,56,51,53,48,55,54,54,48,
+        50,51,49,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,
+        111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,112,104,
+        111,116,111,34,59,32,102,105,108,101,110,97,109,101,61,34,84,114,97,110,115,112,
+        97,114,101,110,116,46,103,105,102,34,13,10,67,111,110,116,101,110,116,45,84,121,
+        112,101,58,32,105,109,97,103,101,47,103,105,102,13,10,13,10,71,73,70,56,57,97,1,0,
+        1,0,128,0,0,0,0,0,255,255,255,33,249,4,1,0,0,0,0,44,0,0,0,0,1,0,1,0,0,2,1,68,0,59,
+        13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,
+        45,45,45,45,50,48,53,52,52,49,49,52,56,48,49,53,56,54,50,53,57,50,56,51,53,48,55,
+        54,54,48,50,51,49,45,45,13,10),
+    tests => {
+        my $body = .body.result;
+        my @parts = $body.parts;
+        is @parts.elems, 2, 'Have 2 parts';
+
+        is @parts[0].headers.elems, 1, 'First part has 1 header';
+        is @parts[0].headers[0].name, 'Content-Disposition', 'First part header name correct';
+        is @parts[0].headers[0].value, 'form-data; name="title"', 'First part header value correct';
+        ok @parts[0].content-type ~~ Cro::MediaType,
+            'First part has a content-type that is a Crow::MediaType';
+        is @parts[0].content-type.type, 'text', 'First part has default text type';
+        is @parts[0].content-type.subtype, 'plain', 'First part has default plain subtype';
+        is @parts[0].field-name, 'title', 'First part has correct field name';
+        ok !defined(@parts[0].filename), 'First part has no filename';
+        is @parts[0].body-text, 'I can see right through this', 'First part has correct body text';
+        is-deeply @parts[0].body, 'I can see right through this', 'First part has correct body';
+
+        is @parts[1].headers.elems, 2, 'Second part has 2 headers';
+        is @parts[1].headers[0].name, 'Content-Disposition',
+            'First header name correct';
+        is @parts[1].headers[0].value, 'form-data; name="photo"; filename="Transparent.gif"',
+            'First header value correct';
+        is @parts[1].headers[1].name, 'Content-Type',
+            'Second header name correct';
+        is @parts[1].headers[1].value, 'image/gif',
+            'Second header value correct';
+        ok @parts[1].content-type ~~ Cro::MediaType,
+            'Second part has a content-type that is a Crow::MediaType';
+        is @parts[1].content-type.type, 'image', 'Second part has image media type';
+        is @parts[1].content-type.subtype, 'gif', 'Second part has gif media subtype';
+        is @parts[1].field-name, 'photo', 'Second part has correct field name';
+        is @parts[1].filename, 'Transparent.gif', 'Second part has correct filename';
+        is-deeply @parts[1].body-blob,
+            Blob[uint8].new(71,73,70,56,57,97,1,0,1,0,128,0,0,0,0,0,255,255,255,33,249,4,1,
+                0,0,0,0,44,0,0,0,0,1,0,1,0,0,2,1,68,0,59),
+            'Second part has correct body blob';
+        is-deeply @parts[1].body,
+            Blob[uint8].new(71,73,70,56,57,97,1,0,1,0,128,0,0,0,0,0,255,255,255,33,249,4,1,
+                0,0,0,0,44,0,0,0,0,1,0,1,0,0,2,1,68,0,59),
+            'Second part has correct body';
+    };
 
 # XXX Test these security checks (allow configuration of them):
 #
