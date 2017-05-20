@@ -690,6 +690,7 @@ parses 'Simple multipart/form-data',
         is-deeply @parts[0].body-blob, '3555555555555555551'.encode('ascii'),
             'First part has correct body blob';
         is @parts[0].body-text, '3555555555555555551', 'First part has correct body text';
+        is-deeply @parts[0].body, '3555555555555555551', 'First part has correct body';
         is @parts[1].headers.elems, 1, 'Second part has 1 header';
         is @parts[1].headers[0].name, 'Content-Disposition', 'Second part header name correct';
         is @parts[1].headers[0].value, 'form-data; name="b"', 'Second part header value correct';
@@ -701,6 +702,7 @@ parses 'Simple multipart/form-data',
         is-deeply @parts[1].body-blob, '53399393939222'.encode('ascii'),
             'Second part has correct body blob';
         is @parts[1].body-text, '53399393939222', 'Second part has correct body text';
+        is-deeply @parts[1].body-text, '53399393939222', 'Second part has correct body';
     }
 
 # XXX Test these security checks (allow configuration of them):
