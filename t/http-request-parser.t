@@ -787,6 +787,20 @@ parses 'An application/json request decodes JSON body',
         is-deeply $body, ${ foo => [ "bar", 42 ] }, 'JSON was correctly decoded';
     };
 
+parses 'An media type with the +json suffix decodes JSON body',
+    q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-type: application/vnd.my-org+json
+    Content-Length: 25
+
+    { "foo": [ "baz", 46 ] }
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        ok $body ~~ Hash, '.body of application/vnd.my-org+json with object gives Hash';
+        is-deeply $body, ${ foo => [ "baz", 46 ] }, 'JSON was correctly decoded';
+    };
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a

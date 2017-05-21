@@ -286,7 +286,7 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
 class Cro::HTTP::BodyParser::JSON does Cro::HTTP::BodyParser {
     method is-applicable(Cro::HTTP::Message $message --> Bool) {
         with $message.content-type {
-            .type eq 'application' && .subtype eq 'json'
+            .type eq 'application' && .subtype eq 'json' || .suffix eq 'json'
         }
         else {
             False
