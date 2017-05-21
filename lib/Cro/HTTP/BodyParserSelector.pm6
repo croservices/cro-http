@@ -30,6 +30,7 @@ class Cro::HTTP::BodyParserSelector::RequestDefault does Cro::HTTP::BodyParserSe
 
 class Cro::HTTP::BodyParserSelector::ResponseDefault does Cro::HTTP::BodyParserSelector {
     my constant @defaults = [
+        Cro::HTTP::BodyParser::JSON,
         Cro::HTTP::BodyParser::TextFallback,
         Cro::HTTP::BodyParser::BlobFallback
     ];

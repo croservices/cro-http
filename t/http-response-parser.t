@@ -20,7 +20,7 @@ sub test-response-to-tcp-message($res, :$body-blob) {
     return Cro::TCP::Message.new(:$data);
 }
 
-sub parses($desc, $test-response, :$body-blob, *@checks, *%config) {
+sub parses($desc, $test-response, :$body-blob, :$tests, *@checks, *%config) {
     my $testee = Cro::HTTP::ResponseParser.new(|%config);
     my $fake-in = Supplier.new;
     my $test-completed = Promise.new;
@@ -30,6 +30,7 @@ sub parses($desc, $test-response, :$body-blob, *@checks, *%config) {
             for @checks.kv -> $i, $check {
                 ok $check($response), "check {$i + 1 }";
             }
+            .($response) with $tests;
             $test-completed.keep(True);
         },
         quit => {
@@ -405,5 +406,33 @@ parses 'With not other indications, and it utf-8 fails, decode as latin-1', q:to
     *.status == 200,
     *.headers == 2,
     *.body-text.result eq "ÐÑÒÓ";
+
+parses 'An application/json response decodes JSON body',
+    q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: application/json
+    Content-Length: 25
+
+    { "foo": [ "bar", 42 ] }
+    RESPONSE
+    tests => {
+        my $body = .body.result;
+        ok $body ~~ Hash, '.body of application/json with object gives Hash';
+        is-deeply $body, ${ foo => [ "bar", 42 ] }, 'JSON was correctly decoded';
+    };
+
+parses 'A media type with the +json suffix decodes JSON body',
+    q:to/RESPONSE/,
+    HTTP/1.1 200 OK
+    Content-type: application/vnd.my-org+json
+    Content-Length: 25
+
+    { "foo": [ "baz", 46 ] }
+    RESPONSE
+    tests => {
+        my $body = .body.result;
+        ok $body ~~ Hash, '.body of application/vnd.my-org+json with object gives Hash';
+        is-deeply $body, ${ foo => [ "baz", 46 ] }, 'JSON was correctly decoded';
+    };
 
 done-testing;
