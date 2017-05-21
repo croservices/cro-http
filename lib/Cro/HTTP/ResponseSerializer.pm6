@@ -9,19 +9,31 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
     method transformer(Supply $response-stream) {
         supply {
             whenever $response-stream -> Cro::HTTP::Response $response {
+                # No body expected or allowed for 204/200.
                 my int $status = $response.status;
                 if $status == 204 || $status < 200 {
-                    # No body expected or allowed.
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
                     done;
                 }
-                elsif $response.has-streaming-body {
-                    # Emit header.
+
+                # Otherwise, obtain body. We must do it before serializing the
+                # headers, as this is the point that a content-length header
+                # may be added in.
+                my $body-byte-stream = $response.body-byte-stream; 
+                if $response.has-header('content-length') {
+                    # Has Content-length header, so already all available; no need
+                    # for chunked.
+                    emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
+                    whenever $response.body-byte-stream() -> $data {
+                        emit Cro::TCP::Message.new(:$data);
+                        LAST done;
+                    }
+                }
+                else {
+                    # Chunked-encode body as it becomes available.
                     $response.append-header('Transfer-encoding', 'chunked');
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
-
-                    # Chunked-encode body as it becomes available.
-                    whenever $response.body-stream() -> $data {
+                    whenever $response.body-byte-stream() -> $data {
                         if $data.elems {
                             my $header = ($data.elems.base(16) ~ "\r\n").encode('ascii');
                             emit Cro::TCP::Message.new(data => $header);
@@ -32,21 +44,6 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                             emit Cro::TCP::Message.new(data =>
                                 BEGIN Blob.new(ord("0"), 13, 10, 13, 10)
                             );
-                            done;
-                        }
-                    }
-                }
-                else {
-                    # Body already fully available; use Content-length.
-                    my @body-messages;
-                    my $length = 0;
-                    whenever $response.body-stream() -> $data {
-                        @body-messages.push(Cro::TCP::Message.new(:$data));
-                        $length += $data.elems;
-                        LAST {
-                            $response.append-header('Content-length', $length.Str);
-                            emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
-                            .emit for @body-messages;
                             done;
                         }
                     }

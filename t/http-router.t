@@ -4,7 +4,7 @@ use Cro::HTTP::Router;
 use Test;
 
 sub body-text(Cro::HTTP::Response $r) {
-    $r.body-stream.list.map(*.decode('utf-8')).join
+    $r.body-byte-stream.list.map(*.decode('utf-8')).join
 }
 
 {

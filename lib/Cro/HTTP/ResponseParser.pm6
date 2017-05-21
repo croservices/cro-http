@@ -20,7 +20,7 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
             $header-decoder.set-line-separators(["\r\n", "\n"]); # XXX Hack; toss \n
 
             my $response = Cro::HTTP::Response.new;
-            my $body-stream;
+            my $raw-body-byte-stream;
 
             whenever $in -> Cro::TCP::Message $packet {
                 $header-decoder.add-bytes($packet.data);
@@ -56,10 +56,10 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                         # the rest will be the body. Otherwise, parse header.
                         if $header-line eq '' {
                             my $raw-body-parser = $!raw-body-parser-selector.select($response);
-                            $body-stream = Supplier::Preserving.new;
-                            $response.set-body($raw-body-parser.parser($response,
-                                $body-stream.Supply));
-                            $body-stream.emit($header-decoder.consume-all-bytes());
+                            $raw-body-byte-stream = Supplier::Preserving.new;
+                            $response.set-body-byte-stream($raw-body-parser.parser($response,
+                                $raw-body-byte-stream.Supply));
+                            $raw-body-byte-stream.emit($header-decoder.consume-all-bytes());
                             emit $response;
                             $expecting = Body;
                             last;
@@ -70,12 +70,12 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                         }
                     }
                     when Body {
-                        $body-stream.emit($packet.data);
+                        $raw-body-byte-stream.emit($packet.data);
                         last;
                     }
                 }
                 LAST {
-                    $body-stream.?done;
+                    $raw-body-byte-stream.?done;
                 }
             }
         }

@@ -32,7 +32,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
             $header-decoder.set-line-separators(["\r\n", "\n"]); # XXX Hack; toss \n
 
             my $request = Cro::HTTP::Request.new;
-            my $body-stream;
+            my $raw-body-byte-stream;
 
             whenever $in -> Cro::TCP::Message $packet {
                 $header-decoder.add-bytes($packet.data);
@@ -84,10 +84,10 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                             if $request.has-header('content-length') ||
                                     $request.has-header('transfer-encoding') {
                                 my $raw-body-parser = $!raw-body-parser-selector.select($request);
-                                $body-stream = Supplier::Preserving.new;
-                                $request.set-body($raw-body-parser.parser($request,
-                                    $body-stream.Supply));
-                                $body-stream.emit($header-decoder.consume-all-bytes());
+                                $raw-body-byte-stream = Supplier::Preserving.new;
+                                $request.set-body-byte-stream($raw-body-parser.parser($request,
+                                    $raw-body-byte-stream.Supply));
+                                $raw-body-byte-stream.emit($header-decoder.consume-all-bytes());
                                 emit $request;
                                 $expecting = Body;
                                 last;
@@ -108,12 +108,12 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         }
                     }
                     when Body {
-                        $body-stream.emit($packet.data);
+                        $raw-body-byte-stream.emit($packet.data);
                         last;
                     }
                 }
                 LAST {
-                    $body-stream.?done;
+                    $raw-body-byte-stream.?done;
                 }
             }
         }

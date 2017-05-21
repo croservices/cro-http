@@ -93,7 +93,7 @@ class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::HTTP::BodyParser {
     method parse(Cro::HTTP::Message $message --> Promise) {
         Promise(supply {
             my $payload = '';
-            whenever $message.body-stream -> $blob {
+            whenever $message.body-byte-stream -> $blob {
                 # Per spec, should only have octets 0x00-0x70, with higher
                 # ones %-encoded.
                 $payload ~= $blob.decode('ascii');
@@ -205,7 +205,7 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
             }
 
             my $payload = '';
-            whenever $message.body-stream -> $blob {
+            whenever $message.body-byte-stream -> $blob {
                 # Decode as latin-1 to cheaply find boundaries.
                 $payload ~= $blob.decode('latin-1');
                 LAST emit parse();
@@ -296,7 +296,7 @@ class Cro::HTTP::BodyParser::JSON does Cro::HTTP::BodyParser {
     method parse(Cro::HTTP::Message $message --> Promise) {
         Promise(supply {
             my $payload = Blob.new;
-            whenever $message.body-stream -> $blob {
+            whenever $message.body-byte-stream -> $blob {
                 $payload ~= $blob;
                 LAST emit from-json($payload.decode('utf-8'));
             }

@@ -55,7 +55,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
         Cro::HTTP::BodySerializerSelector::ResponseDefault;
 
     multi method Str(Cro::HTTP::Response:D:) {
-        my $status = $!status // (self!body-set ?? 200 !! 204);
+        my $status = $!status // (self.has-body ?? 200 !! 204);
         my $reason = %reason-phrases{$status} // 'Unknown';
         my $headers = self!headers-str();
         "HTTP/{self.http-version // '1.1'} $status $reason\r\n$headers\r\n"

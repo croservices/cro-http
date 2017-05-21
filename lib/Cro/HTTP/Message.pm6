@@ -2,15 +2,11 @@ use Cro::MediaType;
 use Cro::Message;
 use Cro::HTTP::Header;
 
-class X::Cro::HTTP::Message::AlreadyHasBody is Exception {
-    method message() { "This HTTP message already has a body" }
-}
-
 role Cro::HTTP::Message does Cro::Message {
     has Str $.http-version is rw;
     has Cro::HTTP::Header @!headers;
-    has Blob $!body-blob;
-    has Supply $!body-stream;
+    has Supply $!body-byte-stream; # Typically set when receiving from network
+    has $!body;                    # Typically set when producing locally
 
     method headers() {
         @!headers.List
@@ -80,38 +76,30 @@ role Cro::HTTP::Message does Cro::Message {
         }
     }
 
-    multi method set-body(Blob:D $blob --> Nil) {
-        self!ensure-no-body-set();
-        $!body-blob = $blob;
+    method set-body-byte-stream(Supply $!body-byte-stream --> Nil) {
+        $!body = Nil;
     }
 
-    multi method set-body(Supply:D $stream --> Nil) {
-        self!ensure-no-body-set();
-        $!body-stream = $stream;
-    }
-
-    method !ensure-no-body-set() {
-        if self!body-set() {
-            die X::Cro::HTTP::Message::AlreadyHasBody.new;
+    method body-byte-stream(--> Supply) {
+        with $!body-byte-stream {
+            $_
+        }
+        orwith $!body {
+            self.body-serializer-selector.select(self, $_).serialize(self, $_)
+        }
+        else {
+            supply { }
         }
     }
 
-    method !body-set() {
-        so $!body-blob || $!body-stream
-    }
-
-    method has-streaming-body(--> Bool) {
-        so $!body-stream
-    }
-
-    method body-stream(--> Supply) {
-        $!body-stream // supply { emit $!body-blob // Blob.new() }
+    method set-body($!body --> Nil) {
+        $!body-byte-stream = Nil;
     }
 
     method body-blob(--> Promise) {
         Promise(supply {
             my $joined = Buf.new;
-            whenever self.body-stream -> $blob {
+            whenever self.body-byte-stream -> $blob {
                 $joined.append($blob);
                 LAST emit $joined;
             }
@@ -148,6 +136,10 @@ role Cro::HTTP::Message does Cro::Message {
 
     method body(--> Promise) {
         self.body-parser-selector.select(self).parse(self)
+    }
+
+    method has-body() {
+        $!body.DEFINITE || $!body-byte-stream.DEFINITE
     }
 
     method body-parser-selector() { ... }
