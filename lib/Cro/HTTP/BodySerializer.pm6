@@ -1,8 +1,15 @@
 use Cro::HTTP::Message;
+use JSON::Fast;
 
 role Cro::HTTP::BodySerializer {
     method is-applicable(Cro::HTTP::Message $message, $body --> Bool) { ... }
     method serialize(Cro::HTTP::Message $message, $body --> Supply) { ... }
+    method !set-content-length(Cro::HTTP::Message $message, Int $length --> Nil) {
+        if $message.has-header('content-length') {
+            $message.remove-header('content-length');
+        }
+        $message.append-header('Content-length', $length);
+    }
 }
 
 class Cro::HTTP::BodySerializer::BlobFallback does Cro::HTTP::BodySerializer {
@@ -11,10 +18,7 @@ class Cro::HTTP::BodySerializer::BlobFallback does Cro::HTTP::BodySerializer {
     }
 
     method serialize(Cro::HTTP::Message $message, $body --> Supply) {
-        if $message.has-header('content-length') {
-            $message.remove-header('content-length');
-        }
-        $message.append-header('Content-length', $body.bytes);
+        self!set-content-length($message, $body.bytes);
         supply { emit $body }
     }
 }
@@ -32,12 +36,7 @@ class Cro::HTTP::BodySerializer::StrFallback does Cro::HTTP::BodySerializer {
             }
         }
         my $encoded = $body.encode($encoding);
-
-        if $message.has-header('content-length') {
-            $message.remove-header('content-length');
-        }
-        $message.append-header('Content-length', $encoded.bytes);
-
+        self!set-content-length($message, $encoded.bytes);
         supply { emit $encoded }
     }
 }
@@ -56,5 +55,23 @@ class Cro::HTTP::BodySerializer::SupplyFallback does Cro::HTTP::BodySerializer {
                 emit $chunk;
             }
         }
+    }
+}
+
+class Cro::HTTP::BodySerializer::JSON does Cro::HTTP::BodySerializer {
+    method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
+        with $message.content-type {
+            (.type eq 'application' && .subtype eq 'json' || .suffix eq 'json') &&
+                ($body ~~ Map || $body ~~ List)
+        }
+        else {
+            False
+        }
+    }
+
+    method serialize(Cro::HTTP::Message $message, $body --> Supply) {
+        my $json = to-json($body, :!pretty).encode('utf-8');
+        self!set-content-length($message, $json.bytes);
+        supply { emit $json }
     }
 }

@@ -25,6 +25,7 @@ class Cro::HTTP::BodySerializerSelector::RequestDefault does Cro::HTTP::BodySeri
 
 class Cro::HTTP::BodySerializerSelector::ResponseDefault does Cro::HTTP::BodySerializerSelector {
     my constant @defaults = [
+        Cro::HTTP::BodySerializer::JSON,
         Cro::HTTP::BodySerializer::StrFallback,
         Cro::HTTP::BodySerializer::BlobFallback,
         Cro::HTTP::BodySerializer::SupplyFallback
