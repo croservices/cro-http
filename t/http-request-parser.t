@@ -773,6 +773,20 @@ parses 'A multipart/form-data with a file upload',
             'Second part has correct body';
     };
 
+parses 'An application/json request decodes JSON body',
+    q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-type: application/json
+    Content-Length: 25
+
+    { "foo": [ "bar", 42 ] }
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        ok $body ~~ Hash, '.body of application/json with object gives Hash';
+        is-deeply $body, ${ foo => [ "bar", 42 ] }, 'JSON was correctly decoded';
+    };
+
 # XXX Test these security checks (allow configuration of them):
 #
 # HTTP does not place a predefined limit on the length of a

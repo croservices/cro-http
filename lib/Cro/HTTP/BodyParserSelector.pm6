@@ -15,6 +15,7 @@ class Cro::HTTP::BodyParserSelector::RequestDefault does Cro::HTTP::BodyParserSe
     my constant @defaults = [
         Cro::HTTP::BodyParser::WWWFormUrlEncoded,
         Cro::HTTP::BodyParser::MultiPartFormData,
+        Cro::HTTP::BodyParser::JSON,
         Cro::HTTP::BodyParser::TextFallback,
         Cro::HTTP::BodyParser::BlobFallback
     ];

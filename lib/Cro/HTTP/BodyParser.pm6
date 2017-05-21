@@ -2,6 +2,7 @@ use Cro::HTTP::Header;
 use Cro::HTTP::Message;
 use Cro::HTTP::MultiValue;
 use Cro::MediaType;
+use JSON::Fast;
 
 role Cro::HTTP::BodyParser {
     method is-applicable(Cro::HTTP::Message $message --> Bool) { ... }
@@ -277,6 +278,27 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
                     }
                 }
                 return Value.new(:@parts);
+            }
+        })
+    }
+}
+
+class Cro::HTTP::BodyParser::JSON does Cro::HTTP::BodyParser {
+    method is-applicable(Cro::HTTP::Message $message --> Bool) {
+        with $message.content-type {
+            .type eq 'application' && .subtype eq 'json'
+        }
+        else {
+            False
+        }
+    }
+
+    method parse(Cro::HTTP::Message $message --> Promise) {
+        Promise(supply {
+            my $payload = Blob.new;
+            whenever $message.body-stream -> $blob {
+                $payload ~= $blob;
+                LAST emit from-json($payload.decode('utf-8'));
             }
         })
     }
