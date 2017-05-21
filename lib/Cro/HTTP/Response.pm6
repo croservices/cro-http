@@ -1,4 +1,5 @@
 use Cro::HTTP::BodyParserSelector;
+use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Message;
 
 my constant %reason-phrases = {
@@ -50,6 +51,8 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     has StatusCode $.status is rw;
     has Cro::HTTP::BodyParserSelector $.body-parser-selector is rw =
         Cro::HTTP::BodyParserSelector::ResponseDefault;
+    has Cro::HTTP::BodySerializerSelector $.body-serializer-selector is rw =
+        Cro::HTTP::BodySerializerSelector::ResponseDefault;
 
     multi method Str(Cro::HTTP::Response:D:) {
         my $status = $!status // (self!body-set ?? 200 !! 204);

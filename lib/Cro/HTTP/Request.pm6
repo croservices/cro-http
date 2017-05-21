@@ -1,4 +1,5 @@
 use Cro::HTTP::BodyParserSelector;
+use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Message;
 use Cro::Uri::HTTP;
 
@@ -14,6 +15,8 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     has Str $!cached-uri-target = '';
     has Cro::HTTP::BodyParserSelector $.body-parser-selector is rw =
         Cro::HTTP::BodyParserSelector::RequestDefault;
+    has Cro::HTTP::BodySerializerSelector $.body-serializer-selector is rw =
+        Cro::HTTP::BodySerializerSelector::RequestDefault;
 
     # This one is a little interesting. Per RFC 7230, "The method token
     # indicates the request method to be performed on the target resource.
