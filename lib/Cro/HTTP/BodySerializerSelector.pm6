@@ -13,6 +13,9 @@ role Cro::HTTP::BodySerializerSelector {
 
 class Cro::HTTP::BodySerializerSelector::RequestDefault does Cro::HTTP::BodySerializerSelector {
     my constant @defaults = [
+        Cro::HTTP::BodySerializer::JSON,
+        Cro::HTTP::BodySerializer::StrFallback,
+        Cro::HTTP::BodySerializer::BlobFallback
     ];
 
     method select(Cro::HTTP::Message $message, $body --> Cro::HTTP::BodySerializer) {

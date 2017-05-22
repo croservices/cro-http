@@ -4,6 +4,11 @@ use JSON::Fast;
 role Cro::HTTP::BodySerializer {
     method is-applicable(Cro::HTTP::Message $message, $body --> Bool) { ... }
     method serialize(Cro::HTTP::Message $message, $body --> Supply) { ... }
+    method !set-default-content-type(Cro::HTTP::Message $message, Str $type --> Nil) {
+        unless $message.has-header('content-type') {
+            $message.append-header('Content-type', $type);
+        }
+    }
     method !set-content-length(Cro::HTTP::Message $message, Int $length --> Nil) {
         if $message.has-header('content-length') {
             $message.remove-header('content-length');
@@ -18,6 +23,7 @@ class Cro::HTTP::BodySerializer::BlobFallback does Cro::HTTP::BodySerializer {
     }
 
     method serialize(Cro::HTTP::Message $message, $body --> Supply) {
+        self!set-default-content-type($message, 'application/octet-stream');
         self!set-content-length($message, $body.bytes);
         supply { emit $body }
     }
@@ -31,9 +37,12 @@ class Cro::HTTP::BodySerializer::StrFallback does Cro::HTTP::BodySerializer {
     method serialize(Cro::HTTP::Message $message, $body --> Supply) {
         my $encoding = 'utf-8';
         with $message.content-type {
-            with .parameters.first(*.name eq 'charset') {
+            with .parameters.first(*.key eq 'charset') {
                 $encoding = .value;
             }
+        }
+        else {
+            $message.append-header('Content-type', qq[text/plain; charset="$encoding"]);
         }
         my $encoded = $body.encode($encoding);
         self!set-content-length($message, $encoded.bytes);
