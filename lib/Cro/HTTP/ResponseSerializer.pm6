@@ -19,7 +19,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                 # Otherwise, obtain body. We must do it before serializing the
                 # headers, as this is the point that a content-length header
                 # may be added in.
-                my $body-byte-stream = $response.body-byte-stream; 
+                my $body-byte-stream = $response.body-byte-stream;
                 if $response.has-header('content-length') {
                     # Has Content-length header, so already all available; no need
                     # for chunked.
