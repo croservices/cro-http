@@ -94,7 +94,7 @@ class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::HTTP::BodyParser {
         Promise(supply {
             my $payload = '';
             whenever $message.body-byte-stream -> $blob {
-                # Per spec, should only have octets 0x00-0x70, with higher
+                # Per spec, should only have octets 0x00-0x7F, with higher
                 # ones %-encoded.
                 $payload ~= $blob.decode('ascii');
                 LAST emit Values.new(pairs => decode-payload-to-pairs());
