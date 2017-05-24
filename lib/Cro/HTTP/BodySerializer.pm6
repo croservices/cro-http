@@ -84,3 +84,39 @@ class Cro::HTTP::BodySerializer::JSON does Cro::HTTP::BodySerializer {
         supply { emit $json }
     }
 }
+
+class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerializer {
+    method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
+        with $message.content-type {
+            .type eq 'application' && .subtype eq 'x-www-form-urlencoded'
+        }
+        else {
+            False
+        }
+    }
+
+    proto method serialize(Cro::HTTP::Message $message, $body --> Supply) {*}
+
+    multi method serialize(Cro::HTTP::Message $message, @body --> Supply) {
+        my @parts;
+        for @body -> $entry {
+            if $entry ~~ Pair {
+                @parts.push: encode($entry.key) ~ '=' ~ encode($entry.value);
+            }
+            else {
+                die "A list body for application/x-www-form-urlencoded may only contain pairs";
+            }
+        }
+        my $body = @parts.join('&').encode('ascii');
+        self!set-content-length($message, $body.bytes);
+        supply { emit $body }
+    }
+
+    multi method serialize(Cro::HTTP::Message $message, $body --> Supply) {
+        die "Do not know how to serialize a $body.^name() as application/x-www-form-urlencoded";
+    }
+
+    sub encode($target) {
+        $target.subst(' ', '+', :g)
+    }
+}
