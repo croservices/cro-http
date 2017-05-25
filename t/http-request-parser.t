@@ -685,7 +685,7 @@ parses 'Simple multipart/form-data',
         is @parts[0].headers[0].name, 'Content-Disposition', 'First part header name correct';
         is @parts[0].headers[0].value, 'form-data; name="a"', 'First part header value correct';
         ok @parts[0].content-type ~~ Cro::MediaType,
-            'First part has a content-type that is a Crow::MediaType';
+            'First part has a content-type that is a Cro::MediaType';
         is @parts[0].content-type.type, 'text', 'First part has default text type';
         is @parts[0].content-type.subtype, 'plain', 'First part has default plain subtype';
         is @parts[0].field-name, 'a', 'First part has correct field name';
@@ -698,7 +698,7 @@ parses 'Simple multipart/form-data',
         is @parts[1].headers[0].value, 'form-data; name="b"', 'Second part header value correct';
         is @parts[1].field-name, 'b', 'Second part has correct field name';
         ok @parts[1].content-type ~~ Cro::MediaType,
-            'Second part has a content-type that is a Crow::MediaType';
+            'Second part has a content-type that is a Cro::MediaType';
         is @parts[1].content-type.type, 'text', 'Second part has default text type';
         is @parts[1].content-type.subtype, 'plain', 'Second part has default plain subtype';
         is-deeply @parts[1].body-blob, '53399393939222'.encode('ascii'),
@@ -740,7 +740,7 @@ parses 'A multipart/form-data with a file upload',
         is @parts[0].headers[0].name, 'Content-Disposition', 'First part header name correct';
         is @parts[0].headers[0].value, 'form-data; name="title"', 'First part header value correct';
         ok @parts[0].content-type ~~ Cro::MediaType,
-            'First part has a content-type that is a Crow::MediaType';
+            'First part has a content-type that is a Cro::MediaType';
         is @parts[0].content-type.type, 'text', 'First part has default text type';
         is @parts[0].content-type.subtype, 'plain', 'First part has default plain subtype';
         is @parts[0].field-name, 'title', 'First part has correct field name';
@@ -758,7 +758,7 @@ parses 'A multipart/form-data with a file upload',
         is @parts[1].headers[1].value, 'image/gif',
             'Second header value correct';
         ok @parts[1].content-type ~~ Cro::MediaType,
-            'Second part has a content-type that is a Crow::MediaType';
+            'Second part has a content-type that is a Cro::MediaType';
         is @parts[1].content-type.type, 'image', 'Second part has image media type';
         is @parts[1].content-type.subtype, 'gif', 'Second part has gif media subtype';
         is @parts[1].field-name, 'photo', 'Second part has correct field name';
