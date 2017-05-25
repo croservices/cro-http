@@ -1,6 +1,6 @@
+use Cro::HTTP::Body;
 use Cro::HTTP::Header;
 use Cro::HTTP::Message;
-use Cro::HTTP::MultiValue;
 use Cro::MediaType;
 use JSON::Fast;
 
@@ -30,56 +30,6 @@ class Cro::HTTP::BodyParser::TextFallback does Cro::HTTP::BodyParser {
 }
 
 class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::HTTP::BodyParser {
-    class Values does Associative {
-        has @!pairs;
-        has $!hashed;
-
-        submethod BUILD(:@pairs) {
-            @!pairs := @pairs
-        }
-
-        method pairs() {
-            Seq.new(@!pairs.iterator)
-        }
-
-        method list() {
-            self.pairs.list
-        }
-
-        method hash() {
-            self!hashed
-        }
-
-        method AT-KEY(Str() $key) {
-            self!hashed.AT-KEY($key)
-        }
-
-        method EXISTS-KEY(Str() $key) {
-            self!hashed.EXISTS-KEY($key)
-        }
-
-        method !hashed() {
-            without $!hashed {
-                my %hashed-pairs;
-                for @!pairs -> $p {
-                    with %hashed-pairs{$p.key} -> $existing {
-                        %hashed-pairs{$p.key} = Cro::HTTP::MultiValue.new(
-                            $existing ~~ Cro::HTTP::MultiValue
-                                ?? $existing.Slip
-                                !! $existing,
-                            $p.value
-                        );
-                    }
-                    else {
-                        %hashed-pairs{$p.key} = $p.value;
-                    }
-                }
-                $!hashed := %hashed-pairs;
-            }
-            $!hashed
-        }
-    }
-
     has Str $.default-encoding = 'utf-8';
 
     method default-encoding() {
@@ -97,7 +47,9 @@ class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::HTTP::BodyParser {
                 # Per spec, should only have octets 0x00-0x7F, with higher
                 # ones %-encoded.
                 $payload ~= $blob.decode('ascii');
-                LAST emit Values.new(pairs => decode-payload-to-pairs());
+                LAST emit Cro::HTTP::Body::WWWFormUrlEncoded.new(
+                    pairs => decode-payload-to-pairs()
+                );
             }
 
             sub decode-payload-to-pairs() {
@@ -158,36 +110,6 @@ class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::HTTP::BodyParser {
 }
 
 class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
-    class Value {
-        class Part {
-            has Cro::HTTP::Header @.headers;
-            has Str $.field-name;
-            has Str $.filename;
-            has Blob $.body-blob;
-
-            method body-text() {
-                (try $!body-blob.decode('utf-8')) // $!body-blob.decode('latin-1')
-            }
-
-            method body() {
-                self.content-type.type eq 'text'
-                    ?? self.body-text
-                    !! self.body-blob
-            }
-
-            method content-type() {
-                with @!headers.first(*.name.lc eq 'content-type') {
-                    Cro::MediaType.parse(.value)
-                }
-                else {
-                    BEGIN Cro::MediaType.new(type => 'text', subtype-name => 'plain') 
-                }
-            }
-        }
-
-        has Part @.parts;
-    }
-
     method is-applicable(Cro::HTTP::Message $message --> Bool) {
         with $message.content-type {
             .type eq 'multipart' && .subtype eq 'form-data'
@@ -271,13 +193,15 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
                         my $filename-param = @params.first(*.key.lc eq 'filename');
                         my $filename = $filename-param ?? $filename-param.value !! Str;
                         my $body-blob = $body-str.encode('latin-1');
-                        push @parts, Value::Part.new(:@headers, :$field-name, :$filename, :$body-blob);
+                        push @parts, Cro::HTTP::Body::MultiPartFormData::Part.new(
+                            :@headers, :$field-name, :$filename, :$body-blob
+                        );
                     }
                     else {
                         die "Missing content-disposition header in multipart/form-data part";
                     }
                 }
-                return Value.new(:@parts);
+                return Cro::HTTP::Body::MultiPartFormData.new(:@parts);
             }
         })
     }
