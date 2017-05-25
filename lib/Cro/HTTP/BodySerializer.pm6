@@ -112,6 +112,10 @@ class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerialize
         supply { emit $body }
     }
 
+    multi method serialize(Cro::HTTP::Message $message, %body --> Supply) {
+        self.serialize($message, %body.pairs)
+    }
+
     multi method serialize(Cro::HTTP::Message $message, $body --> Supply) {
         die "Do not know how to serialize a $body.^name() as application/x-www-form-urlencoded";
     }

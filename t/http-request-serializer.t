@@ -207,4 +207,21 @@ is-request
         x=%C3%80b&%E3%82%A2%E3%82%A2=1
         REQUEST
 
+is-request
+    supply {
+        my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
+        $req.append-header('Host', 'localhost');
+        $req.append-header('Content-type', 'application/x-www-form-urlencoded');
+        $req.set-body({ x => 42 }); # Just one elem, to avoid ordering fun...
+        emit $req;
+    },
+    q:to/REQUEST/.chop, 'application/x-www-form-urlencoded with hash';
+        POST /foo HTTP/1.1
+        Host: localhost
+        Content-type: application/x-www-form-urlencoded
+        Content-length: 4
+
+        x=42
+        REQUEST
+
 done-testing;
