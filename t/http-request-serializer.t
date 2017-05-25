@@ -1,4 +1,5 @@
 use Test;
+use Cro::HTTP::Body;
 use Cro::HTTP::Request;
 use Cro::HTTP::RequestSerializer;
 use Cro::TCP;
@@ -222,6 +223,25 @@ is-request
         Content-length: 4
 
         x=42
+        REQUEST
+
+is-request
+    supply {
+        my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
+        $req.append-header('Host', 'localhost');
+        $req.append-header('Content-type', 'application/x-www-form-urlencoded');
+        $req.set-body(Cro::HTTP::Body::WWWFormUrlEncoded.new(pairs => (
+            x => 'A+C', x => '100%AA!', 'A+C' => '1', '100%AA!' => '2'
+        )));
+        emit $req;
+    },
+    q:to/REQUEST/.chop, 'application/x-www-form-urlencoded with body object';
+        POST /foo HTTP/1.1
+        Host: localhost
+        Content-type: application/x-www-form-urlencoded
+        Content-length: 43
+
+        x=A%2BC&x=100%25AA%21&A%2BC=1&100%25AA%21=2
         REQUEST
 
 done-testing;
