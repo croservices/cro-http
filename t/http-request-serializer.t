@@ -170,4 +170,41 @@ is-request
         rooms=2&balcony=true&area=Praha+3
         REQUEST
 
+is-request
+    supply {
+        my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
+        $req.append-header('Host', 'localhost');
+        $req.append-header('Content-type', 'application/x-www-form-urlencoded');
+        $req.set-body((x => 'A+C', y => '100%AA!', 'A+C' => '1', '100%AA!' => '2'));
+        emit $req;
+    },
+    q:to/REQUEST/.chop, 'application/x-www-form-urlencoded with ASCII things needing escaping';
+        POST /foo HTTP/1.1
+        Host: localhost
+        Content-type: application/x-www-form-urlencoded
+        Content-length: 43
+
+        x=A%2BC&y=100%25AA%21&A%2BC=1&100%25AA%21=2
+        REQUEST
+
+is-request
+    supply {
+        my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
+        $req.append-header('Host', 'localhost');
+        $req.append-header('Content-type', 'application/x-www-form-urlencoded');
+        $req.set-body((
+            x => "\c[LATIN CAPITAL LETTER A WITH GRAVE]b",
+            "\c[KATAKANA LETTER A]\c[KATAKANA LETTER A]" => '1'
+        ));
+        emit $req;
+    },
+    q:to/REQUEST/.chop, 'application/x-www-form-urlencoded with ASCII things needing escaping';
+        POST /foo HTTP/1.1
+        Host: localhost
+        Content-type: application/x-www-form-urlencoded
+        Content-length: 30
+
+        x=%C3%80b&%E3%82%A2%E3%82%A2=1
+        REQUEST
+
 done-testing;

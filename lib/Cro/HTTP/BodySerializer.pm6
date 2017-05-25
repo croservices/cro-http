@@ -117,6 +117,12 @@ class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerialize
     }
 
     sub encode($target) {
-        $target.subst(' ', '+', :g)
+        $target.subst: :g, /<-[A..Za..z0..9_~.-]>/, -> Str() $encodee {
+            $encodee eq ' '
+                ?? '+'
+                !! $encodee le "\x7F"
+                    ?? '%' ~ $encodee.ord.base(16)
+                    !! $encodee.encode('utf-8').list.map({ '%' ~ .base(16) }).join
+        }
     }
 }
