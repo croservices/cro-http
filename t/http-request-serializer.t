@@ -244,4 +244,22 @@ is-request
         x=A%2BC&x=100%25AA%21&A%2BC=1&100%25AA%21=2
         REQUEST
 
+is-request
+    supply {
+        my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
+        $req.append-header('Host', 'localhost');
+        $req.set-body(Cro::HTTP::Body::WWWFormUrlEncoded.new(pairs => (
+            x => 'A+C', x => '100%AA!', 'A+C' => '1', '100%AA!' => '2'
+        )));
+        emit $req;
+    },
+    q:to/REQUEST/.chop, 'application/x-www-form-urlencoded body object implies header';
+        POST /foo HTTP/1.1
+        Host: localhost
+        Content-type: application/x-www-form-urlencoded
+        Content-length: 43
+
+        x=A%2BC&x=100%25AA%21&A%2BC=1&100%25AA%21=2
+        REQUEST
+
 done-testing;

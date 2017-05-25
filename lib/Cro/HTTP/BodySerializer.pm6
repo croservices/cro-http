@@ -1,3 +1,4 @@
+use Cro::HTTP::Body;
 use Cro::HTTP::Message;
 use JSON::Fast;
 
@@ -87,7 +88,10 @@ class Cro::HTTP::BodySerializer::JSON does Cro::HTTP::BodySerializer {
 
 class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerializer {
     method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
-        with $message.content-type {
+        if $body ~~ Cro::HTTP::Body::WWWFormUrlEncoded {
+            True
+        }
+        orwith $message.content-type {
             .type eq 'application' && .subtype eq 'x-www-form-urlencoded'
         }
         else {
@@ -108,6 +112,7 @@ class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerialize
             }
         }
         my $body = @parts.join('&').encode('ascii');
+        self!set-default-content-type($message, 'application/x-www-form-urlencoded');
         self!set-content-length($message, $body.bytes);
         supply { emit $body }
     }
