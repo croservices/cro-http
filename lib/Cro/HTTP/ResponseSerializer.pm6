@@ -24,7 +24,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                     # Has Content-length header, so already all available; no need
                     # for chunked.
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
-                    whenever $response.body-byte-stream() -> $data {
+                    whenever $body-byte-stream -> $data {
                         emit Cro::TCP::Message.new(:$data);
                         LAST done;
                     }
@@ -33,7 +33,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                     # Chunked-encode body as it becomes available.
                     $response.append-header('Transfer-encoding', 'chunked');
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
-                    whenever $response.body-byte-stream() -> $data {
+                    whenever $body-byte-stream -> $data {
                         if $data.elems {
                             my $header = ($data.elems.base(16) ~ "\r\n").encode('ascii');
                             emit Cro::TCP::Message.new(data => $header);
