@@ -135,3 +135,76 @@ class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerialize
         }
     }
 }
+
+class Cro::HTTP::BodySeiralizer::MultiPartFormData does Cro::HTTP::BodySerializer {
+    method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
+        if $body ~~ Cro::HTTP::Body::MultiPartFormData {
+            True
+        }
+        orwith $message.content-type {
+            .type eq 'multipart' && .subtype eq 'form-data'
+        }
+        else {
+            False
+        }
+    }
+
+    proto method serialize(Cro::HTTP::Message $message, $body --> Supply) {*}
+
+    multi method serialize(Cro::HTTP::Message $message,
+                           Cro::HTTP::Body::MultiPartFormData $data --> Supply) {
+        my $boundary = self.generate-boundary;
+        my $encoded = Buf.new;
+        for $data.parts {
+            $encoded.append("--$boundary\r\n".encode('ascii'));
+            my $emitted-disposition = False;
+            with .field-name {
+                my $header = qq[Content-Disposition: form-data; name="$_"\r\n];
+                $encoded.append($header.encode('ascii'));
+                $emitted-disposition = True;
+            }
+            for .headers {
+                if .name.lc eq 'content-disposition' {
+                    next if $emitted-disposition;
+                    $emitted-disposition = True;
+                }
+                $encoded.append("{.name}: {.value}\r\n".encode('ascii'));
+            }
+            $encoded.append(BEGIN "\r\n".encode('ascii'));
+            $encoded.append(.body-blob);
+            $encoded.append(BEGIN "\r\n".encode('ascii'));
+        }
+        $encoded.append("--{$boundary}--\r\n".encode('ascii'));
+
+        $message.remove-header('Content-type');
+        $message.append-header('Content-type', 'multipart/form-data; boundary="' ~ $boundary ~ '"');
+        self!set-content-length($message, $encoded.bytes);
+        supply { emit $encoded }
+    }
+
+    multi method serialize(Cro::HTTP::Message $message, @body --> Supply) {
+        self.serialize: $message, Cro::HTTP::Body::MultiPartFormData.new:
+            parts => @body.map: {
+                when Pair {
+                    Cro::HTTP::Body::MultiPartFormData::Part.new(
+                        field-name => .key,
+                        body-blob => .value ~~ Blob ?? .value !! .value.Str.encode('utf-8')
+                    )
+                }
+                when Cro::HTTP::Body::MultiPartFormData::Part {
+                    $_
+                }
+                default {
+                    die "Don't know how to handle $_.^name() in multipart/form-data body";
+                }
+            }
+    }
+
+    multi method serialize(Cro::HTTP::Message $message, %body --> Supply) {
+        self.serialize($message, %body.pairs)
+    }
+
+    method generate-boundary(--> Str) {
+        '-' x 15 ~ (^10).roll(20).join
+    }
+}

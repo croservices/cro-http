@@ -4,16 +4,21 @@ use Cro::HTTP::Request;
 use Cro::HTTP::RequestSerializer;
 use Cro::TCP;
 
-sub is-request(Supply $source, Str $expected-output, $desc) {
+sub is-request(Supply $source, Str $expected-output, $desc, :$rx) {
     my $rs = Cro::HTTP::RequestSerializer.new();
     my $joined-output = Blob.new;
     $rs.transformer($source).tap: -> $tcp-message {
         $joined-output ~= $tcp-message.data;
     }
-    my ($header, $body) = $expected-output.split("\n\n", 2);
-    $header .= subst("\n", "\r\n", :g);
-    my $expected-buf = "$header\r\n\r\n".encode('latin-1') ~ $body.encode('utf-8');
-    is $joined-output.decode('utf-8'), $expected-buf.decode('utf-8'), $desc;
+    if $rx {
+        like $joined-output.decode('utf-8'), /<$expected-output>/, $desc;
+    }
+    else {
+        my ($header, $body) = $expected-output.split("\n\n", 2);
+        $header .= subst("\n", "\r\n", :g);
+        my $expected-buf = "$header\r\n\r\n".encode('latin-1') ~ $body.encode('utf-8');
+        is $joined-output.decode('utf-8'), $expected-buf.decode('utf-8'), $desc;
+    }
 }
 
 is-request
@@ -260,6 +265,31 @@ is-request
         Content-length: 43
 
         x=A%2BC&x=100%25AA%21&A%2BC=1&100%25AA%21=2
+        REQUEST
+
+is-request
+    supply {
+        my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
+        $req.append-header('Host', 'localhost');
+        $req.append-header('Content-type', 'multipart/form-data');
+        $req.set-body([a => 3555555555555555551, b => 53399393939222]);
+        emit $req;
+    },
+    Q:to/REQUEST/.chop, :rx, 'multipart/form-data with list of pairs';
+        'POST /foo HTTP/1.1' \n
+        'Host: localhost' \n
+        'Content-type: multipart/form-data; boundary="' $<b>=[<-["]>+] '"' \n
+        'Content-length: '\d+ \n
+        \n
+        '--' $<b> \n
+        'Content-Disposition: form-data; name="a"' \n
+        \n
+        '3555555555555555551' \n
+        '--' $<b> \n
+        'Content-Disposition: form-data; name="b"' \n
+        \n
+        '53399393939222' \n
+        '--' $<b> '--'  \n
         REQUEST
 
 done-testing;
