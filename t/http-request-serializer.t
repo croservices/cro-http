@@ -292,4 +292,38 @@ is-request
         '--' $<b> '--'  \n
         REQUEST
 
+is-request
+    supply {
+        my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
+        $req.append-header('Host', 'localhost');
+        $req.append-header('Content-type', 'multipart/form-data');
+        $req.set-body([
+            title => 'Wow an image',
+            Cro::HTTP::Body::MultiPartFormData::Part.new(
+                field-name => 'image',
+                filename => 'foo.gif',
+                headers => [Cro::HTTP::Header.new(name => 'Content-type', value => 'image/gif')],
+                body-blob => 'GIF'.encode('ascii')
+            )
+        ]);
+        emit $req;
+    },
+    Q:to/REQUEST/.chop, :rx, 'multipart/form-data with filename and extra header';
+        'POST /foo HTTP/1.1' \n
+        'Host: localhost' \n
+        'Content-type: multipart/form-data; boundary="' $<b>=[<-["]>+] '"' \n
+        'Content-length: '\d+ \n
+        \n
+        '--' $<b> \n
+        'Content-Disposition: form-data; name="title"' \n
+        \n
+        'Wow an image' \n
+        '--' $<b> \n
+        'Content-Disposition: form-data; name="image"; filename="foo.gif"' \n
+        'Content-type: image/gif' \n
+        \n
+        'GIF' \n
+        '--' $<b> '--'  \n
+        REQUEST
+
 done-testing;

@@ -155,15 +155,18 @@ class Cro::HTTP::BodySeiralizer::MultiPartFormData does Cro::HTTP::BodySerialize
                            Cro::HTTP::Body::MultiPartFormData $data --> Supply) {
         my $boundary = self.generate-boundary;
         my $encoded = Buf.new;
-        for $data.parts {
+        for $data.parts -> $part {
             $encoded.append("--$boundary\r\n".encode('ascii'));
             my $emitted-disposition = False;
-            with .field-name {
-                my $header = qq[Content-Disposition: form-data; name="$_"\r\n];
-                $encoded.append($header.encode('ascii'));
+            with $part.field-name {
+                my $header = qq[Content-Disposition: form-data; name="{.subst('"', '\\"', :g)}"];
+                with $part.filename {
+                    $header ~= qq[; filename="{.subst('"', '\\"', :g)}"];
+                }
+                $encoded.append("$header\r\n".encode('ascii'));
                 $emitted-disposition = True;
             }
-            for .headers {
+            for $part.headers {
                 if .name.lc eq 'content-disposition' {
                     next if $emitted-disposition;
                     $emitted-disposition = True;
@@ -171,7 +174,7 @@ class Cro::HTTP::BodySeiralizer::MultiPartFormData does Cro::HTTP::BodySerialize
                 $encoded.append("{.name}: {.value}\r\n".encode('ascii'));
             }
             $encoded.append(BEGIN "\r\n".encode('ascii'));
-            $encoded.append(.body-blob);
+            $encoded.append($part.body-blob);
             $encoded.append(BEGIN "\r\n".encode('ascii'));
         }
         $encoded.append("--{$boundary}--\r\n".encode('ascii'));
