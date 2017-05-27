@@ -688,7 +688,7 @@ parses 'Simple multipart/form-data',
             'First part has a content-type that is a Cro::MediaType';
         is @parts[0].content-type.type, 'text', 'First part has default text type';
         is @parts[0].content-type.subtype, 'plain', 'First part has default plain subtype';
-        is @parts[0].field-name, 'a', 'First part has correct field name';
+        is @parts[0].name, 'a', 'First part has correct field name';
         is-deeply @parts[0].body-blob, '3555555555555555551'.encode('ascii'),
             'First part has correct body blob';
         is @parts[0].body-text, '3555555555555555551', 'First part has correct body text';
@@ -696,7 +696,7 @@ parses 'Simple multipart/form-data',
         is @parts[1].headers.elems, 1, 'Second part has 1 header';
         is @parts[1].headers[0].name, 'Content-Disposition', 'Second part header name correct';
         is @parts[1].headers[0].value, 'form-data; name="b"', 'Second part header value correct';
-        is @parts[1].field-name, 'b', 'Second part has correct field name';
+        is @parts[1].name, 'b', 'Second part has correct field name';
         ok @parts[1].content-type ~~ Cro::MediaType,
             'Second part has a content-type that is a Cro::MediaType';
         is @parts[1].content-type.type, 'text', 'Second part has default text type';
@@ -743,7 +743,7 @@ parses 'A multipart/form-data with a file upload',
             'First part has a content-type that is a Cro::MediaType';
         is @parts[0].content-type.type, 'text', 'First part has default text type';
         is @parts[0].content-type.subtype, 'plain', 'First part has default plain subtype';
-        is @parts[0].field-name, 'title', 'First part has correct field name';
+        is @parts[0].name, 'title', 'First part has correct field name';
         ok !defined(@parts[0].filename), 'First part has no filename';
         is @parts[0].body-text, 'I can see right through this', 'First part has correct body text';
         is-deeply @parts[0].body, 'I can see right through this', 'First part has correct body';
@@ -761,7 +761,7 @@ parses 'A multipart/form-data with a file upload',
             'Second part has a content-type that is a Cro::MediaType';
         is @parts[1].content-type.type, 'image', 'Second part has image media type';
         is @parts[1].content-type.subtype, 'gif', 'Second part has gif media subtype';
-        is @parts[1].field-name, 'photo', 'Second part has correct field name';
+        is @parts[1].name, 'photo', 'Second part has correct field name';
         is @parts[1].filename, 'Transparent.gif', 'Second part has correct filename';
         is-deeply @parts[1].body-blob,
             Blob[uint8].new(71,73,70,56,57,97,1,0,1,0,128,0,0,0,0,0,255,255,255,33,249,4,1,

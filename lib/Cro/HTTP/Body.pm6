@@ -59,7 +59,7 @@ class WWWFormUrlEncoded does Associative {
 class MultiPartFormData {
     class Part {
         has Cro::HTTP::Header @.headers;
-        has Str $.field-name;
+        has Str $.name;
         has Str $.filename;
         has Blob $.body-blob;
 

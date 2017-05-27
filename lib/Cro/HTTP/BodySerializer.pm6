@@ -158,7 +158,7 @@ class Cro::HTTP::BodySeiralizer::MultiPartFormData does Cro::HTTP::BodySerialize
         for $data.parts -> $part {
             $encoded.append("--$boundary\r\n".encode('ascii'));
             my $emitted-disposition = False;
-            with $part.field-name {
+            with $part.name {
                 my $header = qq[Content-Disposition: form-data; name="{.subst('"', '\\"', :g)}"];
                 with $part.filename {
                     $header ~= qq[; filename="{.subst('"', '\\"', :g)}"];
@@ -190,7 +190,7 @@ class Cro::HTTP::BodySeiralizer::MultiPartFormData does Cro::HTTP::BodySerialize
             parts => @body.map: {
                 when Pair {
                     Cro::HTTP::Body::MultiPartFormData::Part.new(
-                        field-name => .key,
+                        name => .key,
                         body-blob => .value ~~ Blob ?? .value !! .value.Str.encode('utf-8')
                     )
                 }

@@ -300,7 +300,7 @@ is-request
         $req.set-body([
             title => 'Wow an image',
             Cro::HTTP::Body::MultiPartFormData::Part.new(
-                field-name => 'image',
+                name => 'image',
                 filename => 'foo.gif',
                 headers => [Cro::HTTP::Header.new(name => 'Content-type', value => 'image/gif')],
                 body-blob => 'GIF'.encode('ascii')

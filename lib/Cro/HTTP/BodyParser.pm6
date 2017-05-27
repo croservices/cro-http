@@ -189,12 +189,12 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
                         without $name-param {
                             die "Missing name parameter in content-disposition of multipart/formdata";
                         }
-                        my $field-name = $name-param.value;
+                        my $name = $name-param.value;
                         my $filename-param = @params.first(*.key.lc eq 'filename');
                         my $filename = $filename-param ?? $filename-param.value !! Str;
                         my $body-blob = $body-str.encode('latin-1');
                         push @parts, Cro::HTTP::Body::MultiPartFormData::Part.new(
-                            :@headers, :$field-name, :$filename, :$body-blob
+                            :@headers, :$name, :$filename, :$body-blob
                         );
                     }
                     else {
