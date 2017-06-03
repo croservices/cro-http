@@ -825,4 +825,66 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $app = route {
+        get -> 'blob' {
+            request-body-blob -> $blob {
+                content 'text/plain', "blob: {$blob ~~ Blob}, $blob.elems()"
+            }
+        }
+
+        get -> 'text' {
+            request-body-text -> $text {
+                content 'text/plain', "text: {$text ~~ Str}, $text.chars()"
+            }
+        }
+
+        get -> 'body' {
+            request-body -> $body {
+                content 'text/plain', "body: city is $body<city>, rooms is $body<rooms>";
+            }
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $test-body-stream = supply { emit 'city=Praha&rooms=2'.encode('ascii') }
+    my $test-body-length = 18;
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</blob>);
+        $req.append-header('Content-type', 'application/x-www-form-urlencoded');
+        $req.append-header('Content-length', $test-body-length);
+        $req.set-body-byte-stream($test-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'blob: True, 18',
+                'request-body-blob passed a block invokes it with the body blob';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</text>);
+        $req.append-header('Content-type', 'application/x-www-form-urlencoded');
+        $req.append-header('Content-length', $test-body-length);
+        $req.set-body-byte-stream($test-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'text: True, 18',
+                'request-body-text passed a block invokes it with the body text';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</body>);
+        $req.append-header('Content-type', 'application/x-www-form-urlencoded');
+        $req.append-header('Content-length', $test-body-length);
+        $req.set-body-byte-stream($test-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'body: city is Praha, rooms is 2',
+                'request-body passed a block invokes it with the body object';
+        }
+    }
+}
+
 done-testing;

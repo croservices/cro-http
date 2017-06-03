@@ -245,6 +245,18 @@ module Cro::HTTP::Router {
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<response>)
     }
 
+    sub request-body-blob($handler) is export {
+        $handler(await request.body-blob)
+    }
+
+    sub request-body-text($handler) is export {
+        $handler(await request.body-text)
+    }
+
+    sub request-body($handler) is export {
+        $handler(await request.body)
+    }
+
     proto header(|) is export {*}
     multi header(Cro::HTTP::Header $header --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
