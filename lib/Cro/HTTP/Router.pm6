@@ -237,7 +237,7 @@ module Cro::HTTP::Router {
 
     sub term:<request>() is export {
         $*CRO-ROUTER-REQUEST //
-        die X::Cro::HTTP::Router::OnlyInHandler.new(:what<request>)
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<request>)
     }
 
     sub term:<response>() is export {
