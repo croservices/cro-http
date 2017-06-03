@@ -258,20 +258,20 @@ module Cro::HTTP::Router {
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<response>)
     }
 
-    sub request-body-blob($handler) is export {
-        run-body-handler($handler, await request.body-blob)
+    sub request-body-blob(**@handlers) is export {
+        run-body-handler(@handlers, await request.body-blob)
     }
 
-    sub request-body-text($handler) is export {
-        run-body-handler($handler, await request.body-text)
+    sub request-body-text(**@handlers) is export {
+        run-body-handler(@handlers, await request.body-text)
     }
 
-    sub request-body($handler) is export {
-        run-body-handler($handler, await request.body)
+    sub request-body(**@handlers) is export {
+        run-body-handler(@handlers, await request.body)
     }
 
-    sub run-body-handler($handler, \body) {
-        given $handler {
+    sub run-body-handler(@handlers, \body) {
+        for @handlers {
             when Block {
                 return .(body);
             }
@@ -281,6 +281,9 @@ module Cro::HTTP::Router {
                         return .value()(body);
                     }
                 }
+            }
+            default {
+                die "request-body handlers can only be a Block or a Pair, not a $_.^name()";
             }
         }
         die X::Cro::HTTP::Router::NoRequestBodyMatch.new;

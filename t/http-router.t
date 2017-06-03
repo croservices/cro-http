@@ -850,6 +850,19 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
                 content 'text/plain', "pair: x is $body<x>, y is $body<y>";
             }
         }
+
+        get -> 'list' {
+            request-body
+                'application/json' => -> $body {
+                    content 'text/plain', "list(json): x is $body<x>, y is $body<y>";
+                },
+                'text/plain' => -> $body {
+                    content 'text/plain', "list(text): $body";
+                },
+                {
+                    content 'text/plain', "list(unknown)";
+                }
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -916,6 +929,42 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         $source.emit($req);
         given $responses.receive -> $r {
             is $r.status, '400', 'When no body match, get bad request response';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</list>);
+        $req.append-header('Content-type', 'application/json; charset="UTF-8"');
+        $req.append-header('Content-length', $json-body-length);
+        $req.set-body-byte-stream($json-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'list(json): x is 42, y is 101',
+                'request-body passed a list chooses first Pair if there is a match';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</list>);
+        $req.append-header('Content-type', 'text/plain; charset="UTF-8"');
+        $req.append-header('Content-length', $json-body-length);
+        $req.set-body-byte-stream($json-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'list(text): {"x":42,"y":101}',
+                'request-body passed a list chooses second Pair if there is a match';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</list>);
+        $req.append-header('Content-type', 'application/x-mystery; charset="UTF-8"');
+        $req.append-header('Content-length', $json-body-length);
+        $req.set-body-byte-stream($json-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'list(unknown)',
+                'request-body passed a list chooses final block if no earlier pairs match';
         }
     }
 }
