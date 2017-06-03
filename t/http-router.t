@@ -844,9 +844,16 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
                 content 'text/plain', "body: city is $body<city>, rooms is $body<rooms>";
             }
         }
+
+        get -> 'pair' {
+            request-body 'application/json' => -> $body {
+                content 'text/plain', "pair: x is $body<x>, y is $body<y>";
+            }
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
+
     my $test-body-stream = supply { emit 'city=Praha&rooms=2'.encode('ascii') }
     my $test-body-length = 18;
 
@@ -883,6 +890,32 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         given $responses.receive -> $r {
             is body-text($r), 'body: city is Praha, rooms is 2',
                 'request-body passed a block invokes it with the body object';
+        }
+    }
+
+    my $json-body-stream = supply { emit '{"x":42,"y":101}'.encode('ascii') }
+    my $json-body-length = 16;
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</pair>);
+        $req.append-header('Content-type', 'application/json; charset="UTF-8"');
+        $req.append-header('Content-length', $json-body-length);
+        $req.set-body-byte-stream($json-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'pair: x is 42, y is 101',
+                'request-body passed a pair invokes block when content type matches';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</pair>);
+        $req.append-header('Content-type', 'application/vnd.me+json; charset="UTF-8"');
+        $req.append-header('Content-length', $json-body-length);
+        $req.set-body-byte-stream($json-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is $r.status, '400', 'When no body match, get bad request response';
         }
     }
 }

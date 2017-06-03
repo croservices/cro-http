@@ -8,6 +8,13 @@ class X::Cro::HTTP::Router::OnlyInHandler is Exception {
         "Can only use '$!what' inside of a request handler"
     }
 }
+class X::Cro::HTTP::Router::NoRequestBodyMatch is Exception {
+    method message() {
+        "None of the request-body matches could handle the body (this exception " ~
+        "type is typically caught and handled by Cro to produce a 400 Bad Request " ~
+        "error; if you're seeing it, you may have an over-general error handling)"
+    }
+}
 
 module Cro::HTTP::Router {
     role Query {}
@@ -50,6 +57,12 @@ module Cro::HTTP::Router {
                             implementation(|$arg-capture);
                         }
                         emit $*CRO-ROUTER-RESPONSE;
+                        CATCH {
+                            when X::Cro::HTTP::Router::NoRequestBodyMatch {
+                                $*CRO-ROUTER-RESPONSE.status = 400;
+                                emit $*CRO-ROUTER-RESPONSE;
+                            }
+                        }
                     }
                     else {
                         my $status = 404;
@@ -246,15 +259,31 @@ module Cro::HTTP::Router {
     }
 
     sub request-body-blob($handler) is export {
-        $handler(await request.body-blob)
+        run-body-handler($handler, await request.body-blob)
     }
 
     sub request-body-text($handler) is export {
-        $handler(await request.body-text)
+        run-body-handler($handler, await request.body-text)
     }
 
     sub request-body($handler) is export {
-        $handler(await request.body)
+        run-body-handler($handler, await request.body)
+    }
+
+    sub run-body-handler($handler, \body) {
+        given $handler {
+            when Block {
+                return .(body);
+            }
+            when Pair {
+                with request.content-type -> $content-type {
+                    if .key eq $content-type.type-and-subtype {
+                        return .value()(body);
+                    }
+                }
+            }
+        }
+        die X::Cro::HTTP::Router::NoRequestBodyMatch.new;
     }
 
     proto header(|) is export {*}
