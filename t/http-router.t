@@ -863,6 +863,16 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
                     content 'text/plain', "list(unknown)";
                 }
         }
+
+        get -> 'bysig' {
+            request-body
+                "application/json" => -> (:$x, :$y where $y > $x) {
+                    content 'text/plain', "bysig($y > $x)";
+                },
+                -> (:$x, :$y where $y <= $x) {
+                    content 'text/plain', "bysig($y <= $x)";
+                };
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -965,6 +975,31 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         given $responses.receive -> $r {
             is body-text($r), 'list(unknown)',
                 'request-body passed a list chooses final block if no earlier pairs match';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</bysig>);
+        $req.append-header('Content-type', 'application/json; charset="UTF-8"');
+        $req.append-header('Content-length', $json-body-length);
+        $req.set-body-byte-stream($json-body-stream);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'bysig(101 > 42)',
+                'request-body matches by signature (Pair case)';
+        }
+    }
+
+    my $json-body-stream-b = supply { emit '{"x":142,"y":10}'.encode('ascii') }
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</bysig>);
+        $req.append-header('Content-type', 'application/json; charset="UTF-8"');
+        $req.append-header('Content-length', $json-body-length);
+        $req.set-body-byte-stream($json-body-stream-b);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'bysig(10 <= 142)',
+                'request-body matches by signature (Block case)';
         }
     }
 }

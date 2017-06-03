@@ -273,12 +273,12 @@ module Cro::HTTP::Router {
     sub run-body-handler(@handlers, \body) {
         for @handlers {
             when Block {
-                return .(body);
+                return .(body) if .signature.ACCEPTS(\(body));
             }
             when Pair {
                 with request.content-type -> $content-type {
                     if .key eq $content-type.type-and-subtype {
-                        return .value()(body);
+                        return .value()(body) if .value.signature.ACCEPTS(\(body));
                     }
                 }
             }
