@@ -324,20 +324,17 @@ module Cro::HTTP::Router {
     }
 
     proto content(|) is export {*}
-    multi content(Str $content-type, Blob $body --> Nil) {
+    multi content(Str $content-type, $body, :$enc = $body ~~ Str ?? 'utf-8' !! Nil --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
         $resp.status //= 200;
-        $resp.append-header('Content-type', $content-type);
+        with $enc {
+            $resp.append-header('Content-type', qq[$content-type; charset=$_]);
+        }
+        else {
+            $resp.append-header('Content-type', $content-type);
+        }
         $resp.set-body($body);
-    }
-    multi content(Str $content-type, Str $body, :$enc = 'utf-8' --> Nil) {
-        my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
-        my $encoded = $body.encode($enc);
-        $resp.status //= 200;
-        $resp.append-header('Content-type', $content-type ~ '; charset=' ~ $enc);
-        $resp.set-body($encoded);
     }
 
     proto created(|) is export {*}
