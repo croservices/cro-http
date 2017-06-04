@@ -1,4 +1,5 @@
 use Cro;
+use Cro::HTTP::BodyParser;
 use Cro::HTTP::Request;
 use Cro::HTTP::Router;
 use Test;
@@ -1000,6 +1001,68 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         given $responses.receive -> $r {
             is body-text($r), 'bysig(10 <= 142)',
                 'request-body matches by signature (Block case)';
+        }
+    }
+}
+
+{
+    my class TestBody {
+        has $.content;
+    }
+
+    my class TestBodyParser does Cro::HTTP::BodyParser {
+        method is-applicable(Cro::HTTP::Message $message --> Bool) {
+            with $message.content-type {
+                .type eq 'text' && .subtype eq 'x-test'
+            }
+            else {
+                False
+            }
+        }
+        method parse(Cro::HTTP::Message $message --> Promise) {
+            $message.body-text.then({ TestBody.new(content => .result) })
+        }
+    }
+
+    my $app = route {
+        body-parser TestBodyParser;
+
+        get -> 'parser' {
+            request-body -> $body {
+                content 'text/plain', "test-parser: $body.^name(), $body.content()";
+            }
+        }
+
+        get -> 'prepend' {
+            request-body 'application/json' => -> $body {
+                content 'text/plain', "prepend: x is $body<x>, y is $body<y>";
+            }
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</parser>);
+        $req.append-header('Content-type', 'text/x-test');
+        $req.append-header('Content-length', 13);
+        $req.set-body-byte-stream(supply { emit 'cabbage candy'.encode('ascii') });
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'test-parser: TestBody, cabbage candy',
+                'body-parser installs a new body parser and it is used';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</prepend>);
+        $req.append-header('Content-type', 'application/json; charset="UTF-8"');
+        $req.append-header('Content-length', 16);
+        $req.set-body-byte-stream(supply { emit '{"x":42,"y":101}'.encode('ascii') });
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'prepend: x is 42, y is 101',
+                'body-parser leaves existing body parsers in place';
         }
     }
 }

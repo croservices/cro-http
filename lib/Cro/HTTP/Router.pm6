@@ -1,4 +1,6 @@
 use Cro;
+use Cro::HTTP::BodyParser;
+use Cro::HTTP::BodyParserSelector;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 
@@ -34,6 +36,7 @@ module Cro::HTTP::Router {
 
         has Handler @!handlers;
         has $!path-matcher;
+        has Cro::HTTP::BodyParser @!body-parsers;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -46,6 +49,12 @@ module Cro::HTTP::Router {
                     my $*MISSING-UNPACK = False;
                     my @*BIND-FAILS;
                     with $req.path ~~ $!path-matcher {
+                        if @!body-parsers {
+                            $req.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(
+                                parsers => @!body-parsers,
+                                next => $req.body-parser-selector
+                            );
+                        }
                         my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new();
                         my ($handler-idx, $arg-capture) = .ast;
                         my $handler := @!handlers[$handler-idx];
@@ -94,6 +103,10 @@ module Cro::HTTP::Router {
 
         method add-handler(Str $method, &implementation --> Nil) {
             @!handlers.push(Handler.new(:$method, :&implementation));
+        }
+
+        method add-body-parser(Cro::HTTP::BodyParser $parser --> Nil) {
+            @!body-parsers.push($parser);
         }
 
         method definition-complete(--> Nil) {
@@ -246,6 +259,10 @@ module Cro::HTTP::Router {
 
     sub delete(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('DELETE', &handler);
+    }
+
+    sub body-parser(Cro::HTTP::BodyParser $parser --> Nil) is export {
+        $*CRO-ROUTE-SET.add-body-parser($parser);
     }
 
     sub term:<request>() is export {
