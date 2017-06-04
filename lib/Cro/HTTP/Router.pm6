@@ -1,6 +1,8 @@
 use Cro;
 use Cro::HTTP::BodyParser;
 use Cro::HTTP::BodyParserSelector;
+use Cro::HTTP::BodySerializer;
+use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 
@@ -37,6 +39,7 @@ module Cro::HTTP::Router {
         has Handler @!handlers;
         has $!path-matcher;
         has Cro::HTTP::BodyParser @!body-parsers;
+        has Cro::HTTP::BodySerializer @!body-serializers;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -56,6 +59,13 @@ module Cro::HTTP::Router {
                             );
                         }
                         my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new();
+                        if @!body-serializers {
+                            $*CRO-ROUTER-RESPONSE.body-serializer-selector =
+                                Cro::HTTP::BodySerializerSelector::Prepend.new(
+                                    serializers => @!body-serializers,
+                                    next => $req.body-serializer-selector
+                                );
+                        }
                         my ($handler-idx, $arg-capture) = .ast;
                         my $handler := @!handlers[$handler-idx];
                         my &implementation := $handler.implementation;
@@ -107,6 +117,10 @@ module Cro::HTTP::Router {
 
         method add-body-parser(Cro::HTTP::BodyParser $parser --> Nil) {
             @!body-parsers.push($parser);
+        }
+
+        method add-body-serializer(Cro::HTTP::BodySerializer $serializer --> Nil) {
+            @!body-serializers.push($serializer);
         }
 
         method definition-complete(--> Nil) {
@@ -263,6 +277,10 @@ module Cro::HTTP::Router {
 
     sub body-parser(Cro::HTTP::BodyParser $parser --> Nil) is export {
         $*CRO-ROUTE-SET.add-body-parser($parser);
+    }
+
+    sub body-serializer(Cro::HTTP::BodySerializer $serializer --> Nil) is export {
+        $*CRO-ROUTE-SET.add-body-serializer($serializer);
     }
 
     sub term:<request>() is export {

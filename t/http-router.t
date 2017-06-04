@@ -1,5 +1,6 @@
 use Cro;
 use Cro::HTTP::BodyParser;
+use Cro::HTTP::BodySerializer;
 use Cro::HTTP::Request;
 use Cro::HTTP::Router;
 use Test;
@@ -1063,6 +1064,57 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         given $responses.receive -> $r {
             is body-text($r), 'prepend: x is 42, y is 101',
                 'body-parser leaves existing body parsers in place';
+        }
+    }
+}
+
+{
+    my class Point {
+        has Int $.x;
+        has Int $.y;
+    }
+
+    class TestSerializer does Cro::HTTP::BodySerializer {
+        method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
+            $body ~~ Point
+        }
+        method serialize(Cro::HTTP::Message $message, $body --> Supply) {
+            supply {
+                my $ser = '{"point-x":' ~ $body.x ~ ',"point-y":' ~ $body.y ~ '}';
+                emit $ser.encode('ascii');
+            }
+        }
+    }
+
+    my $app = route {
+        body-serializer TestSerializer;
+
+        get -> 'point' {
+            content 'application/json', Point.new(:12x, :100y)
+        }
+
+        get -> 'json' {
+            content 'application/json', [1,2,3,4]
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</point>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), '{"point-x":12,"point-y":100}',
+                'body-serializer prepends a new body serializer and it is used';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :target</json>);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), '[1,2,3,4]',
+                'body-serializer does not prevent default serializers being found';
         }
     }
 }
