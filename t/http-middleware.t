@@ -68,7 +68,7 @@ class LowerCase does Cro::Transform {
     my $url = "http://localhost:{TEST_PORT}";
 
     given await Cro::HTTP::Client.get("$url") -> $resp {
-        ok $resp ~~ Cro::HTTP::Response, 'Response with before middleware is okay';
+        ok $resp ~~ Cro::HTTP::Response, 'Response with after middleware is okay';
         is $resp.header('Strict-Transport-Security'), "max-age=60", 'Header was set';
     }
 
