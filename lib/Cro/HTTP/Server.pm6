@@ -5,7 +5,7 @@ use Cro::SSL;
 use Cro::TCP;
 
 class Cro::HTTP::Server does Cro::Service {
-    only method new(Cro::Transform :$application!, :$host, :$port, :%ssl) {
+    only method new(Cro::Transform :$application!, :$host, :$port, :%ssl, :$before, :$after) {
         my $listener = %ssl
             ?? Cro::SSL::Listener.new(
                   |(:$host with $host),
@@ -17,11 +17,16 @@ class Cro::HTTP::Server does Cro::Service {
                   |(:$port with $port)
                );
 
+        my @after = $after ~~ Iterable ?? $after.List !! ($after === Any ?? () !! $after);
+        my @before = $before ~~ Iterable ?? $before.List !! ($before === Any ?? () !! $before);
+
         return Cro.compose(
             service-type => self.WHAT,
             $listener,
             Cro::HTTP::RequestParser.new,
+            |@before,
             $application,
+            |@after,
             Cro::HTTP::ResponseSerializer.new
         )
     }
