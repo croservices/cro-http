@@ -6,6 +6,12 @@ use Cro::SSL;
 use Cro::Uri;
 use Cro;
 
+class X::Cro::HTTP::Client::BodyAlreadySet is Exception {
+    method message() {
+        "Body was set twice"
+    }
+}
+
 class Cro::HTTP::Client {
     multi method get($url, %options --> Supply) {
         self.request('GET', $url, %options)
@@ -88,20 +94,18 @@ class Cro::HTTP::Client {
             }
             when 'body-byte-stream' {
                 if !$body-set {
-                    # $request.append-header('Content-type', %options<content-type>);
-                    # throw if Content-type is not set?
                     $request.set-body-byte-stream($value);
                     $body-set = True;
                 } else {
-                    # throw?
+                    die X::Cro::HTTP::Client::BodyAlreadySet.new;
                 }
             }
             when 'content-type' {
                 $request.append-header('content-type', $value)
             }
             when 'headers' {
-                if $key ~~ Iterable {
-                    for $key.List -> $header {
+                if $_ ~~ Iterable {
+                    for $_.List -> $header {
                         when $header ~~ Pair {
                             $request.append-header($header.key, $header.value)
                         }
