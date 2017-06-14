@@ -136,6 +136,13 @@ class TestHttpApp does Cro::Transform {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON packed';
         is await($resp.body-text), 'pair: x is 42, y is 101', 'Response body text is correct';
     };
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'text/plain',
+                                      body => "Aokigahara") -> $resp {
+        note "Before throw";
+        dies-ok { await($resp.body-text) }, 'Response body text is correct';
+    };
 }
 
 

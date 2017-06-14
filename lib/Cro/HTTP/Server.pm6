@@ -5,8 +5,8 @@ use Cro::SSL;
 use Cro::TCP;
 
 my class RequestParserExtension does Cro::Transform {
-    has @!parsers;
-    has @!additional-parsers;
+    has @.body-parsers;
+    has @.additional-parsers;
 
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Request }
@@ -14,11 +14,11 @@ my class RequestParserExtension does Cro::Transform {
     method transformer(Supply $pipeline --> Supply) {
         supply {
             whenever $pipeline -> $request {
-                if @!parsers.elems != 0 {
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @!parsers);
+                if @.body-parsers.elems != 0 {
+                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @.body-parsers);
                 }
-                if @!additional-parsers.elems != 0 {
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @!additional-parsers,
+                if @.additional-parsers.elems != 0 {
+                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @.additional-parsers,
                                                                                                next => $request.body-parser-selector);
                 }
                 emit $request;
