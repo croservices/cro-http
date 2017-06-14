@@ -69,17 +69,17 @@ module Cro::HTTP::Router {
                         my ($handler-idx, $arg-capture) = .ast;
                         my $handler := @!handlers[$handler-idx];
                         my &implementation := $handler.implementation;
-                        if $req.path eq '/' { # XXX Should be able to avoid this
-                            implementation();
-                        }
-                        else {
-                            implementation(|$arg-capture);
-                        }
-                        emit $*CRO-ROUTER-RESPONSE;
-                        CATCH {
-                            when X::Cro::HTTP::Router::NoRequestBodyMatch {
-                                $*CRO-ROUTER-RESPONSE.status = 400;
-                                emit $*CRO-ROUTER-RESPONSE;
+                        my $response = $*CRO-ROUTER-RESPONSE;
+                        whenever start ($req.path eq '/' ??
+                                        implementation() !!
+                                        implementation(|$arg-capture)) {
+                            emit $response;
+
+                            QUIT {
+                                when X::Cro::HTTP::Router::NoRequestBodyMatch {
+                                    $*CRO-ROUTER-RESPONSE.status = 400;
+                                    emit $*CRO-ROUTER-RESPONSE;
+                                }
                             }
                         }
                     }
