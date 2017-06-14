@@ -5,8 +5,8 @@ use Cro::SSL;
 use Cro::TCP;
 
 my class RequestParserExtension does Cro::Transform {
-    has @!parsers = [];
-    has @!additional-parsers = [];
+    has @!parsers;
+    has @!additional-parsers;
 
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Request }
@@ -14,13 +14,12 @@ my class RequestParserExtension does Cro::Transform {
     method transformer(Supply $pipeline --> Supply) {
         supply {
             whenever $pipeline -> $request {
-                if @!parsers.elems != 0 & @!additional-parsers.elems == 0 {
+                if @!parsers.elems != 0 {
                     $request.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @!parsers);
-                } elsif @!parsers.elems == 0 & @!additional-parsers.elems != 0 {
-                    my $old-selector = $request.body-parser-selector;
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @!additional-parsers, next => $old-selector);
-                } elsif @!parsers.elems != 0 & @!additional-parsers.elems != 0 {
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @!additional-parsers, next => @!parsers);
+                }
+                if @!additional-parsers.elems != 0 {
+                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @!additional-parsers,
+                                                                                               next => $request.body-parser-selector);
                 }
                 emit $request;
             }
@@ -51,8 +50,7 @@ class Cro::HTTP::Server does Cro::Service {
             service-type => self.WHAT,
             $listener,
             Cro::HTTP::RequestParser.new,
-            RequestParserExtension.new(add-body-parsers => @add-body-parsers,
-                                       body-parsers => @body-parsers),
+            RequestParserExtension.new(:@add-body-parsers, :@body-parsers),
             |@before,
             $application,
             # serialization
