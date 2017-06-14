@@ -1,4 +1,3 @@
-use Cro::HTTP::Client;
 use Cro::HTTP::Response;
 use Test;
 
@@ -47,6 +46,7 @@ constant %key-cert := {
 }
 
 {
+    use Cro::HTTP::Client;
     my $base = "http://localhost:{HTTP_TEST_PORT}";
 
     given await Cro::HTTP::Client.get("$base/") -> $resp {
