@@ -76,6 +76,47 @@ class Cro::HTTP::Client {
         my $target = $url.path || '/';
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
+        my Bool $body-set = False;
+        for %options.kv -> $key, $value {
+            when $key ~~ 'body' {
+                if !$body-set {
+                    # $request.append-header('Content-type', %options<content-type>);
+                    # throw if Content-type is not set?
+                    $request.set-body($value);
+                    $body-set = True;
+                } else {
+                    # throw?
+                }
+            }
+            when $key ~~ 'body-byte-stream' {
+                if !$body-set {
+                    # $request.append-header('Content-type', %options<content-type>);
+                    # throw if Content-type is not set?
+                    $request.set-body-byte-stream($value);
+                    $body-set = True;
+                } else {
+                    # throw?
+                }
+            }
+            when $key ~~ 'content-type' {
+                $request.append-header('content-type', $value)
+            }
+            when $key ~~ 'headers' {
+                if $key ~~ Iterable {
+                    for $key.List -> $header {
+                        when $header ~~ Pair {
+                            $request.append-header($header.key, $header.value)
+                        }
+                        when $header ~~ Cro::HTTP::Header {
+                            $request.append-header($header)
+                        }
+                        default {
+                            # throw?
+                        }
+                    }
+                }
+}
+        }
         return $request;
     }
 }

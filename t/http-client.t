@@ -81,6 +81,13 @@ constant %key-cert := {
         is await($resp.body-blob).list, 'Home'.encode('ascii').list,
             'Can also get body back as a blob';
     }
+
+    my %body = :truth, :!lie;
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'application/json',
+                                      body => %body) -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON';
+    }
 }
 
 done-testing;
