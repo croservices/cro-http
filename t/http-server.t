@@ -113,10 +113,10 @@ class TestHttpApp does Cro::Transform {
     use Cro::HTTP::Router;
 
     my $app = route {
-        get -> 'json' {
-            request-body 'application/json' => -> $body {
-                content 'text/plain', "pair: x is $body<truth>, y is $body<lie>";
-            }
+        post -> {
+            # request-body -> %json-object {
+            content 'text/plain', "Home";
+            # }
         }
     }
 
@@ -130,7 +130,7 @@ class TestHttpApp does Cro::Transform {
     my $base = "http://localhost:{TEST_PORT}";
     my %body = :42x, :101y;
 
-    given await Cro::HTTP::Client.get("$base/json",
+    given await Cro::HTTP::Client.post("$base/",
                                       content-type => 'application/json',
                                       body => %body) -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON packed';
