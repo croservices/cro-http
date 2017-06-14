@@ -1,6 +1,7 @@
 use Cro;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
+use Cro::HTTP::Client;
 use Cro::HTTP::Server;
 use Cro::Transform;
 use IO::Socket::Async::SSL;
@@ -110,7 +111,6 @@ class TestHttpApp does Cro::Transform {
 
 {
     use Cro::HTTP::Router;
-    use Cro::HTTP::Client;
 
     my $app = route {
         get -> 'json' {
@@ -121,23 +121,21 @@ class TestHttpApp does Cro::Transform {
     }
 
     my Cro::Service $test = Cro::HTTP::Server.new(
-        :host('localhost'), :port(TEST_PORT), application => $app);#,
-        #body-parsers => [Cro::HTTP::BodyParser::JSON.new]);
+        :host('localhost'), :port(TEST_PORT), application => $app,
+        body-parsers => [Cro::HTTP::BodyParser::JSON.new]);
 
     $test.start();
     END $test.stop();
 
-    # {
-    #     my $base = "http://localhost:{TEST_PORT}";
-    #     my %body = :42x, :101y;
+    my $base = "http://localhost:{TEST_PORT}";
+    my %body = :42x, :101y;
 
-    #     given await Cro::HTTP::Client.get("$base/json",
-    #                                       content-type => 'application/json',
-    #                                       body => %body) -> $resp {
-    #         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON packed';
-    #         is await($resp.body-text), 'pair: x is 42, y is 101', 'Body text is correct';
-    #     };
-    # }
+    given await Cro::HTTP::Client.get("$base/json",
+                                      content-type => 'application/json',
+                                      body => %body) -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON packed';
+        is await($resp.body-text), 'pair: x is 42, y is 101', 'Body text is correct';
+    };
 }
 
 
