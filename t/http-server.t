@@ -108,4 +108,37 @@ class TestHttpApp does Cro::Transform {
         'Server not listening after stopped (HTTPS)';
 }
 
+{
+    use Cro::HTTP::Router;
+    use Cro::HTTP::Client;
+
+    my $app = route {
+        get -> 'json' {
+            request-body 'application/json' => -> $body {
+                content 'text/plain', "pair: x is $body<truth>, y is $body<lie>";
+            }
+        }
+    }
+
+    my Cro::Service $test = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app);#,
+        #body-parsers => [Cro::HTTP::BodyParser::JSON.new]);
+
+    $test.start();
+    END $test.stop();
+
+    # {
+    #     my $base = "http://localhost:{TEST_PORT}";
+    #     my %body = :42x, :101y;
+
+    #     given await Cro::HTTP::Client.get("$base/json",
+    #                                       content-type => 'application/json',
+    #                                       body => %body) -> $resp {
+    #         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON packed';
+    #         is await($resp.body-text), 'pair: x is 42, y is 101', 'Body text is correct';
+    #     };
+    # }
+}
+
+
 done-testing;
