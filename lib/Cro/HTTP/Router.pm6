@@ -82,6 +82,10 @@ module Cro::HTTP::Router {
                                     $*CRO-ROUTER-RESPONSE.status = 400;
                                     emit $*CRO-ROUTER-RESPONSE;
                                 }
+                                when X::Cro::HTTP::BodyParserSelector::NoneApplicable {
+                                    $*CRO-ROUTER-RESPONSE.status = 400;
+                                    emit $*CRO-ROUTER-RESPONSE;
+                                }
                                 default {
                                     $*CRO-ROUTER-RESPONSE.status = 500;
                                     emit $*CRO-ROUTER-RESPONSE;
