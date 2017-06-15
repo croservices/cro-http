@@ -70,11 +70,9 @@ module Cro::HTTP::Router {
                         my $handler := @!handlers[$handler-idx];
                         my &implementation := $handler.implementation;
                         my $response = $*CRO-ROUTER-RESPONSE;
-                        note "Before start";
                         whenever start ($req.path eq '/' ??
                                         implementation() !!
                                         implementation(|$arg-capture)) {
-                            note "Response is emitted~~";
                             emit $response;
 
                             QUIT {

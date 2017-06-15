@@ -140,8 +140,8 @@ class TestHttpApp does Cro::Transform {
     given await Cro::HTTP::Client.get("$base/",
                                       content-type => 'text/plain',
                                       body => "Aokigahara") -> $resp {
-        note "Before throw";
-        dies-ok { await($resp.body-text) }, 'Response body text is correct';
+        is (await $resp.body), Buf.new, 'Body of incorrect type request is empty';
+        is $resp.status, 400, 'Status of incorrect type requst is correct'
     };
 }
 
