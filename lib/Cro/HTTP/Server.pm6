@@ -6,7 +6,7 @@ use Cro::TCP;
 
 my class RequestParserExtension does Cro::Transform {
     has @.body-parsers;
-    has @.additional-parsers;
+    has @.add-body-parsers;
 
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Request }
@@ -17,8 +17,8 @@ my class RequestParserExtension does Cro::Transform {
                 if @.body-parsers.elems != 0 {
                     $request.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @.body-parsers);
                 }
-                if @.additional-parsers.elems != 0 {
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @.additional-parsers,
+                if @.add-body-parsers.elems != 0 {
+                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @.add-body-parsers,
                                                                                                next => $request.body-parser-selector);
                 }
                 emit $request;
