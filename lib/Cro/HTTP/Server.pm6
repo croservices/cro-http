@@ -41,10 +41,9 @@ my class ResponseSerializerExtension does Cro::Transform {
                     $response.body-serializer-selector = Cro::HTTP::BodySerializerSelector::List.new(serializers => @$.body-serializers);
                 }
                 if $.add-body-serializers.defined {
-                    $response.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(serializers => $@.add-body-serializers,
+                    $response.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(serializers => @$.add-body-serializers,
                                                                                                         next => $response.body-serializer-selector);
                 }
-                note "Emitting";
                 emit $response;
             }
         }
