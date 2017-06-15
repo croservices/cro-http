@@ -125,7 +125,7 @@ class TestHttpApp does Cro::Transform {
         body-parsers => [Cro::HTTP::BodyParser::JSON.new]);
 
     $test.start();
-    END $test.stop();
+    LEAVE $test.stop();
 
     my $base = "http://localhost:{TEST_PORT}";
     my %body = :42x, :101y;
@@ -140,10 +140,47 @@ class TestHttpApp does Cro::Transform {
     given await Cro::HTTP::Client.get("$base/",
                                       content-type => 'text/plain',
                                       body => "Aokigahara") -> $resp {
-        is (await $resp.body), Buf.new, 'Body of incorrect type request is empty';
-        is $resp.status, 400, 'Status of incorrect type requst is correct'
+        subtest {
+            is (await $resp.body), Buf.new;
+            is $resp.status, 400;
+        }, 'Request with incorrect content-type is processed'
+
     };
 }
 
+{
+    use Cro::HTTP::Router;
+
+    my $app = route {
+        get -> {
+            request-body
+            'application/json' => -> %object {
+                content 'text/plain', "pair: x is %object<x>, y is %object<y>";
+            },
+            'text/plain' => -> $text {
+                content 'text/plain', "$text";
+            }
+        }
+    }
+
+    my Cro::Service $test = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app,
+        body-parsers => [Cro::HTTP::BodyParser::JSON.new],
+        add-body-parsers => [Cro::HTTP::BodyParser::TextFallback.new]);
+
+    $test.start();
+    LEAVE $test.stop();
+
+    my $base = "http://localhost:{TEST_PORT}";
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'text/plain',
+                                      body => 'Zuriaake') -> $resp {
+        subtest {
+            is (await $resp.body), 'Zuriaake';
+            is $resp.status, 200;
+        }, 'Request for additional parser is processed';
+    };
+}
 
 done-testing;
