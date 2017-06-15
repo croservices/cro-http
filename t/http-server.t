@@ -1,3 +1,4 @@
+use Cro::HTTP::Router;
 use Cro;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
@@ -109,9 +110,35 @@ class TestHttpApp does Cro::Transform {
         'Server not listening after stopped (HTTPS)';
 }
 
-{
-    use Cro::HTTP::Router;
+# Parsing
 
+{
+    my $app = route {
+        get -> {
+            request-body -> %object {
+                content 'text/plain', "Cannot be seen";
+            }
+        }
+    }
+
+    my Cro::Service $test = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app,
+        body-parsers => []);
+
+    $test.start();
+    LEAVE $test.stop();
+
+    my $base = "http://localhost:{TEST_PORT}";
+    my %body = :42x, :101y;
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'application/json',
+                                      :%body) -> $resp {
+        is $resp.status, 400, 'Server with empty body-parsers cannot parse requests';
+    };
+}
+
+{
     my $app = route {
         get -> {
             request-body -> %object {
@@ -133,7 +160,6 @@ class TestHttpApp does Cro::Transform {
     given await Cro::HTTP::Client.get("$base/",
                                       content-type => 'application/json',
                                       body => %body) -> $resp {
-        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON packed';
         is await($resp.body-text), 'pair: x is 42, y is 101', 'Response body text is correct';
     };
 
@@ -143,14 +169,11 @@ class TestHttpApp does Cro::Transform {
         subtest {
             is (await $resp.body), Buf.new;
             is $resp.status, 400;
-        }, 'Request with incorrect content-type is processed'
-
+        }, 'Request with incorrect content-type is processed';
     };
 }
 
 {
-    use Cro::HTTP::Router;
-
     my $app = route {
         get -> {
             request-body
@@ -180,6 +203,116 @@ class TestHttpApp does Cro::Transform {
             is (await $resp.body), 'Zuriaake';
             is $resp.status, 200;
         }, 'Request for additional parser is processed';
+    };
+}
+
+# Serializing
+
+{
+    my $app = route {
+        get -> {
+            request-body 'text/plain' => -> $text {
+                content 'text/plain', 'Hands That Lift the Oceans';
+            }
+        }
+    }
+
+    my Cro::Service $test = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app,
+        body-serializers => []);
+
+    $test.start();
+    LEAVE $test.stop();
+
+    my $base = "http://localhost:{TEST_PORT}";
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'text/plain',
+                                      body => 'give-me-text') -> $resp {
+        subtest {
+            is $resp.status, 500;
+        }, 'Request to server without serializers ends up with 500 error';
+    };
+}
+
+{
+    my $app = route {
+        get -> {
+            request-body 'text/plain' => -> $text {
+                if $text eq 'give-me-text' {
+                    content 'text/plain', 'Hands That Lift the Oceans';
+                } else {
+                    content 'application/json', :42answer;
+                }
+            }
+        }
+    }
+
+    my Cro::Service $test = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app,
+        body-serializers => [Cro::HTTP::BodySerializer::StrFallback.new]);
+
+    $test.start();
+    LEAVE $test.stop();
+
+    my $base = "http://localhost:{TEST_PORT}";
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'text/plain',
+                                      body => 'give-me-text') -> $resp {
+        subtest {
+            is (await $resp.body), 'Hands That Lift the Oceans';
+            is $resp.status, 200;
+        }, 'Request for one serializer is processed';
+    };
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'text/plain',
+                                      body => 'give-me-json') -> $resp {
+        subtest {
+            is $resp.status, 500;
+        }, 'Request without a serializer gives error';
+    };
+}
+
+{
+    my $app = route {
+        get -> {
+            request-body 'text/plain' => -> $text {
+                if $text eq 'give-me-text' {
+                    content 'text/plain', 'Hands That Lift the Oceans';
+                } else {
+                    content 'application/json', {:42answer};
+                }
+            }
+        }
+    }
+
+    my Cro::Service $test = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app,
+        body-serializers => [Cro::HTTP::BodySerializer::StrFallback.new],
+        add-body-serializers => [Cro::HTTP::BodySerializer::JSON.new]);
+
+    $test.start();
+    LEAVE $test.stop();
+
+    my $base = "http://localhost:{TEST_PORT}";
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'text/plain',
+                                      body => 'give-me-text') -> $resp {
+        subtest {
+            is (await $resp.body), 'Hands That Lift the Oceans';
+            is $resp.status, 200;
+        }, 'Request for one serializer is processed';
+    };
+
+    given await Cro::HTTP::Client.get("$base/",
+                                      content-type => 'text/plain',
+                                      body => 'give-me-json') -> $resp {
+        subtest {
+            is $resp.status, 200;
+        }, 'Request for additional serializer works';
     };
 }
 
