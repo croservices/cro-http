@@ -51,9 +51,14 @@ my class ResponseSerializerExtension does Cro::Transform {
 }
 
 class Cro::HTTP::Server does Cro::Service {
+    method convert-middleware($middle) {
+        $middle ~~ Iterable ?? $middle.List !! ($middle === Any ?? () !! $middle)
+    }
+
     only method new(Cro::Transform :$application!,
                     :$host, :$port, :%ssl,
-                    :$before, :$after,
+                    :$before-parse, :$before,
+                    :$after, :$after-serialize,
                     :$add-body-parsers, :$body-parsers,
                     :$add-body-serializers, :$body-serializers) {
         my $listener = %ssl
@@ -67,19 +72,23 @@ class Cro::HTTP::Server does Cro::Service {
                   |(:$port with $port)
                );
 
-        my @after = $after ~~ Iterable ?? $after.List !! ($after === Any ?? () !! $after);
-        my @before = $before ~~ Iterable ?? $before.List !! ($before === Any ?? () !! $before);
+        my @before = self.convert-middleware($before);
+        my @after = self.convert-middleware($after);
+        my @before-parse = self.convert-middleware($before-parse);
+        my @after-serialize = self.convert-middleware($after-serialize);
 
         return Cro.compose(
             service-type => self.WHAT,
             $listener,
+            |@before-parse,
             Cro::HTTP::RequestParser.new,
             RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
             |@before,
             $application,
             ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
             |@after,
-            Cro::HTTP::ResponseSerializer.new
+            Cro::HTTP::ResponseSerializer.new,
+            |@after-serialize
         )
     }
 }

@@ -1,3 +1,4 @@
+use Cro::TCP;
 use Cro::HTTP::Router;
 use Cro::HTTP::Server;
 use Cro::HTTP::Client;
@@ -6,11 +7,18 @@ use Cro::Transform;
 use Test;
 
 constant TEST_PORT = 31314;
+my $url = "http://localhost:{TEST_PORT}";
 
 # Application
 my $application = route {
     get -> {
         content 'text/html', "<strong>Hello from Cro!</strong>";
+    }
+
+    get -> 'echo' {
+        request-body -> $body {
+            content 'text/plain', "$body";
+        }
     }
 
     get -> 'index.shtml' {
@@ -61,14 +69,9 @@ class LowerCase does Cro::Transform {
         :host('localhost'), :port(TEST_PORT), application => $application,
         after => StrictTransportSecurity.new(max-age => Duration.new(60))
     );
-    dies-ok { await IO::Socket::Async.connect('localhost', TEST_PORT) },
-        'Server not listening until started';
-    lives-ok { $service.start }, 'Can start service';
-
-    my $url = "http://localhost:{TEST_PORT}";
+    $service.start;
 
     given await Cro::HTTP::Client.get("$url") -> $resp {
-        ok $resp ~~ Cro::HTTP::Response, 'Response with after middleware is okay';
         is $resp.header('Strict-Transport-Security'), "max-age=60", 'Header was set';
     }
 
@@ -80,14 +83,9 @@ class LowerCase does Cro::Transform {
         :host('localhost'), :port(TEST_PORT), application => $application,
         before => LowerCase
     );
-    dies-ok { await IO::Socket::Async.connect('localhost', TEST_PORT) },
-        'Server not listening until started';
-    lives-ok { $service.start }, 'Can start service';
-
-    my $url = "http://localhost:{TEST_PORT}";
+    $service.start;
 
     given await Cro::HTTP::Client.get("$url/index.SHTML") -> $resp {
-        ok $resp ~~ Cro::HTTP::Response, 'Response with before middleware is okay';
         is await($resp.body-text), 'Correct Answer', 'Target was processed';
     }
 
@@ -100,16 +98,55 @@ class LowerCase does Cro::Transform {
         before => LowerCase,
         after => StrictTransportSecurity.new(max-age => Duration.new(60))
     );
-    dies-ok { await IO::Socket::Async.connect('localhost', TEST_PORT) },
-        'Server not listening until started';
-    lives-ok { $service.start }, 'Can start service';
-
-    my $url = "http://localhost:{TEST_PORT}";
+    $service.start;
 
     given await Cro::HTTP::Client.get("$url/index.SHTML") -> $resp {
-        ok $resp ~~ Cro::HTTP::Response, 'before and after can work together';
         is $resp.header('Strict-Transport-Security'), "max-age=60", 'after works with before';
         is await($resp.body-text), 'Correct Answer', 'before works with after';
+    }
+
+    LEAVE $service.stop();
+}
+
+class UpperCase does Cro::Transform {
+    method consumes() { Cro::TCP::Message }
+    method produces() { Cro::TCP::Message }
+
+    method transformer(Supply $pipeline --> Supply) {
+        supply {
+            whenever $pipeline -> $message {
+                emit Cro::TCP::Message.new(data => $message.data.decode.subst('hello', 'HELLO').encode('latin-1'));
+            }
+        }
+    }
+}
+
+{
+    my Cro::Service $service = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $application,
+        before-parse => UpperCase);
+    $service.start;
+
+    given await Cro::HTTP::Client.get("$url/echo",
+                                      content-type => 'text/plain',
+                                      body => "hello WORLD") -> $resp {
+        is await($resp.body-text), 'HELLO WORLD', 'before-parse works';
+    }
+
+    LEAVE $service.stop();
+}
+
+{
+    my Cro::Service $service = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $application,
+        after-serialize => UpperCase);
+    note "After serialize test";
+    $service.start;
+
+    given await Cro::HTTP::Client.get("$url/echo",
+                                      content-type => 'text/plain',
+                                      body => "hello WORLD") -> $resp {
+        is await($resp.body-text), 'HELLO WORLD', 'after-serialize works';
     }
 
     LEAVE $service.stop();
