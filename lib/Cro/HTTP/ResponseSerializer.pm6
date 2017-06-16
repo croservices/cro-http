@@ -24,6 +24,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                     CATCH {
                         when X::Cro::HTTP::BodySerializerSelector::NoneApplicable {
                             $response.status = 500;
+                            $response.remove-header({ True });
                             $response.append-header('Content-length', 0);
                             $body-byte-stream = supply {};
                         }

@@ -51,7 +51,7 @@ my class ResponseSerializerExtension does Cro::Transform {
 }
 
 class Cro::HTTP::Server does Cro::Service {
-    method convert-middleware($middle) {
+    method !convert-middleware($middle) {
         $middle ~~ Iterable ?? $middle.List !! ($middle === Any ?? () !! $middle)
     }
 
@@ -72,10 +72,10 @@ class Cro::HTTP::Server does Cro::Service {
                   |(:$port with $port)
                );
 
-        my @before = self.convert-middleware($before);
-        my @after = self.convert-middleware($after);
-        my @before-parse = self.convert-middleware($before-parse);
-        my @after-serialize = self.convert-middleware($after-serialize);
+        my @before = self!convert-middleware($before);
+        my @after = self!convert-middleware($after);
+        my @before-parse = self!convert-middleware($before-parse);
+        my @after-serialize = self!convert-middleware($after-serialize);
 
         return Cro.compose(
             service-type => self.WHAT,
