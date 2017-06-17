@@ -300,6 +300,12 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             response.append-header('Content-type', 'text/html');
             response.set-body("optintarg $page".encode('ascii'));
         }
+
+        get -> 'optintarg_uint', UInt :$page {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("optuintarg $page".encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -332,7 +338,11 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         '/optintarg?page=100', 'optintarg 100',
             'Route with optional Int named arg for query parameter works when passed',
         '/optintarg', 'optintarg 1',
-            'Route with optional Int named arg for query parameter works when not passed';
+            'Route with optional Int named arg for query parameter works when not passed',
+        '/optintarg_uint?page=1', 'optuintarg 1',
+            'Route with optional UInt named arg for query parameter works when passed',
+        '/optintarg_uint?page=-1', '',
+            'Route with optional UInt named arg for query parameter doesn\'t match negative values';
     for @cases -> $target, $expected-output, $desc {
         my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $req.append-header('X-Custom1', 'c1');
