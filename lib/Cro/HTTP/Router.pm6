@@ -174,14 +174,10 @@ module Cro::HTTP::Router {
                                 $need-sig-bind = True;
                             }
                         }
-                        elsif $type =:= Int {
+                        elsif $type =:= Int || $type =:= UInt {
                             @matcher-target.push(Q['-'?\d+:]);
-                            @make-tasks.push: Q:c/.=Int with @segs[{$seg-index}]/;
-                            $need-sig-bind = True if @constraints;
-                        }
-                        elsif $type =:= UInt {
-                            @matcher-target.push(Q[\d+:]);
-                            @make-tasks.push: Q:c/.=UInt with @segs[{$seg-index}]/;
+                            my Str $coerce-prefix = $type =:= Int ?? '.=Int' !! '.=UInt';
+                            @make-tasks.push: $coerce-prefix ~ Q:c/ with @segs[{$seg-index}]/;
                             $need-sig-bind = True if @constraints;
                         }
                         else {
@@ -231,13 +227,11 @@ module Cro::HTTP::Router {
                     if $type =:= Mu || $type =:= Any || $type =:= Str {
                         push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $_ with ' ~ $lookup;
                     }
-                    elsif $type =:= Int {
+                    elsif $type =:= Int || $type =:= UInt {
                         push @checks, '(with ' ~ $lookup ~ ' { so /^"-"?\d+$/ } else { True })';
-                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = .Int with ' ~ $lookup;
-                    }
-                    elsif $type =:= UInt {
-                        push @checks, '(with ' ~ $lookup ~ ' { so /^\d+$/ } else { True })';
-                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = .UInt with ' ~ $lookup;
+                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = ' ~
+                                                        ($type =:= Int ?? '.Int' !! '.UInt')
+                                                        ~ ' with ' ~ $lookup;
                     }
                     elsif $type =:= uint8 {
                         pack-range(uint8, 8, False)
