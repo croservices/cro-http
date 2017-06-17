@@ -345,6 +345,87 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
 }
 
 {
+    my $app = route {
+        get -> 'id_int8', int8 :$id {
+            content 'text/plain', "Correct, int8, $id";
+        }
+        get -> 'id_uint8', uint8 :$id {
+            content 'text/plain', "Correct, uint8, $id";
+        }
+        get -> 'id_int16', int16 :$id {
+            content 'text/plain', "Correct, int16, $id";
+        }
+        get -> 'id_uint16', uint16 :$id {
+            content 'text/plain', "Correct, uint16, $id";
+        }
+        get -> 'id_int32', int32 :$id {
+            content 'text/plain', "Correct, int32, $id";
+        }
+        get -> 'id_uint32', uint32 :$id {
+            content 'text/plain', "Correct, uint32, $id";
+        }
+        get -> 'id_int64', int64 :$id {
+            content 'text/plain', "Correct, int64, $id";
+        }
+        get -> 'id_uint64', uint64 :$id {
+            content 'text/plain', "Correct, uint64, $id";
+        }
+    }
+
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my @cases =
+        # int8
+        '/id_int8', 'Correct, int8, 0', 'Route with optional int8 works',
+        '/id_int8?id=1', 'Correct, int8, 1', 'Route for int8 works',
+        '/id_int8?id=-129', '', 'Lower border for int8 Route works',
+        '/id_int8?id=128', '',  'Upper border for int8 Route works',
+        # uint8
+        '/id_uint8', 'Correct, uint8, 0', 'Route with optional uint8 works',
+        '/id_uint8?id=1', 'Correct, uint8, 1', 'Route for uint8 works',
+        '/id_uint8?id=-1', '', 'Lower border for uint8 Route works',
+        '/id_uint8?id=256', '',  'Upper border for uint8 Route works',
+        # int16
+        '/id_int16', 'Correct, int16, 0', 'Route with optional int16 works',
+        '/id_int16?id=1', 'Correct, int16, 1', 'Route for int16 works',
+        '/id_int16?id=-32769', '', 'Lower border for int16 Route works',
+        '/id_int16?id=32768', '',  'Upper border for int16 Route works',
+        # uint16
+        '/id_uint16', 'Correct, uint16, 0', 'Route with optional uint16 works',
+        '/id_uint16?id=1', 'Correct, uint16, 1', 'Route for uint16 works',
+        '/id_uint16?id=-1', '', 'Lower border for uint16 Route works',
+        '/id_uint16?id=65536', '',  'Upper border for uint16 Route works',
+        # int32
+        '/id_int32', 'Correct, int32, 0', 'Route with optional int32 works',
+        '/id_int32?id=1', 'Correct, int32, 1', 'Route for int32 works',
+        '/id_int32?id=-2147483649', '', 'Lower border for int32 Route works',
+        '/id_int32?id=2147483648', '',  'Upper border for int32 Route works',
+        # uint32
+        '/id_uint32', 'Correct, uint32, 0', 'Route with optional uint32 works',
+        '/id_uint32?id=1', 'Correct, uint32, 1', 'Route for uint32 works',
+        '/id_uint32?id=-1', '', 'Lower border for uint32 Route works',
+        '/id_uint32?id=4294967296', '',  'Upper border for uint32 Route works',
+        # int64
+        '/id_int64', 'Correct, int64, 0', 'Route with optional int64 works',
+        '/id_int64?id=1', 'Correct, int64, 1', 'Route for int64 works',
+        '/id_int64?id=-9223372036854775809', '', 'Lower border for int64 Route works',
+        '/id_int64?id=9223372036854775808', '',  'Upper border for int64 Route works',
+        # uint64
+        '/id_uint64', 'Correct, uint64, 0', 'Route with optional uint64 works',
+        '/id_uint64?id=1', 'Correct, uint64, 1', 'Route for uint64 works',
+        '/id_uint64?id=-1', '', 'Lower border for uint64 Route works',
+        '/id_uint64?id=18446744073709551616', '',  'Upper border for uint64 Route works';
+
+    for @cases -> $target, $expected-output, $desc {
+        my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is-deeply body-text($r), $expected-output, $desc;
+        }
+    }
+}
+
+{
     my subset UUIDv4 of Str where /^
         <[0..9a..f]> ** 12
         4 <[0..9a..f]> ** 3
