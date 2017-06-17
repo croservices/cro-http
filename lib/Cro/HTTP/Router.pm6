@@ -138,7 +138,9 @@ module Cro::HTTP::Router {
             for @handlers.kv -> $index, $handler {
                 # Things we need to do to prepare segments for binding and unpack
                 # request data.
+                my @checks;
                 my @make-tasks;
+                my @types = int8, int16, int32, int64, uint8, uint16, uint32, uint64;
 
                 # If we need a signature bind test (due to subset/where).
                 my $need-sig-bind = False;
@@ -153,6 +155,35 @@ module Cro::HTTP::Router {
                 my @segments-required;
                 my @segments-optional;
                 my $segments-terminal = '';
+
+                sub pack-range($type, $bits, $signed = True,
+                               :$target, :$target-name, # named
+                               :$seg-index, :@matcher-target, :@constraints) {
+                    my $bound = 2 ** ($bits - 1);
+
+                    if $target.defined && $target-name.defined {
+                        push @checks, '(with ' ~ $target ~ ' { ' ~
+                                               ( if $signed {
+                                                       -$bound ~ ' <= $_ <= ' ~ $bound - 1
+                                                   } else {
+                                                     '0 <= $_ <= ' ~ 2 ** $bits - 1
+                                                 }
+                                               ) ~ ' } else { True })';
+                        # we coerce to Int here for two reasons:
+                        # * Str cannot be coerced to native types;
+                        # * We already did a range check;
+                        @make-tasks.push: '%unpacks{Q[' ~ $target-name ~ ']} = .Int with ' ~ $target;
+                    } else {
+                        @matcher-target.push(Q['-'?\d+:]) if $signed;
+                        @matcher-target.push(Q[?\d+:]) if !$signed;
+                        @make-tasks.push: Q:c/.=Int with @segs[{$seg-index}]/;
+                        @checks.push: Q:c/(with @segs[{$seg-index}]/ ~ ' { ' ~
+                                           ( -$bound ~ ' <= $_ <= ' ~ $bound - 1 )
+                                           ~ ' } else { True })';
+                                           $need-sig-bind = True if @constraints;
+                    }
+                }
+
                 for @positional.kv -> $seg-index, $param {
                     if $param.slurpy {
                         $segments-terminal = '{} .*:';
@@ -181,7 +212,21 @@ module Cro::HTTP::Router {
                             $need-sig-bind = True if @constraints;
                         }
                         else {
-                            die "Parameter type $type.^name() not allowed as a URL segment matcher";
+                            my $else = True;
+                            for @types {
+                                if $type.^name eq $_.^name {
+                                    if $type.^name.comb[0] eq 'u' {
+                                        pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                                   False, :$seg-index, :@matcher-target, :@constraints);
+                                    } else {
+                                        pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                                   :$seg-index, :@matcher-target, :@constraints);
+                                    }
+                                    $else = False;
+                                    last;
+                                }
+                            }
+                            die "Parameter type $type.^name() not allowed on a request unpack parameter" if $else;
                         }
                     }
                 }
@@ -191,7 +236,6 @@ module Cro::HTTP::Router {
                     $segments-terminal;
 
                 # Turned nameds into unpacks.
-                my @checks;
                 for @named -> $param {
                     my $target-name = $param.named_names[0];
                     my ($exists, $lookup) = do given $param {
@@ -208,21 +252,6 @@ module Cro::HTTP::Router {
                         push @checks, '(' ~ $exists ~ ' || !($*MISSING-UNPACK = True))';
                     }
 
-                    sub pack-range($type, $bits, $signed = True) {
-                        push @checks, '(with ' ~ $lookup ~ ' { ' ~
-                                               ( if $signed {
-                                                       my $bound = 2 ** ($bits - 1);
-                                                       -$bound ~ ' <= $_ <= ' ~ $bound - 1
-                                                   } else {
-                                                     '0 <= $_ <= ' ~ 2 ** $bits - 1
-                                                 }
-                                               ) ~ ' } else { True })';
-                        # we coerce to Int here for two reasons:
-                        # * Str cannot be coerced to native types;
-                        # * We already did a range check;
-                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = .Int with ' ~ $lookup;
-                    }
-
                     my $type := $param.type;
                     if $type =:= Mu || $type =:= Any || $type =:= Str {
                         push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $_ with ' ~ $lookup;
@@ -233,32 +262,22 @@ module Cro::HTTP::Router {
                                                         ($type =:= Int ?? '.Int' !! '.UInt')
                                                         ~ ' with ' ~ $lookup;
                     }
-                    elsif $type =:= uint8 {
-                        pack-range(uint8, 8, False)
-                    }
-                    elsif $type =:= int8 {
-                        pack-range(int8, 8)
-                    }
-                    elsif $type =:= uint16 {
-                        pack-range(uint16, 16, False)
-                    }
-                    elsif $type =:= int16 {
-                        pack-range(int16, 16)
-                    }
-                    elsif $type =:= uint32 {
-                        pack-range(uint32, 32, False)
-                    }
-                    elsif $type =:= int32 {
-                        pack-range(int32, 32)
-                    }
-                    elsif $type =:= uint64 {
-                        pack-range(uint64, 64, False)
-                    }
-                    elsif $type =:= int64 {
-                        pack-range(int64, 64)
-                    }
                     else {
-                        die "Parameter type $type.^name() not allowed on a request unpack parameter";
+                        my $else = True;
+                        for @types {
+                            if $type.^name eq $_.^name {
+                                if $type.^name.comb[0] eq 'u' {
+                                    pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                               False, target => $lookup, :$target-name);
+                                } else {
+                                    pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                               target => $lookup, :$target-name);
+                                }
+                                $else = False;
+                                last;
+                            }
+                        }
+                        die "Parameter type $type.^name() not allowed on a request unpack parameter" if $else;
                     }
                     $need-sig-bind = True if extract-constraints($param);
                 }
