@@ -179,6 +179,11 @@ module Cro::HTTP::Router {
                             @make-tasks.push: Q:c/.=Int with @segs[{$seg-index}]/;
                             $need-sig-bind = True if @constraints;
                         }
+                        elsif $type =:= UInt {
+                            @matcher-target.push(Q[\d+:]);
+                            @make-tasks.push: Q:c/.=UInt with @segs[{$seg-index}]/;
+                            $need-sig-bind = True if @constraints;
+                        }
                         else {
                             die "Parameter type $type.^name() not allowed as a URL segment matcher";
                         }
@@ -194,20 +199,32 @@ module Cro::HTTP::Router {
                 for @named -> $param {
                     my $target-name = $param.named_names[0];
                     my ($exists, $lookup) = do given $param {
-                        when Query {
-                            '$req.query-hash{Q[' ~ $target-name ~ ']}:exists',
-                            '$req.query-value(Q[' ~ $target-name ~ '])'
-                        }
                         when Header {
                             '$req.has-header(Q[' ~ $target-name ~ '])',
                             '$req.header(Q[' ~ $target-name ~ '])'
                         }
                         default {
-                            die "Unhandled named parameter case";
+                            '$req.query-hash{Q[' ~ $target-name ~ ']}:exists',
+                            '$req.query-value(Q[' ~ $target-name ~ '])'
                         }
                     }
                     unless $param.optional {
                         push @checks, '(' ~ $exists ~ ' || !($*MISSING-UNPACK = True))';
+                    }
+
+                    sub pack-range($type, $bits, $signed = True) {
+                        push @checks, '(with ' ~ $lookup ~ ' { ' ~
+                                               ( if $signed {
+                                                       my $bound = 2 ** ($bits - 1);
+                                                       -$bound ~ ' <= $_ <= ' ~ $bound - 1
+                                                   } else {
+                                                     '0 <= $_ <= ' ~ 2 ** $bits - 1
+                                                 }
+                                               ) ~ ' } else { True })';
+                        # we coerce to Int here for two reasons:
+                        # * Str cannot be coerced to native types;
+                        # * We already did a range check;
+                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = .Int with ' ~ $lookup;
                     }
 
                     my $type := $param.type;
@@ -217,6 +234,34 @@ module Cro::HTTP::Router {
                     elsif $type =:= Int {
                         push @checks, '(with ' ~ $lookup ~ ' { so /^"-"?\d+$/ } else { True })';
                         push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = .Int with ' ~ $lookup;
+                    }
+                    elsif $type =:= UInt {
+                        push @checks, '(with ' ~ $lookup ~ ' { so /^\d+$/ } else { True })';
+                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = .UInt with ' ~ $lookup;
+                    }
+                    elsif $type =:= uint8 {
+                        pack-range(uint8, 8, False)
+                    }
+                    elsif $type =:= int8 {
+                        pack-range(int8, 8)
+                    }
+                    elsif $type =:= uint16 {
+                        pack-range(uint16, 16, False)
+                    }
+                    elsif $type =:= int16 {
+                        pack-range(int16, 16)
+                    }
+                    elsif $type =:= uint32 {
+                        pack-range(uint32, 32, False)
+                    }
+                    elsif $type =:= int32 {
+                        pack-range(int32, 32)
+                    }
+                    elsif $type =:= uint64 {
+                        pack-range(uint64, 64, False)
+                    }
+                    elsif $type =:= int64 {
+                        pack-range(int64, 64)
                     }
                     else {
                         die "Parameter type $type.^name() not allowed on a request unpack parameter";
