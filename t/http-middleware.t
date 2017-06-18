@@ -140,7 +140,6 @@ class UpperCase does Cro::Transform {
     my Cro::Service $service = Cro::HTTP::Server.new(
         :host('localhost'), :port(TEST_PORT), application => $application,
         after-serialize => UpperCase);
-    note "After serialize test";
     $service.start;
 
     given await Cro::HTTP::Client.get("$url/echo",
