@@ -42,3 +42,5 @@ dies-ok { $c.max-age   = 'new' }, 'Max-age is read only';
 dies-ok { $c.domain    = 'new' }, 'Domain is read only';
 dies-ok { $c.path      = 'new' }, 'Path is read only';
 dies-ok { $c.http-only = 'new' }, 'Http-only is read only';
+
+done-testing;
