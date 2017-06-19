@@ -156,7 +156,7 @@ module Cro::HTTP::Router {
                 my @segments-optional;
                 my $segments-terminal = '';
 
-                sub pack-range($type, $bits, $signed = True,
+                sub pack-range($bits, $signed = True,
                                :$target, :$target-name, # named
                                :$seg-index, :@matcher-target, :@constraints) {
                     my $bound = 2 ** ($bits - 1);
@@ -168,19 +168,22 @@ module Cro::HTTP::Router {
                                                    } else {
                                                      '0 <= $_ <= ' ~ 2 ** $bits - 1
                                                  }
-                                               ) ~ ' } else { True })';
+                                               )
+                                               ~ '|| !($*MISSING-UNPACK = True)'
+                                               ~ ' } else { True })';
                         # we coerce to Int here for two reasons:
                         # * Str cannot be coerced to native types;
                         # * We already did a range check;
                         @make-tasks.push: '%unpacks{Q[' ~ $target-name ~ ']} = .Int with ' ~ $target;
                     } else {
-                        @matcher-target.push(Q['-'?\d+:]) if $signed;
-                        @matcher-target.push(Q[?\d+:]) if !$signed;
+                        my Str $range = $signed ?? -$bound ~ ' <= $_ <= ' ~ $bound - 1 !! '0 <= $_ <= ' ~ 2 ** $bits - 1;
+                        my Str $check = '<?{('
+                                      ~ Q:c/with @segs[{$seg-index}]/
+                                      ~ ' {( '~ $range
+                                      ~ ' )} else { True }) }>';
+                        @matcher-target.push: Q['-'?\d+:] ~ $check;
                         @make-tasks.push: Q:c/.=Int with @segs[{$seg-index}]/;
-                        @checks.push: Q:c/(with @segs[{$seg-index}]/ ~ ' { ' ~
-                                           ( -$bound ~ ' <= $_ <= ' ~ $bound - 1 )
-                                           ~ ' } else { True })';
-                                           $need-sig-bind = True if @constraints;
+                        $need-sig-bind = True if @constraints;
                     }
                 }
 
@@ -216,10 +219,10 @@ module Cro::HTTP::Router {
                             for @types {
                                 if $type.^name eq $_.^name {
                                     if $type.^name.comb[0] eq 'u' {
-                                        pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                        pack-range((~($type.^name ~~ /\d+/)).Int,
                                                    False, :$seg-index, :@matcher-target, :@constraints);
                                     } else {
-                                        pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                        pack-range((~($type.^name ~~ /\d+/)).Int,
                                                    :$seg-index, :@matcher-target, :@constraints);
                                     }
                                     $else = False;
@@ -267,10 +270,10 @@ module Cro::HTTP::Router {
                         for @types {
                             if $type.^name eq $_.^name {
                                 if $type.^name.comb[0] eq 'u' {
-                                    pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                    pack-range((~($type.^name ~~ /\d+/)).Int,
                                                False, target => $lookup, :$target-name);
                                 } else {
-                                    pack-range($_, (~($type.^name ~~ /\d+/)).Int,
+                                    pack-range((~($type.^name ~~ /\d+/)).Int,
                                                target => $lookup, :$target-name);
                                 }
                                 $else = False;
