@@ -167,4 +167,30 @@ use Test;
     is $req2.content-type, Nil, 'content-type returns Nil when no header';
 }
 
+{
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    is $req.has-cookie('Summoning'), False, 'has-cookie on non-existent cookie returns False';
+    is $req.cookie-value('Summoning'), Nil, 'cookie-value on non-existent cookie returns Nil';
+    is $req.cookie-hash, {}, 'cookie-hash returns empty hash when cookies not set';
+
+    lives-ok { $req.add-cookie('Foo', 'Bar'); }, 'Can add cookie';
+
+    is $req.has-cookie('Foo'), True, 'has-cookie on added cookie returns True';
+    is $req.cookie-value('Foo'), 'Bar', 'cookie-value on added cookie returns correct value';
+    is $req.cookie-hash, {:Foo<Bar>}, 'cookie-hash returns correct result';
+
+    lives-ok { $req.add-cookie('Foo', 'Baz'); }, 'Can update cookie';
+    is $req.has-cookie('Foo'), True, 'has-cookie on updated cookie returns True';
+    is $req.cookie-value('Foo'), 'Baz', 'cookie-value on updated cookie returns correct value';
+
+    lives-ok { $req.remove-cookie('Foo'); }, 'Can remove cookie';
+    is $req.has-cookie('Foo'), False, 'Removed cookie is removed';
+
+    $req.add-cookie('Foo', 'Bar');
+    $req.add-cookie('Lang', 'US');
+    dies-ok { $req.add-cookie('', '') }, 'Empty names are not permitted';
+    $req.add-cookie('Heaven', 'Valhalla');
+    like $req.Str, /"GET / HTTP/1.0\r\nCookie: " ['Foo=Bar' || 'Heaven=Valhalla' || 'Lang=US'] ** 3 % '; '  "\r\n\r\n"/, 'Cookie header looks good';
+}
+
 done-testing;

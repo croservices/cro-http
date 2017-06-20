@@ -1,3 +1,4 @@
+use Cro::HTTP::Cookie;
 use Cro::HTTP::BodyParserSelector;
 use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Message;
@@ -11,6 +12,7 @@ class X::Cro::HTTP::Request::Incomplete is Exception {
 }
 
 class Cro::HTTP::Request does Cro::HTTP::Message {
+    has Cro::HTTP::Cookie %!cookie-storage;
     has Cro::Uri::HTTP $!cached-uri;
     has Str $!cached-uri-target = '';
     has Cro::HTTP::BodyParserSelector $.body-parser-selector is rw =
@@ -39,6 +41,11 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
         die X::Cro::HTTP::Request::Incomplete.new(:missing<method>) unless $!method;
         die X::Cro::HTTP::Request::Incomplete.new(:missing<target>) unless $!target;
         my $version = self.http-version // (self.has-header('Host') ?? '1.1' !! '1.0');
+        if %!cookie-storage {
+            self.remove-header('Cookie');
+            self.append-header('Cookie',
+                               %!cookie-storage.pairs.map({ $_.value.to-cookie; }).join('; '));
+        }
         my $headers = self!headers-str();
         "$.method $.target HTTP/$version\r\n$headers\r\n"
     }
@@ -72,5 +79,34 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
 
     method query-value(Str() $key) {
         self.query-hash.{$key}
+    }
+
+    method has-cookie($name) {
+        %!cookie-storage{$name}:exists;
+    }
+    method cookie-value($name) {
+        return %!cookie-storage{$name}.value if self.has-cookie($name);
+        Nil;
+    }
+
+    method cookie-hash() {
+        my %result;
+        %!cookie-storage.pairs.map({ %result{$_.key} = $_.value.value });
+        %result;
+    }
+
+    multi method add-cookie(Cro::HTTP::Cookie $c) {
+        my $old = %!cookie-storage{$c.name}:exists;
+        %!cookie-storage{$c.name} = $c;
+        $old;
+    }
+    multi method add-cookie(Str $name, Str() $value) {
+        self.add-cookie(Cro::HTTP::Cookie.new(:$name, :$value));
+    }
+
+    method remove-cookie($name) {
+        my $old = %!cookie-storage{$name}:exists;
+        %!cookie-storage{$name}:delete;
+        $old;
     }
 }
