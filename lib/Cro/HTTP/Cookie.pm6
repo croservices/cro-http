@@ -30,15 +30,57 @@ subset Path of Str where /^ <path> $/;
 grammar CookieString {
     token TOP          { <cookie-pair> ['; ' <cookie-av> ]* }
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
-    token cookie-av    { <expires-av> || <max-age-av> || <domain-av> ||
-                         <path-av> || <secure-av> || <httponly-av> || <extension-av> }
-    token expires-av   { 'Expires=' <HTTP-date> }
-    token max-age-av   { 'Max-Age=' <[1..9]> <[0..9]>* }
-    token domain-av    { 'Domain=' <domain> }
-    token path-av      { 'Path=' <path> }
-    token secure-av    { 'Secure' }
-    token httponly-av  { 'HttpOnly' }
-    token extension-av { <path> }
+    proto token cookie-av {*}
+          token cookie-av:sym<expires>   { 'Expires=' <HTTP-date> }
+          token cookie-av:sym<max-age>   { 'Max-Age=' <[1..9]> <[0..9]>* }
+          token cookie-av:sym<domain>    { 'Domain=' <domain> }
+          token cookie-av:sym<path>      { 'Path=' <path> }
+          token cookie-av:sym<secure>    { 'Secure' }
+          token cookie-av:sym<httponly>  { 'HttpOnly' }
+          token cookie-av:sym<extension> { <path> }
+}
+
+class Cro::HTTP::Cookie { ... }
+
+class CookieBuilder {
+    method TOP($/) {
+        my ($name, $value) = $<cookie-pair>.made;
+        my %args;
+        %args.append('name',  $name);
+        %args.append('value', $value);
+        for $<cookie-av> -> $av {
+            %args.append($av.made);
+        };
+        make Cro::HTTP::Cookie.new(|%args);
+    }
+    method cookie-pair($/) {
+        make $/.split('=')
+    }
+
+    method !data-deal($str) {
+        # XXX: can throw
+        DateTimeGrammar.parse($str, actions => DateTimeActions.new).made;
+    }
+
+    method cookie-av:sym<expires> ($/) {
+        make ('expires', self!data-deal(~$/<HTTP-date>));
+    }
+    method cookie-av:sym<max-age> ($/) {
+        make ('max-age', Duration.new: (~$/).split('=')[1].Int);
+    }
+    method cookie-av:sym<domain> ($/) {
+        make ('domain', $/.split('=')[1]);
+    }
+    method cookie-av:sym<path> ($/) {
+        make ('path', $/.split('=')[1]);
+    }
+    method cookie-av:sym<secure> ($/) {
+        make ('secure', True);
+    }
+    method cookie-av:sym<httponly> ($/) {
+        make ('http-only', True);
+    }
+    method cookie-av:sym<extension> ($/) {}
 }
 
 class Cro::HTTP::Cookie {
@@ -76,5 +118,9 @@ class Cro::HTTP::Cookie {
     }
 
     method to-cookie() { "$!name=$!value" }
-    method from-set-cookie(Str $header) {  }
+    method from-set-cookie(Str $str) {
+        my $cookie = CookieString.parse($str, :actions(CookieBuilder.new));
+        die X::Cro::HTTP::Cookie::Unrecognized.new(what => $str) unless $cookie;
+        $cookie.made;
+    }
 }

@@ -56,6 +56,7 @@ dies-ok { Cro::HTTP::Cookie.new: value => 'TEST' }, 'Cookie cannot be created wi
 lives-ok { Cro::HTTP::Cookie.new(name => "UID", value => "TEST"); }, 'Cookie can be created';
 
 my $c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST");
+my $cookie;
 
 dies-ok { $c.name      = 'new' }, 'New is read only';
 dies-ok { $c.value     = 'new' }, 'Value is read only';
@@ -68,6 +69,9 @@ dies-ok { $c.http-only = 'new' }, 'Http-only is read only';
 is $c.to-set-cookie, 'UID=TEST', 'Set cookie 1 works';
 is $c.to-cookie, 'UID=TEST', 'Cookie 1 works';
 
+$cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
+is $cookie.to-set-cookie, 'UID=TEST', 'Cookie 1 can be parsed';
+
 my DateTime $datetime = DateTime.new(
     year    => 2017,
     month   => 1,
@@ -78,15 +82,24 @@ $c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST", expires => $datetime)
 is $c.to-set-cookie, 'UID=TEST; Expires=Sun, 01 Jan 2017 12:05:00 GMT', 'Set cookie 2 works';
 is $c.to-cookie, 'UID=TEST', 'Cookie 2 works';
 
+$cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
+is $cookie.to-set-cookie, 'UID=TEST; Expires=Sun, 01 Jan 2017 12:05:00 GMT', 'Cookie 2 can be parsed';
+
 my Duration $d = Duration.new: 3600;
 $c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST", max-age => $d);
 is $c.to-set-cookie, "UID=TEST; Max-Age=$d", 'Set cookie 3 works';
 is $c.to-cookie, "UID=TEST", 'Cookie 3 works';
+
+$cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
+is $cookie.to-set-cookie, "UID=TEST; Max-Age=$d", 'Cookie 3 can be parsed';
 
 $c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST",
                            max-age => $d, secure => True,
                            http-only => True);
 is $c.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Set cookie 4 works';
 is $c.to-cookie, 'UID=TEST', 'Cookie 4 works';
+
+my $cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
+is $cookie.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Cookie 4 can be parsed';
 
 done-testing;
