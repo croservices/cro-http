@@ -60,11 +60,12 @@ my $cookie;
 
 dies-ok { $c.name      = 'new' }, 'New is read only';
 dies-ok { $c.value     = 'new' }, 'Value is read only';
-dies-ok { $c.expires   = 'new' }, 'Expires is read only';
-dies-ok { $c.max-age   = 'new' }, 'Max-age is read only';
+dies-ok { $c.expires   = DateTime.now }, 'Expires is read only';
+dies-ok { $c.max-age   = Duration.new(3600) }, 'Max-age is read only';
 dies-ok { $c.domain    = 'new' }, 'Domain is read only';
-dies-ok { $c.path      = 'new' }, 'Path is read only';
-dies-ok { $c.http-only = 'new' }, 'Http-only is read only';
+dies-ok { $c.path      = '/'   }, 'Path is read only';
+dies-ok { $c.secure    = True  }, 'Secure is read only';
+dies-ok { $c.http-only = True  }, 'Http-only is read only';
 
 is $c.to-set-cookie, 'UID=TEST', 'Set cookie 1 works';
 is $c.to-cookie, 'UID=TEST', 'Cookie 1 works';
@@ -99,7 +100,7 @@ $c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST",
 is $c.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Set cookie 4 works';
 is $c.to-cookie, 'UID=TEST', 'Cookie 4 works';
 
-my $cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
+$cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
 is $cookie.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Cookie 4 can be parsed';
 
 done-testing;

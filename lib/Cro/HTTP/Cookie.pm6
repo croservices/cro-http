@@ -84,14 +84,14 @@ class CookieBuilder {
 }
 
 class Cro::HTTP::Cookie {
-    has CookieName $!name is required;
-    has CookieValue $!value is required;
-    has DateTime $!expires;
-    has Duration $!max-age;
-    has Domain $!domain;
-    has Path $!path;
-    has Bool $!secure;
-    has Bool $!http-only;
+    has CookieName $.name is required;
+    has CookieValue $.value is required;
+    has DateTime $.expires;
+    has Duration $.max-age;
+    has Domain $.domain;
+    has Path $.path;
+    has Bool $.secure;
+    has Bool $.http-only;
 
     submethod BUILD(:$!name, :$!value,
                     :$!expires=Nil, :$!max-age=Nil,
