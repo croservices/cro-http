@@ -28,6 +28,16 @@ subtest {
     }
 }, "Incorrect symbols are outside of CookieValue subset";
 
+lives-ok {
+    my Domain $d;
+    $d = "www.example.com";
+    $d = "example.com";
+    $d = "127domain.com";
+}, 'Correct domain name works';
+dies-ok { my Domain $d = "\n"; }, 'Incorrect domain name with bad character';
+dies-ok { my Domain $d = ""; }, 'Empty domain name cannot be created';
+dies-ok { my Domain $d = ' '; }, 'Domain name cannot contain spaces';
+
 dies-ok { Cro::HTTP::Cookie.new }, 'Cookie cannot be created with no arguments';
 dies-ok { Cro::HTTP::Cookie.new: name => 'UID' }, 'Cookie cannot be created without value';
 dies-ok { Cro::HTTP::Cookie.new: value => 'TEST' }, 'Cookie cannot be created without name';
