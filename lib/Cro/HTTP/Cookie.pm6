@@ -33,7 +33,7 @@ grammar CookieString {
     token cookie-av    { <expires-av> || <max-age-av> || <domain-av> ||
                          <path-av> || <secure-av> || <httponly-av> || <extension-av> }
     token expires-av   { 'Expires=' <HTTP-date> }
-    token max-age-av   { 'Max-Age=' <[1..9]> <[1..9]>* }
+    token max-age-av   { 'Max-Age=' <[1..9]> <[0..9]>* }
     token domain-av    { 'Domain=' <domain> }
     token path-av      { 'Path=' <path> }
     token secure-av    { 'Secure' }
