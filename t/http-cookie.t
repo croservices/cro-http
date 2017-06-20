@@ -1,3 +1,4 @@
+use Cro::HTTP::DateTime;
 use Cro::HTTP::Cookie;
 use Test;
 
@@ -63,5 +64,20 @@ dies-ok { $c.max-age   = 'new' }, 'Max-age is read only';
 dies-ok { $c.domain    = 'new' }, 'Domain is read only';
 dies-ok { $c.path      = 'new' }, 'Path is read only';
 dies-ok { $c.http-only = 'new' }, 'Http-only is read only';
+
+is $c.to-set-cookie, 'UID=TEST', 'Set cookie 1 works';
+
+my DateTime $datetime = DateTime.new(
+    year    => 2017,
+    month   => 1,
+    day     => 1,
+    hour    => 12,
+    minute  => 5);
+$c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST", expires => $datetime);
+is $c.to-set-cookie, 'UID=TEST; Expires=Sun, 01 Jan 2017 12:05:00 GMT', 'Set cookie 2 works';
+
+my Duration $d = Duration.new: 3600;
+$c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST", max-age => $d);
+is $c.to-set-cookie, "UID=TEST; Max-Age=$d", 'Set cookie 3 works';
 
 done-testing;

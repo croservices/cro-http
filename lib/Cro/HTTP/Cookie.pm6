@@ -1,3 +1,5 @@
+use Cro::HTTP::DateTime;
+
 my regex cookie-name { <[\x1F..\xFF] - [() \< \> @,;: \\ \x22 /\[\] ?={} \x20 \x1F \x7F]>+ };
 subset CookieName of Str where /^ <cookie-name> $/;
 
@@ -28,29 +30,33 @@ class Cro::HTTP::Cookie {
     has Bool $!secure;
     has Bool $!http-only;
 
-    submethod BUILD(:$!name, :$!value) {};
+    submethod BUILD(:$!name, :$!value,
+                    :$!expires=Nil, :$!max-age=Nil,
+                    :$!domain=Nil,:$!path=Nil,
+                    :$!secure=False, :$!http-only=False) {};
 
-    method to-set-cookie() {}
-    method to-cookie() {}
-    method from-set-cookie(Str $header) {}
+    method !transform(DateTime $time) {
+        my $rfc1123-format = sub ($self) { sprintf "%s, %02d %s %04d %02d:%02d:%02d GMT",
+                                           %weekdays{.day-of-week}, .day,
+                                           %month-names{.month}, .year,
+                                           .hour, .minute, .second given $self; }
+        DateTime.new($time.Str, formatter => $rfc1123-format);
+    }
+
+    method to-set-cookie() {
+        my $base = "$!name=$!value";
+        $base ~= "; Expires={self!transform($!expires)}" if $!expires;
+        $base ~= "; Max-Age=$!max-age" if $!max-age;
+        $base ~= "; Domain=$!domain" if $!domain;
+        $base ~= "; Path=$!path" if $!path;
+        $base ~= "; Secure" if $!secure;
+        $base ~= "; HttpOnly" if $!http-only;
+        $base;
+    }
+
+    method to-cookie() { "$!name=$!value" }
+    method from-set-cookie(Str $header) {  }
 }
-
-my regex time { [\d\d ':'] ** 2 [\d\d] };
-my regex wkday { 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun' };
-my regex weekday { 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' |
-                   'Friday' | 'Saturday' | 'Sunday' };
-my regex month { 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'Jun'
-                 'Jul' | 'Aug' | 'Sep' | 'Oct' | 'Nov' | 'Dec' };
-
-my regex date1 { \d\d ' ' <month>  ' ' \d ** 4 };
-my regex date2 { \d\d '-' <month>  '-' \d ** 2 };
-my regex date3 { <month> ' ' [\d\d | ' ' \d] };
-
-my regex rfc1123-date { <wkday> ', ' <date1> ' ' <time> ' GMT' };
-my regex rfc850-date { <weekday> ', ' <date2> ' ' <time> ' GMT' };
-my regex asctime-date { <wkday> ' ' <date3> ' ' <time> ' ' \d ** 4 };
-
-our regex HTTP-date { <rfc1123-date> || <rfc850-date> || <asctime-date> };
 
 grammar CookieString {
     token TOP          { <cookie-pair> ['; ' <cookie-av> ]* }
