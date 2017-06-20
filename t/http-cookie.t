@@ -80,4 +80,10 @@ my Duration $d = Duration.new: 3600;
 $c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST", max-age => $d);
 is $c.to-set-cookie, "UID=TEST; Max-Age=$d", 'Set cookie 3 works';
 
+$c = Cro::HTTP::Cookie.new(name => "UID", value => "TEST",
+                           max-age => $d, secure => True,
+                           http-only => True);
+is $c.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Set cookie 4 works';
+
+
 done-testing;
