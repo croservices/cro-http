@@ -102,6 +102,9 @@ use Test;
     $res.set-cookie('Session', 'scary-hash', max-age => Duration.new(3600), expires => $date);
     like $res.Str, /'Set-Cookie: Session=scary-hash; Expires=' .+? '; Max-Age=3600'/,
         'Cookie header is set for a complex cookie';
+
+    ok $res.cookies[0] ~~ Cro::HTTP::Cookie, 'Cookies are returned from .cookies call';
+    is $res.cookies.elems, 3, 'All cookies are returned';
 }
 
 done-testing;
