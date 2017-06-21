@@ -87,4 +87,21 @@ use Test;
         'Default status code when body set is 200, not 204';
 }
 
+{
+    my $res = Cro::HTTP::Response.new;
+    $res.set-body('This is body');
+    lives-ok { $res.set-cookie('Foo', 'Bar') }, 'Can set correct cookie';
+    is $res.Str, "HTTP/1.1 200 OK\r\nSet-Cookie: Foo=Bar\r\n\r\n", 'Cookie header is set';
+
+    dies-ok { $res.set-cookie('Foo', 'Bad') }, 'Cookie cannot be set twice';
+
+    $res.set-cookie('NewCookie', 'NewValue');
+    is $res.Str, "HTTP/1.1 200 OK\r\nSet-Cookie: Foo=Bar\r\nSet-Cookie: NewCookie=NewValue\r\n\r\n", 'Cookie header is set for two cookies';
+
+    my $date = DateTime.now.later(hours => 1);
+    $res.set-cookie('Session', 'scary-hash', max-age => Duration.new(3600), expires => $date);
+    like $res.Str, /'Set-Cookie: Session=scary-hash; Expires=' .+? '; Max-Age=3600'/,
+        'Cookie header is set for a complex cookie';
+}
+
 done-testing;
