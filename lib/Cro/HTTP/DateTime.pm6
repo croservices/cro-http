@@ -1,20 +1,18 @@
 # Here are placed all time-related things: regexes, hashes, grammars.
 
-our %month-names = 1 => 'Jan', 2 => 'Feb', 3 => 'Mar',
-                   4 => 'Apr', 5 => 'May', 6 => 'Jun',
-                   7 => 'Jul', 8 => 'Aug', 9 => 'Sep',
-                   10 => 'Oct', 11 => 'Nov', 12 => 'Dec';
+my %month-names = 1 => 'Jan', 2 => 'Feb', 3 => 'Mar',
+                  4 => 'Apr', 5 => 'May', 6 => 'Jun',
+                  7 => 'Jul', 8 => 'Aug', 9 => 'Sep',
+                  10 => 'Oct', 11 => 'Nov', 12 => 'Dec';
 
-our %amonth-names;
-%month-names.antipairs.map({ %amonth-names{$_.key} = $_.value });
+my %amonth-names = %month-names.antipairs;
 
-our %weekdays = 1 => 'Mon', 2 => 'Tue',
-                3 => 'Wed', 4 => 'Thu',
-                5 => 'Fri', 6 => 'Sat',
-                7 => 'Sun';
+my %weekdays = 1 => 'Mon', 2 => 'Tue',
+               3 => 'Wed', 4 => 'Thu',
+               5 => 'Fri', 6 => 'Sat',
+               7 => 'Sun';
 
-our %aweekdays;
-%weekdays.antipairs.map({ %aweekdays{$_.key} = $_.value });
+my %aweekdays = %weekdays.antipairs;
 
 my regex time { [\d\d ':'] ** 2 [\d\d] };
 my regex wkday { 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun' };
@@ -78,4 +76,12 @@ class DateTimeActions {
             minute  => (~$time[1]).Int
         );
     }
+}
+
+sub rfc1123-formatter(DateTime $_) is export {
+    my $rfc1123-format = sub ($self) { sprintf "%s, %02d %s %04d %02d:%02d:%02d GMT",
+                                       %weekdays{.day-of-week}, .day,
+                                       %month-names{.month}, .year,
+                                       .hour, .minute, .second given $self; }
+    DateTime.new(.Str, formatter => $rfc1123-format);
 }
