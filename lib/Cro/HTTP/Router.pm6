@@ -268,12 +268,12 @@ module Cro::HTTP::Router {
                     else {
                         my $else = True;
                         for @types {
-                            if $type.^name eq $_.^name {
-                                if $type.^name.comb[0] eq 'u' {
-                                    pack-range((~($type.^name ~~ /\d+/)).Int,
+                            if $type === $_ {
+                                if $type.^unsigned {
+                                    pack-range($type.^nativesize,
                                                False, target => $lookup, :$target-name);
                                 } else {
-                                    pack-range((~($type.^name ~~ /\d+/)).Int,
+                                    pack-range($type.^nativesize,
                                                target => $lookup, :$target-name);
                                 }
                                 $else = False;
