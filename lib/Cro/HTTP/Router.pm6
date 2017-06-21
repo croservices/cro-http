@@ -160,7 +160,25 @@ module Cro::HTTP::Router {
                 my @segments-optional;
                 my $segments-terminal = '';
 
-                sub pack-range($bits, $signed = True,
+                sub match-types($type,
+                                :$lookup, :$target-name,
+                                :$seg-index, :@matcher-target, :@constraints) {
+                    for @types {
+                        if $type === $_ {
+                            if $lookup {
+                                pack-range($type.^nativesize, !$type.^unsigned,
+                                           target => $lookup, :$target-name);
+                            } else {
+                                pack-range($type.^nativesize, !$type.^unsigned,
+                                           :$seg-index, :@matcher-target, :@constraints);
+                            }
+                            return True;
+                        }
+                    }
+                    False;
+                }
+
+                sub pack-range($bits, $signed,
                                :$target, :$target-name, # named
                                :$seg-index, :@matcher-target, :@constraints) {
                     my $bound = 2 ** ($bits - 1);
@@ -219,21 +237,9 @@ module Cro::HTTP::Router {
                             $need-sig-bind = True if @constraints;
                         }
                         else {
-                            my $else = True;
-                            for @types {
-                                if $type.^name eq $_.^name {
-                                    if $type.^name.comb[0] eq 'u' {
-                                        pack-range((~($type.^name ~~ /\d+/)).Int,
-                                                   False, :$seg-index, :@matcher-target, :@constraints);
-                                    } else {
-                                        pack-range((~($type.^name ~~ /\d+/)).Int,
-                                                   :$seg-index, :@matcher-target, :@constraints);
-                                    }
-                                    $else = False;
-                                    last;
-                                }
-                            }
-                            die "Parameter type $type.^name() not allowed on a request unpack parameter" if $else;
+                            my $matched = match-types($type, :$seg-index,
+                                                      :@matcher-target, :@constraints);
+                            die "Parameter type $type.^name() not allowed on a request unpack parameter" unless $matched;
                         }
                     }
                 }
@@ -277,21 +283,8 @@ module Cro::HTTP::Router {
                         push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.cookie-hash';
                     }
                     else {
-                        my $else = True;
-                        for @types {
-                            if $type === $_ {
-                                if $type.^unsigned {
-                                    pack-range($type.^nativesize,
-                                               False, target => $lookup, :$target-name);
-                                } else {
-                                    pack-range($type.^nativesize,
-                                               target => $lookup, :$target-name);
-                                }
-                                $else = False;
-                                last;
-                            }
-                        }
-                        die "Parameter type $type.^name() not allowed on a request unpack parameter" if $else;
+                        my $matched = match-types($type, :$lookup, :$target-name);
+                        die "Parameter type $type.^name() not allowed on a request unpack parameter" unless $matched;
                     }
                     $need-sig-bind = True if extract-constraints($param);
                 }
