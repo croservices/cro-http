@@ -31,13 +31,13 @@ grammar CookieString {
     token TOP          { <cookie-pair> ['; ' <cookie-av> ]* }
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
     proto token cookie-av {*}
-          token cookie-av:sym<expires>   { 'Expires=' <HTTP-date> }
-          token cookie-av:sym<max-age>   { 'Max-Age=' <[1..9]> <[0..9]>* }
-          token cookie-av:sym<domain>    { 'Domain=' <domain> }
-          token cookie-av:sym<path>      { 'Path=' <path> }
-          token cookie-av:sym<secure>    { 'Secure' }
-          token cookie-av:sym<httponly>  { 'HttpOnly' }
-          token cookie-av:sym<extension> { <path> }
+          token cookie-av:sym<expires>   { :i 'Expires=' <HTTP-date> }
+          token cookie-av:sym<max-age>   { :i 'Max-Age=' <[1..9]> <[0..9]>* }
+          token cookie-av:sym<domain>    { :i 'Domain=' <domain> }
+          token cookie-av:sym<path>      { :i 'Path=' <path> }
+          token cookie-av:sym<secure>    { :i 'Secure' }
+          token cookie-av:sym<httponly>  { :i 'HttpOnly' }
+          token cookie-av:sym<extension> { :i <path> }
 }
 
 class Cro::HTTP::Cookie { ... }
@@ -98,17 +98,9 @@ class Cro::HTTP::Cookie {
                     :$!domain=Nil,:$!path=Nil,
                     :$!secure=False, :$!http-only=False) {};
 
-    method !transform(DateTime $time) {
-        my $rfc1123-format = sub ($self) { sprintf "%s, %02d %s %04d %02d:%02d:%02d GMT",
-                                           %weekdays{.day-of-week}, .day,
-                                           %month-names{.month}, .year,
-                                           .hour, .minute, .second given $self; }
-        DateTime.new($time.Str, formatter => $rfc1123-format);
-    }
-
     method to-set-cookie() {
         my $base = "$!name=$!value";
-        $base ~= "; Expires={self!transform($!expires)}" if $!expires;
+        $base ~= "; Expires={rfc1123-formatter($!expires)}" if $!expires;
         $base ~= "; Max-Age=$!max-age" if $!max-age;
         $base ~= "; Domain=$!domain" if $!domain;
         $base ~= "; Path=$!path" if $!path;
