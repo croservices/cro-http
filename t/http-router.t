@@ -1292,4 +1292,66 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $app = route {
+        get -> 'maybe-cookie', :$Foo is cookie {
+            content 'text/plain', 'Good job!' if !$Foo;
+            content 'text/plain', "Good job with $Foo!" if $Foo;
+        }
+        get -> 'i-need-cookie', :$Foo! is cookie {
+            content 'text/plain', "Very tasty $Foo";
+        }
+        get -> 'cookie-bag', :%cookies is cookie {
+            content 'text/plain', "Just a bag here, with %cookies<Foo> and %cookies<EP>";
+        }
+    }
+
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+
+    {
+        my $req = Cro::HTTP::Request.new(method => 'GET', target => '/maybe-cookie');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'Good job!', 'Optional cookie route matches without cookie';
+            is $r.status, 200, 'Status is good';
+        }
+
+        $req.add-cookie('Foo', 'Bar');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'Good job with Bar!', 'Optional cookie route matches with cookie';
+            is $r.status, 200, 'Status is good';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(method => 'GET', target => '/i-need-cookie');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), '', 'Request without needed cookie was rejected';
+            is $r.status, 400, 'Bad request to access page without needed cookie';
+        }
+
+        $req.add-cookie('Foo', 'Bar');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'Very tasty Bar', 'Request with required cookie works correctly';
+            is $r.status, 200, 'Status is good';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(method => 'GET', target => '/cookie-bag');
+        $req.add-cookie('Foo', 'Bar');
+        $req.add-cookie('EP', 'Descent');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'Just a bag here, with Bar and Descent',
+                'Cookie hash works correctly';
+            is $r.status, 200, 'Status is good';
+        }
+    }
+}
+
 done-testing;

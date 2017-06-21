@@ -29,6 +29,10 @@ module Cro::HTTP::Router {
     multi trait_mod:<is>(Parameter:D $param, :$header! --> Nil) is export {
         $param does Header;
     }
+    role Cookie {}
+    multi trait_mod:<is>(Parameter:D $param, :$cookie! --> Nil) is export {
+        $param does Cookie;
+    }
 
     class RouteSet does Cro::Transform {
         my class Handler {
@@ -242,6 +246,10 @@ module Cro::HTTP::Router {
                 for @named -> $param {
                     my $target-name = $param.named_names[0];
                     my ($exists, $lookup) = do given $param {
+                        when Cookie {
+                            '$req.has-cookie(Q[' ~ $target-name ~ '])',
+                            '$req.cookie-value(Q[' ~ $target-name ~ '])'
+                        }
                         when Header {
                             '$req.has-header(Q[' ~ $target-name ~ '])',
                             '$req.header(Q[' ~ $target-name ~ '])'
@@ -264,6 +272,9 @@ module Cro::HTTP::Router {
                         push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = ' ~
                                                         ($type =:= Int ?? '.Int' !! '.UInt')
                                                         ~ ' with ' ~ $lookup;
+                    }
+                    elsif $type =:= Associative {
+                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.cookie-hash';
                     }
                     else {
                         my $else = True;
