@@ -280,7 +280,22 @@ module Cro::HTTP::Router {
                                                         ~ ' with ' ~ $lookup;
                     }
                     elsif $type =:= Associative {
-                        push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.cookie-hash';
+                        given $param {
+                            when Cookie {
+                                push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.cookie-hash';
+                            }
+                            when Header {
+                                push @make-tasks,
+                                'my %result;'
+                                    ~ '$req.headers.map({ %result{$_.name} = $_.value });'
+                                    ~ '%unpacks{Q['
+                                    ~ $target-name
+                                    ~ ']} = %result;';
+                            }
+                            default {
+                                push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.query-hash;'
+                            }
+                        }
                     }
                     else {
                         my $matched = match-types($type, :$lookup, :$target-name);

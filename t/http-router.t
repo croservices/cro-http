@@ -277,6 +277,12 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             response.set-body("reqquery field2".encode('ascii'));
         }
 
+        get -> 'reqquery-hash', :%params {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reqquery with %params<field1> and %params<field2>".encode('ascii'));
+        }
+
         get -> 'reqheader', :$unknown! is header {
             response.status = 200;
             response.append-header('Content-type', 'text/html');
@@ -287,6 +293,12 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             response.status = 200;
             response.append-header('Content-type', 'text/html');
             response.set-body("reqheader x-custom1".encode('ascii'));
+        }
+
+        get -> 'reqheader-hash', :%headers is header {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("reqheader with a %headers<X-Custom1> and %headers<X-Custom2>".encode('ascii'));
         }
 
         get -> 'reqintarg', Int :$page! is query {
@@ -331,7 +343,11 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             'Required query parameter selects correct route (2)',
         '/reqquery?field1=x&field2=x', 'reqquery field1',
             'First winning route with required query items wins',
+        '/reqquery-hash?field1=x&field2=y', 'reqquery with x and y',
+            'First winning route with required query items wins',
         '/reqheader', 'reqheader x-custom1',
+            'Correct route picked when there are required headers',
+        '/reqheader-hash', 'reqheader with a c1 and c2',
             'Correct route picked when there are required headers',
         '/reqintarg?page=42', 'reqintarg 42',
             'Route with required Int named arg for query parameter works',
