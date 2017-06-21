@@ -525,6 +525,12 @@ module Cro::HTTP::Router {
         content $content-type, $body, |%options;
     }
 
+    sub set-cookie($name, $value, *%opts) is export {
+        my $resp = $*CRO-ROUTER-RESPONSE //
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+        $resp.set-cookie($name, $value, |%opts);
+    }
+
     sub set-status(Int $status --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);

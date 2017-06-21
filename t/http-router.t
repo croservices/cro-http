@@ -1338,6 +1338,16 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         get -> 'cookie-bag', :%cookies is cookie {
             content 'text/plain', "Just a bag here, with %cookies<Foo> and %cookies<EP>";
         }
+        get -> 'set-cookie-please', :$present {
+            if $present {
+                set-cookie 'Present', 'Very-Tasty',
+                    max-age => Duration.new(3600),
+                    expires => DateTime.now.later(hours => 1);
+            } else {
+                set-cookie 'Present', 'Tasty';
+            }
+            content 'text/plain', "Done";
+        }
     }
 
     my $source = Supplier.new;
@@ -1384,6 +1394,25 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             is body-text($r), 'Just a bag here, with Bar and Descent',
                 'Cookie hash works correctly';
             is $r.status, 200, 'Status is good';
+        }
+    }
+
+    {
+        my $req = Cro::HTTP::Request.new(method => 'GET', target => '/set-cookie-please');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'Done';
+            is $r.status, 200, 'Got plain cookie';
+            is $r.headers.grep({ $_.name ~~ /'Set-Cookie'/ && $_.value ~~ /'Present=Tasty'/ }).elems, 1, 'Cookie is here';
+        }
+
+        $req = Cro::HTTP::Request.new(method => 'GET', target => '/set-cookie-please?present=yes');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), 'Done';
+            is $r.status, 200, 'Status is good';
+            is $r.headers.grep({ $_.name ~~ /'Set-Cookie'/ && $_.value ~~ /'Present=Very-Tasty; Expires=' .+? '; Max-Age=3600'/ }).elems,
+                1, 'Complex cookie is here';
         }
     }
 }
