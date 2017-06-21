@@ -277,6 +277,13 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             response.set-body("reqquery field2".encode('ascii'));
         }
 
+        get -> 'reqquery-list', :@params {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            my $res = @params.map({ "$_.key()=$_.value()" }).join(',');
+            response.set-body("reqquery with $res".encode('ascii'));
+        }
+
         get -> 'reqquery-hash', :%params {
             response.status = 200;
             response.append-header('Content-type', 'text/html');
@@ -293,6 +300,13 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             response.status = 200;
             response.append-header('Content-type', 'text/html');
             response.set-body("reqheader x-custom1".encode('ascii'));
+        }
+
+        get -> 'reqheader-list', :@headers is header {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            my @sorted-headers = @headers.sort({$^a.name cmp $^b.name});
+            response.set-body(@sorted-headers.map({ "$_.name() = $_.value()" }).join(",").encode('ascii'));
         }
 
         get -> 'reqheader-hash', :%headers is header {
@@ -343,10 +357,14 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             'Required query parameter selects correct route (2)',
         '/reqquery?field1=x&field2=x', 'reqquery field1',
             'First winning route with required query items wins',
+        '/reqquery-list?field1=x&field2=y', 'reqquery with field1=x,field2=y',
+            'Route with named array of query parameters works',
         '/reqquery-hash?field1=x&field2=y', 'reqquery with x and y',
             'First winning route with required query items wins',
         '/reqheader', 'reqheader x-custom1',
             'Correct route picked when there are required headers',
+        '/reqheader-list', 'X-Custom1 = c1,X-Custom2 = c2',
+            'Route with named array of headers works',
         '/reqheader-hash', 'reqheader with a c1 and c2',
             'Correct route picked when there are required headers',
         '/reqintarg?page=42', 'reqintarg 42',

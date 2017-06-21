@@ -279,6 +279,19 @@ module Cro::HTTP::Router {
                                                         ($type =:= Int ?? '.Int' !! '.UInt')
                                                         ~ ' with ' ~ $lookup;
                     }
+                    elsif $type =:= Positional {
+                        given $param {
+                            when Header {
+                                push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.headers';
+                            }
+                            when Cookie {
+                                die "Cookies cannot be extracted to List. Maybe you want '%' instead of '@'";
+                            }
+                            default {
+                                push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.query-hash.List';
+                            }
+                        }
+                    }
                     elsif $type =:= Associative {
                         given $param {
                             when Cookie {
@@ -293,7 +306,7 @@ module Cro::HTTP::Router {
                                     ~ ']} = %result;';
                             }
                             default {
-                                push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.query-hash;'
+                                push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.query-hash'
                             }
                         }
                     }
