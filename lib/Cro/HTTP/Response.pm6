@@ -68,4 +68,8 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
         die "Cookie with name '$name' is already set" if $is-dup;
         self.append-header('Set-Cookie', $cookie-line);
     }
+
+    method cookies() {
+        self.headers.grep({ .name.lc eq 'set-cookie' }).map({ Cro::HTTP::Cookie.from-set-cookie: .value });
+    }
 }
