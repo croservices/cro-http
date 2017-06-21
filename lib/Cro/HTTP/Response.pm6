@@ -63,7 +63,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     }
 
     method set-cookie($name, $value, *%options) {
-        my $cookie-line = Cro::HTTP::Cookie.new(:$name, :$value, |%options).to-set-cookie;
+        my $cookie-line = Cro::HTTP::Cookie.new(name => $name, value => $value, |%options).to-set-cookie;
         my $is-dup = so self.headers.map({ .name.lc eq 'set-cookie' && .value.starts-with("$name=") }).any;
         die "Cookie with name '$name' is already set" if $is-dup;
         self.append-header('Set-Cookie', $cookie-line);
