@@ -32,7 +32,7 @@ grammar CookieString {
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
     proto token cookie-av {*}
           token cookie-av:sym<expires>   { :i 'Expires=' <HTTP-date> }
-          token cookie-av:sym<max-age>   { :i 'Max-Age=' <[1..9]> <[0..9]>* }
+          token cookie-av:sym<max-age>   { :i 'Max-Age=' '-'? <[1..9]> <[0..9]>* }
           token cookie-av:sym<domain>    { :i 'Domain=' <domain> }
           token cookie-av:sym<path>      { :i 'Path=' <path> }
           token cookie-av:sym<secure>    { :i 'Secure' }
