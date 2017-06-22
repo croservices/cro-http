@@ -41,7 +41,7 @@ dies-ok { my Domain $d = ' '; }, 'Domain name cannot contain spaces';
 
 
 # Time-related tests
-like 'Sun, 06 Nov 1994 08:49:37 GMT', /<HTTP-date>/, 'RFC 822';
+like 'Sun, 06 Nov 1994 08:49:37 GMT', /<HTTP-date>/, 'RFC 1123';
 like 'Sunday, 06-Nov-94 08:49:37 GMT', /<HTTP-date>/, 'RFC 850';
 like 'Sun Nov  6 08:49:37 1994', /<HTTP-date>/, 'ANSI C\'s asctime() format';
 

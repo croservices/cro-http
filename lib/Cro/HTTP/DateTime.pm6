@@ -78,7 +78,7 @@ class DateTimeActions {
     }
 }
 
-sub rfc1123-formatter(DateTime $_) is export {
+sub rfc1123-formatter(DateTime $_ --> Str) is export {
     my $rfc1123-format = sub ($self) { sprintf "%s, %02d %s %04d %02d:%02d:%02d GMT",
                                        %weekdays{.day-of-week}, .day,
                                        %month-names{.month}, .year,
