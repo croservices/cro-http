@@ -72,4 +72,8 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     method cookies() {
         self.headers.grep({ .name.lc eq 'set-cookie' }).map({ Cro::HTTP::Cookie.from-set-cookie: .value });
     }
+
+    method get-response-phrase() {
+        "Server responded with $!status {%reason-phrases{$!status} // 'Unknown'}";
+    }
 }

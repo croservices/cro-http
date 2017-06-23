@@ -7,6 +7,17 @@ use Cro::SSL;
 use Cro::Uri;
 use Cro;
 
+class X::Cro::HTTP::Error is Exception {
+    has $.response;
+
+    method message() {
+        "Server responded with {$.response.get-response-phrase}"
+    }
+}
+
+class X::Cro::HTTP::Error::Client is X::Cro::HTTP::Error {}
+class X::Cro::HTTP::Error::Server is X::Cro::HTTP::Error {}
+
 class X::Cro::HTTP::Client::BodyAlreadySet is Exception {
     method message() {
         "Body was set twice"
@@ -73,7 +84,17 @@ class Cro::HTTP::Client {
         my $request-object = self!assemble-request($method, $parsed-url, %options);
         $pipeline.in.emit($request-object);
         $pipeline.in.done();
-        return $pipeline.out;
+        supply {
+            whenever $pipeline.out {
+                if .status < 400 {
+                    .emit
+                } elsif .status >= 500 {
+                    die X::Cro::HTTP::Error::Server.new(response => $_);
+                } else {
+                    die X::Cro::HTTP::Error::Client.new(response => $_);
+                }
+            }
+        }
     }
 
     method !get-pipeline(Cro::Uri $url) {

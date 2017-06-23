@@ -58,6 +58,9 @@ constant %key-cert := {
         get -> 'path', :$User-agent! is header {
             content 'text/plain', "When you are $User-agent, it is fine to request";
         }
+        get -> 'error' {
+            die 'Sudden error';
+        }
     }
 
     my $http-server = Cro::HTTP::Server.new(
@@ -79,6 +82,12 @@ constant %key-cert := {
 {
     use Cro::HTTP::Client;
     my $base = "http://localhost:{HTTP_TEST_PORT}";
+
+    throws-like { await Cro::HTTP::Client.get("$base/random-page"); }, X::Cro::HTTP::Error::Client,
+        'It throws exception for 405';
+
+    throws-like { await Cro::HTTP::Client.get("$base/error"); }, X::Cro::HTTP::Error::Server,
+        'It throws exception for 500';
 
     given await Cro::HTTP::Client.get("$base/") -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /';
