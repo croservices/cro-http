@@ -34,11 +34,12 @@ monitor Cro::HTTP::Client::CookieJar {
     }
 
     method !default-path(Cro::Uri $uri --> Str) {
-        my $path = $uri.path;
-        return '/' if $path eq '' || !$path.starts-with('/');
-        return '/' if $path eq '/';
-        my $index = rindex $path, '/' - 1;
-        $path.comb[0..$index].join;
+        my $path = $uri.path ?? '/' !! $uri.path;
+        return '/'  if $path eq '' || !$path.starts-with('/');
+        return '/'  if $path eq '/';
+        my $index = (rindex $path, '/') - 1;
+        return $path.comb[0..$index].join if $index > 0;
+        $path;
     }
 
     method !path-match(Str $path, Str $request-path) {
@@ -111,14 +112,12 @@ monitor Cro::HTTP::Client::CookieJar {
         @!cookies.map({
             if $checker($_) {
                 .last-access-time = DateTime.now;
-                @cookie-list.push: .cookie;
+                @cookie-list.push: $_;
             };
         });
         # Sorting
-        @cookie-list.sort({ $^a.path.comb.elems cmp $^b.path.comb.elems });
-        # TODO: sort by .creation-time too
-
-        @cookie-list.map({ $req.add-cookie($_) });
+        @cookie-list.sort({ .cookie.path.comb.elems, .creation-time });
+        @cookie-list.map({ $req.add-cookie($_.cookie) });
     };
 
     multi method contents(--> List) { @!cookies };
