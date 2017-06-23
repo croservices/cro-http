@@ -12,7 +12,6 @@ class X::Cro::HTTP::Request::Incomplete is Exception {
 }
 
 class Cro::HTTP::Request does Cro::HTTP::Message {
-    has Cro::HTTP::Cookie %!cookie-storage;
     has Cro::Uri::HTTP $!cached-uri;
     has Str $!cached-uri-target = '';
     has Cro::HTTP::BodyParserSelector $.body-parser-selector is rw =
@@ -41,11 +40,6 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
         die X::Cro::HTTP::Request::Incomplete.new(:missing<method>) unless $!method;
         die X::Cro::HTTP::Request::Incomplete.new(:missing<target>) unless $!target;
         my $version = self.http-version // (self.has-header('Host') ?? '1.1' !! '1.0');
-        if %!cookie-storage {
-            self.remove-header('Cookie');
-            self.append-header('Cookie',
-                               %!cookie-storage.pairs.map({ $_.value.to-cookie; }).join('; '));
-        }
         my $headers = self!headers-str();
         "$.method $.target HTTP/$version\r\n$headers\r\n"
     }
@@ -81,32 +75,58 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
         self.query-hash.{$key}
     }
 
-    method has-cookie($name) {
-        %!cookie-storage{$name}:exists;
+    method !unpack-cookie(--> List) {
+        my @str = self.headers.grep({ .name.lc eq 'cookie' });
+        return () if @str.elems == 0;
+        @str = @str[0].value.split('; ').List;
+        my @res;
+        for @str {
+            my ($name, $value) = $_.split('=');
+            @res.push: Cro::HTTP::Cookie.new(:$name, :$value);
+        }
+        @res;
     }
-    method cookie-value($name) {
-        return %!cookie-storage{$name}.value if self.has-cookie($name);
+
+    method !pack-cookie(*@cookies) {
+        self.remove-header('Cookie');
+        return if @cookies.elems == 0;
+        self.append-header('Cookie',
+                           @cookies.map({ $_.to-cookie; }).join('; '));
+    }
+
+    method has-cookie(Str $name --> Bool) {
+        self!unpack-cookie.grep({ $_.name eq $name }).elems == 1
+    }
+
+    method cookie-value(Str $name --> Str) {
+        for self!unpack-cookie {
+            return $_.value if $_.name eq $name
+        }
         Nil;
     }
 
-    method cookie-hash() {
+    method cookie-hash(--> Hash) {
         my %result;
-        %!cookie-storage.pairs.map({ %result{$_.key} = $_.value.value });
+        for self!unpack-cookie {
+            %result{$_.name} = $_.value
+        };
         %result;
     }
 
-    multi method add-cookie(Cro::HTTP::Cookie $c) {
-        my $old = %!cookie-storage{$c.name}:exists;
-        %!cookie-storage{$c.name} = $c;
-        $old;
+    multi method add-cookie(Cro::HTTP::Cookie $c --> Bool) {
+        my @cookies = self!unpack-cookie;
+        my @all-other = @cookies.grep({ not $_.name eq $c.name });
+        self!pack-cookie($c, |@all-other);
+        @cookies.elems !== @all-other.elems
     }
-    multi method add-cookie(Str $name, Str() $value) {
+    multi method add-cookie(Str $name, Str() $value --> Bool) {
         self.add-cookie(Cro::HTTP::Cookie.new(:$name, :$value));
     }
 
-    method remove-cookie($name) {
-        my $old = %!cookie-storage{$name}:exists;
-        %!cookie-storage{$name}:delete;
-        $old;
+    method remove-cookie(Str $name --> Bool) {
+        my @cookies = self!unpack-cookie;
+        my @res = @cookies.grep({ not $_.name eq $name });
+        self!pack-cookie(|@res);
+        @res.elems !== @cookies.elems;
     }
 }
