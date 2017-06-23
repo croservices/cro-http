@@ -89,7 +89,7 @@ class Cro::HTTP::Client {
                     $request.set-body($value);
                     $body-set = True;
                 } else {
-                    # throw?
+                    die X::Cro::HTTP::Client::BodyAlreadySet.new;
                 }
             }
             when 'body-byte-stream' {
