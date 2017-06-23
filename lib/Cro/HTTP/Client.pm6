@@ -1,3 +1,4 @@
+use Cro::HTTP::Header;
 use Cro::HTTP::Request;
 use Cro::HTTP::RequestSerializer;
 use Cro::HTTP::ResponseParser;
@@ -12,7 +13,15 @@ class X::Cro::HTTP::Client::BodyAlreadySet is Exception {
     }
 }
 
+class X::Cro::HTTP::Client::IncorrectHeaderWasPassed {
+    method message() {
+        "Incorrect header was passed to Client"
+    }
+}
+
 class Cro::HTTP::Client {
+    has @.headers;
+
     multi method get($url, %options --> Supply) {
         self.request('GET', $url, %options)
     }
@@ -82,6 +91,10 @@ class Cro::HTTP::Client {
         my $target = $url.path || '/';
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
+        if self.defined {
+            @.headers //= ();
+            self!set-headers($request, @.headers.List);
+        }
         my Bool $body-set = False;
         for %options.kv -> $_, $value {
             when 'body' {
@@ -104,21 +117,18 @@ class Cro::HTTP::Client {
                 $request.append-header('content-type', $value)
             }
             when 'headers' {
-                if $_ ~~ Iterable {
-                    for $_.List -> $header {
-                        when $header ~~ Pair {
-                            $request.append-header($header.key, $header.value)
-                        }
-                        when $header ~~ Cro::HTTP::Header {
-                            $request.append-header($header)
-                        }
-                        default {
-                            # throw?
-                        }
-                    }
-                }
-}
+                self!set-headers($request, $_.List) if $_ ~~ Iterable;
+            }
         }
         return $request;
+    }
+    method !set-headers($request, @headers) {
+        for @headers {
+            if not ($_ ~~ Cro::HTTP::Header || $_ ~~ Pair) {
+                die X::Cro::HTTP::Client::IncorrectHeaderWasPassed.new;
+            } else {
+                $request.append-header($_)
+            }
+        }
     }
 }

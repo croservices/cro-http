@@ -27,6 +27,9 @@ constant %key-cert := {
         delete -> {
             content 'text/plain', 'Gone';
         }
+        get -> 'path', :$User-agent! is header {
+            content 'text/plain', "When you are $User-agent, it is fine to request";
+        }
     }
 
     my $http-server = Cro::HTTP::Server.new(
@@ -88,6 +91,12 @@ constant %key-cert := {
                                       body => %body) -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON';
     }
+
+    my $client = Cro::HTTP::Client.new(headers => [ User-agent => 'Cro' ]);
+    given await $client.get("$base/path") -> $resp {
+        is await($resp.body-text), 'When you are Cro, it is fine to request', 'Default headers were sent';
+    }
 }
 
 done-testing;
+
