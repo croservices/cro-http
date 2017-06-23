@@ -131,11 +131,11 @@ class TestHttpApp does Cro::Transform {
     my $base = "http://localhost:{TEST_PORT}";
     my %body = :42x, :101y;
 
-    given await Cro::HTTP::Client.get("$base/",
-                                      content-type => 'application/json',
-                                      :%body) -> $resp {
-        is $resp.status, 400, 'Server with empty body-parsers cannot parse requests';
-    };
+    throws-like { await Cro::HTTP::Client.get("$base/",
+                                              content-type => 'application/json',
+                                              :%body) },
+        X::Cro::HTTP::Error::Client,
+        'Server with empty body-parsers cannot parse requests';
 }
 
 {
@@ -163,14 +163,11 @@ class TestHttpApp does Cro::Transform {
         is await($resp.body-text), 'pair: x is 42, y is 101', 'Response body text is correct';
     };
 
-    given await Cro::HTTP::Client.get("$base/",
-                                      content-type => 'text/plain',
-                                      body => "Aokigahara") -> $resp {
-        subtest {
-            is (await $resp.body), Buf.new;
-            is $resp.status, 400;
-        }, 'Request with incorrect content-type is processed';
-    };
+    throws-like { await Cro::HTTP::Client.get("$base/",
+                                              content-type => 'text/plain',
+                                              body => "Aokigahara") },
+        X::Cro::HTTP::Error::Client,
+        'Request with incorrect content-type is processed';
 }
 
 {
@@ -226,13 +223,11 @@ class TestHttpApp does Cro::Transform {
 
     my $base = "http://localhost:{TEST_PORT}";
 
-    given await Cro::HTTP::Client.get("$base/",
-                                      content-type => 'text/plain',
-                                      body => 'give-me-text') -> $resp {
-        subtest {
-            is $resp.status, 500;
-        }, 'Request to server without serializers ends up with 500 error';
-    };
+    throws-like { await Cro::HTTP::Client.get("$base/",
+                                        content-type => 'text/plain',
+                                        body => 'give-me-text') },
+        X::Cro::HTTP::Error::Server,
+        'Request to server without serializers ends up with 500 error';
 }
 
 {
@@ -266,13 +261,11 @@ class TestHttpApp does Cro::Transform {
         }, 'Request for one serializer is processed';
     };
 
-    given await Cro::HTTP::Client.get("$base/",
-                                      content-type => 'text/plain',
-                                      body => 'give-me-json') -> $resp {
-        subtest {
-            is $resp.status, 500;
-        }, 'Request without a serializer gives error';
-    };
+    throws-like { await Cro::HTTP::Client.get("$base/",
+                                              content-type => 'text/plain',
+                                              body => 'give-me-json') },
+        X::Cro::HTTP::Error::Server,
+        'Request without a serializer gives error';
 }
 
 {

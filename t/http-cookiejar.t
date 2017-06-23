@@ -91,4 +91,4 @@ $jar.add-from-response($resp, Cro::Uri.parse: 'http://example.com');
 my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
 $jar.add-to-request($req, Cro::Uri.parse: 'http://example.com/');
 like $req.Str, /Cookie/,  'Header was added';
-like $req.Str, /'Foo=Bar; Bar=Baz'/,  'Setted string is correct';
+like $req.Str, /'Foo=Bar; Bar=Baz' || 'Bar=Baz; Foo=Bar'/,  'Setted string is correct';
