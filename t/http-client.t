@@ -1,3 +1,4 @@
+use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Response;
 use Test;
 
@@ -60,6 +61,25 @@ constant %key-cert := {
         }
         get -> 'error' {
             die 'Sudden error';
+        }
+
+        # Cookie section
+        get -> 'first-pass' {
+            set-cookie 'First', 'Done';
+            content 'text/plain', 'Done';
+        }
+        get -> 'second-pass', :$First! is cookie {
+            set-cookie 'Second', 'Done';
+            content 'text/plain', 'Done';
+        }
+        get -> 'second-pass', {
+            content 'text/plain', 'It was a good attempt';
+        }
+        get -> 'third-pass', :$First! is cookie, :$Second! is cookie {
+            content 'text/plain', 'Done';
+        }
+        get -> 'third-pass', {
+            content 'text/plain', 'Nice try';
         }
     }
 
@@ -191,7 +211,26 @@ constant %key-cert := {
     $client = Cro::HTTP::Client.new(headers => [ 1 ]);
     throws-like { $client.get("$base/path") }, X::Cro::HTTP::Client::IncorrectHeaderType,
         'Client header can only be Pair or Cro::HTTP::Header instance';
+
+    lives-ok { $client = Cro::HTTP::Client.new(:cookie-jar); }, 'Bool flag for cookies';
+
+    my $jar = Cro::HTTP::Client::CookieJar.new;
+    lives-ok { $client = Cro::HTTP::Client.new(cookie-jar => $jar); }, 'Predefined jar of cookies';
+
+    await $client.get("$base/first-pass");
+    given await $client.get("$base/second-pass") -> $resp {
+        is await($resp.body-text), 'Done', 'Browser-like cookie handling works';
+    }
+
+    given await $client.get("$base/third-pass") -> $resp {
+        is await($resp.body-text), 'Done', 'Multiple cookie are handled well';
+    }
+
+    $client = Cro::HTTP::Client.new;
+    await $client.get("$base/first-pass");
+    given await $client.get("$base/second-pass") -> $resp {
+        is await($resp.body-text), 'It was a good attempt', 'Cookies were not handled';
+    }
 }
 
 done-testing;
-

@@ -1,3 +1,4 @@
+use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Header;
 use Cro::HTTP::Request;
 use Cro::HTTP::RequestSerializer;
@@ -34,6 +35,17 @@ class X::Cro::HTTP::Client::IncorrectHeaderType is Exception {
 
 class Cro::HTTP::Client {
     has @.headers;
+    has $.cookie-jar;
+
+    submethod BUILD(:$cookie-jar, :@!headers) {
+        when $cookie-jar ~~ Bool {
+            $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
+        }
+        when $cookie-jar ~~ Cro::HTTP::Client::CookieJar {
+            $!cookie-jar = $cookie-jar;
+        }
+        # throw?
+    }
 
     multi method get($url, %options --> Supply) {
         self.request('GET', $url, %options)
@@ -87,6 +99,8 @@ class Cro::HTTP::Client {
         supply {
             whenever $pipeline.out {
                 if .status < 400 {
+                    $.cookie-jar.add-from-response($_,
+                                                   $parsed-url) if self && $.cookie-jar.defined;
                     .emit
                 } elsif .status >= 500 {
                     die X::Cro::HTTP::Error::Server.new(response => $_);
@@ -115,6 +129,7 @@ class Cro::HTTP::Client {
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
         self!set-headers($request, @.headers.List) if self;
+        $.cookie-jar.add-to-request($request, $url) if self && $.cookie-jar;
         my Bool $body-set = False;
 
         for %options.kv -> $_, $value {
