@@ -23,6 +23,9 @@ role Cro::HTTP::Message does Cro::Message {
     multi method append-header(Str $name, Str(Cool) $value --> Nil) {
         @!headers.push(Cro::HTTP::Header.new(:$name, :$value));
     }
+    multi method append-header(Pair $header --> Nil) {
+        @!headers.push(Cro::HTTP::Header.new(name => $header.key, value => $header.value));
+    }
 
     multi method remove-header(Str $name --> Int) {
         my $folded = $name.fc;
