@@ -96,6 +96,10 @@ constant %key-cert := {
     given await $client.get("$base/path") -> $resp {
         is await($resp.body-text), 'When you are Cro, it is fine to request', 'Default headers were sent';
     }
+
+    $client = Cro::HTTP::Client.new(headers => [ 1 ]);
+    throws-like { $client.get("$base/path") }, X::Cro::HTTP::Client::IncorrectHeaderType,
+        'Client header can only be Pair or Cro::HTTP::Header instance';
 }
 
 done-testing;

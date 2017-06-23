@@ -13,9 +13,11 @@ class X::Cro::HTTP::Client::BodyAlreadySet is Exception {
     }
 }
 
-class X::Cro::HTTP::Client::IncorrectHeaderWasPassed {
+class X::Cro::HTTP::Client::IncorrectHeaderType is Exception {
+    has $.what;
+
     method message() {
-        "Incorrect header was passed to Client"
+        "Incorrect header of type {$.what.^name} was passed to Client"
     }
 }
 
@@ -91,11 +93,9 @@ class Cro::HTTP::Client {
         my $target = $url.path || '/';
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
-        if self.defined {
-            @.headers //= ();
-            self!set-headers($request, @.headers.List);
-        }
+        self!set-headers($request, @.headers.List) if self;
         my Bool $body-set = False;
+
         for %options.kv -> $_, $value {
             when 'body' {
                 if !$body-set {
@@ -125,7 +125,7 @@ class Cro::HTTP::Client {
     method !set-headers($request, @headers) {
         for @headers {
             if not ($_ ~~ Cro::HTTP::Header || $_ ~~ Pair) {
-                die X::Cro::HTTP::Client::IncorrectHeaderWasPassed.new;
+                die X::Cro::HTTP::Client::IncorrectHeaderType.new(what => $_);
             } else {
                 $request.append-header($_)
             }
