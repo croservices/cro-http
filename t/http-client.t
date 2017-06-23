@@ -27,6 +27,34 @@ constant %key-cert := {
         delete -> {
             content 'text/plain', 'Gone';
         }
+        get -> 'json' {
+            request-body -> %json {
+                content 'text/plain', "%json<reason>";
+            }
+        }
+        get -> 'str' {
+            request-body-text -> $str {
+                content 'text/plain', "$str";
+            }
+        }
+        get -> 'blob' {
+            request-body-blob -> $blob {
+                content 'image/jpeg', $blob.reverse;
+            }
+        }
+        get -> 'urlencoded' {
+            request-body -> $body {
+                content 'text/plain', "Welcome, {$body.hash<name>} {$body.hash<surname>}!";
+            }
+        }
+        get -> 'multipart' {
+            request-body -> $body {
+                if $body ~~ Cro::HTTP::Body::MultiPartFormData
+                && $body.parts[2].filename eq 'secret.jpg' {
+                    content 'text/plain', "You are cute!";
+                }
+            }
+        }
         get -> 'path', :$User-agent! is header {
             content 'text/plain', "When you are $User-agent, it is fine to request";
         }
@@ -85,11 +113,60 @@ constant %key-cert := {
             'Can also get body back as a blob';
     }
 
-    my %body = :truth, :!lie;
-    given await Cro::HTTP::Client.get("$base/",
+    my %body = reason => 'works';
+    throws-like { await Cro::HTTP::Client.get("$base/",
+                                              content-type => 'application/json',
+                                              body => %body,
+                                              body-byte-stream => supply {}); },
+        X::Cro::HTTP::Client::BodyAlreadySet,
+        'Body cannot be set twice';
+
+    given await Cro::HTTP::Client.get("$base/json",
                                       content-type => 'application/json',
                                       body => %body) -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON';
+        is await($resp.body-text), 'works', 'JSON was sent and processed';
+    }
+
+    given await Cro::HTTP::Client.get("$base/str",
+                                      content-type => 'text/plain; charset=UTF-8',
+                                      body => 'Plain string') -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with Str';
+        is await($resp.body-text), 'Plain string', 'Str was sent and processed';
+    }
+
+    given await Cro::HTTP::Client.get("$base/blob",
+                                      content-type => 'image/jpeg', # Just to process as blob
+                                      body => Blob.new("String".encode)) -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with Blob';
+        ok await($resp.body-blob) eq Blob.new('gnirtS'.encode), 'Blob was sent and processed';
+    }
+
+    given await Cro::HTTP::Client.get("$base/urlencoded",
+                                      content-type => 'application/x-www-form-urlencoded',
+                                      body => [name => 'John',
+                                               surname => 'Doe']) -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with urlencoded query';
+        is await($resp.body-text), "Welcome, John Doe!", 'Query params were sent and processed';
+    }
+
+    my $part = Cro::HTTP::Body::MultiPartFormData::Part.new(
+        headers => [Cro::HTTP::Header.new(
+                           name => 'Content-type',
+                           value => 'image/jpeg'
+                       )],
+        name => 'photo',
+        filename => 'secret.jpg',
+        body-blob => Buf[uint8].new("It is a secret!".encode)
+    );
+
+    given await Cro::HTTP::Client.get("$base/multipart",
+                                      content-type => 'multipart/form-data',
+                                      body => [name => 'John',
+                                               surname => 'Doe',
+                                               $part]) -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with form-data';
+        is await($resp.body-text), "You are cute!", 'Form data was sent and processed';
     }
 
     given await Cro::HTTP::Client.get("$base/path",
