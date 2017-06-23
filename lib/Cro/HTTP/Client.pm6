@@ -11,7 +11,7 @@ class X::Cro::HTTP::Error is Exception {
     has $.response;
 
     method message() {
-        "Server responded with {$.response.get-response-phrase}"
+        "{$.response.get-response-phrase}"
     }
 }
 
