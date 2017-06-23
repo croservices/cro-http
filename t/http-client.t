@@ -92,6 +92,11 @@ constant %key-cert := {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with JSON';
     }
 
+    given await Cro::HTTP::Client.get("$base/path",
+                                      headers => [ User-agent => 'Cro' ]) -> $resp {
+        is await($resp.body-text), 'When you are Cro, it is fine to request', 'Default headers were sent';
+    }
+
     my $client = Cro::HTTP::Client.new(headers => [ User-agent => 'Cro' ]);
     given await $client.get("$base/path") -> $resp {
         is await($resp.body-text), 'When you are Cro, it is fine to request', 'Default headers were sent';

@@ -117,7 +117,7 @@ class Cro::HTTP::Client {
                 $request.append-header('content-type', $value)
             }
             when 'headers' {
-                self!set-headers($request, $_.List) if $_ ~~ Iterable;
+                self!set-headers($request, $value.List) if $value ~~ Iterable;
             }
         }
         return $request;
