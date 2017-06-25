@@ -9,6 +9,7 @@ use IO::Socket::Async::SSL;
 use Test;
 
 constant TEST_PORT = 31314;
+my $base = "http://localhost:{TEST_PORT}";
 
 class TestHttpApp does Cro::Transform {
     method consumes() { Cro::HTTP::Request }
@@ -128,7 +129,6 @@ class TestHttpApp does Cro::Transform {
     $test.start();
     LEAVE $test.stop();
 
-    my $base = "http://localhost:{TEST_PORT}";
     my %body = :42x, :101y;
 
     throws-like { await Cro::HTTP::Client.get("$base/",
@@ -154,7 +154,6 @@ class TestHttpApp does Cro::Transform {
     $test.start();
     LEAVE $test.stop();
 
-    my $base = "http://localhost:{TEST_PORT}";
     my %body = :42x, :101y;
 
     given await Cro::HTTP::Client.get("$base/",
@@ -167,7 +166,7 @@ class TestHttpApp does Cro::Transform {
                                               content-type => 'text/plain',
                                               body => "Aokigahara") },
         X::Cro::HTTP::Error::Client,
-        'Request with incorrect content-type is processed';
+        'Request with incorrect content-type is rejected';
 }
 
 {
@@ -190,8 +189,6 @@ class TestHttpApp does Cro::Transform {
 
     $test.start();
     LEAVE $test.stop();
-
-    my $base = "http://localhost:{TEST_PORT}";
 
     given await Cro::HTTP::Client.get("$base/",
                                       content-type => 'text/plain',
@@ -221,8 +218,6 @@ class TestHttpApp does Cro::Transform {
     $test.start();
     LEAVE $test.stop();
 
-    my $base = "http://localhost:{TEST_PORT}";
-
     throws-like { await Cro::HTTP::Client.get("$base/",
                                         content-type => 'text/plain',
                                         body => 'give-me-text') },
@@ -249,8 +244,6 @@ class TestHttpApp does Cro::Transform {
 
     $test.start();
     LEAVE $test.stop();
-
-    my $base = "http://localhost:{TEST_PORT}";
 
     given await Cro::HTTP::Client.get("$base/",
                                       content-type => 'text/plain',
@@ -288,8 +281,6 @@ class TestHttpApp does Cro::Transform {
 
     $test.start();
     LEAVE $test.stop();
-
-    my $base = "http://localhost:{TEST_PORT}";
 
     given await Cro::HTTP::Client.get("$base/",
                                       content-type => 'text/plain',
