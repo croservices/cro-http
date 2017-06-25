@@ -86,8 +86,9 @@ class Cro::HTTP::Client {
     has $.add-body-serializers;
     has $.body-parsers;
     has $.add-body-parsers;
+    has $.content-type;
 
-    submethod BUILD(:$cookie-jar, :@!headers,
+    submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers) {
         when $cookie-jar ~~ Bool {
@@ -186,8 +187,11 @@ class Cro::HTTP::Client {
         my $target = $url.path || '/';
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
-        self!set-headers($request, @.headers.List) if self;
-        $.cookie-jar.add-to-request($request, $url) if self && $.cookie-jar;
+        if self {
+            $request.append-header('content-type', $.content-type) if $.content-type;
+            self!set-headers($request, @.headers.List);
+            $.cookie-jar.add-to-request($request, $url) if $.cookie-jar;
+        }
         my Bool $body-set = False;
 
         for %options.kv -> $_, $value {
