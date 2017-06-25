@@ -8,6 +8,52 @@ use Cro::SSL;
 use Cro::Uri;
 use Cro;
 
+my class ResponseParserExtension does Cro::Transform {
+    has $.body-parsers;
+    has $.add-body-parsers;
+
+    method consumes() { Cro::HTTP::Response }
+    method produces() { Cro::HTTP::Response }
+
+    method transformer(Supply $pipeline --> Supply) {
+        supply {
+            whenever $pipeline -> $response {
+                if $.body-parsers.defined {
+                    $response.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @$.body-parsers);
+                }
+                if $.add-body-parsers.defined {
+                    $response.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @$.add-body-parsers,
+                                                                                                next => $response.body-parser-selector);
+                }
+                emit $response;
+            }
+        }
+    }
+}
+
+my class RequestSerializerExtension does Cro::Transform {
+    has $.body-serializers;
+    has $.add-body-serializers;
+
+    method consumes() { Cro::HTTP::Request }
+    method produces() { Cro::HTTP::Request }
+
+    method transformer(Supply $pipeline --> Supply) {
+        supply {
+            whenever $pipeline -> $request {
+                if $.body-serializers.defined {
+                    $request.body-serializer-selector = Cro::HTTP::BodySerializerSelector::List.new(serializers => @$.body-serializers);
+                }
+                if $.add-body-serializers.defined {
+                    $request.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(serializers => @$.add-body-serializers,
+                                                                                                       next => $request.body-serializer-selector);
+                }
+                emit $request;
+            }
+        }
+    }
+}
+
 class X::Cro::HTTP::Error is Exception {
     has $.response;
 
@@ -36,8 +82,14 @@ class X::Cro::HTTP::Client::IncorrectHeaderType is Exception {
 class Cro::HTTP::Client {
     has @.headers;
     has $.cookie-jar;
+    has $.body-serializers;
+    has $.add-body-serializers;
+    has $.body-parsers;
+    has $.add-body-parsers;
 
-    submethod BUILD(:$cookie-jar, :@!headers) {
+    submethod BUILD(:$cookie-jar, :@!headers,
+                    :$!body-serializers, :$!add-body-serializers,
+                    :$!body-parsers, :$!add-body-parsers) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -113,10 +165,16 @@ class Cro::HTTP::Client {
 
     method !get-pipeline(Cro::Uri $url) {
         my $secure = $url.scheme.lc eq 'https';
-        my $connector = Cro.compose(
+        my @parts =
+            (RequestSerializerExtension.new(add-body-serializers => $.add-body-serializers,
+                                            body-serializers => $.body-serializers) if self),
             Cro::HTTP::RequestSerializer.new,
             $secure ?? Cro::SSL::Connector !! Cro::TCP::Connector,
-            Cro::HTTP::ResponseParser.new);
+            Cro::HTTP::ResponseParser.new,
+            (ResponseParserExtension.new(add-body-parsers => $.add-body-parsers,
+                                         body-parsers => $.body-parsers) if self);
+
+        my $connector = Cro.compose(|@parts);
         my $in = Supplier::Preserving.new;
         my $out = $connector.establish($in.Supply,
             host => $url.host,

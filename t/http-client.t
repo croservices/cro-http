@@ -33,6 +33,9 @@ constant %key-cert := {
                 content 'text/plain', "%json<reason>";
             }
         }
+        get -> 'get-json' {
+            content 'application/json', {:42truth};
+        }
         get -> 'str' {
             request-body-text -> $str {
                 content 'text/plain', "$str";
@@ -230,6 +233,85 @@ constant %key-cert := {
     await $client.get("$base/first-pass");
     given await $client.get("$base/second-pass") -> $resp {
         is await($resp.body-text), 'It was a good attempt', 'Cookies were not handled';
+    }
+
+    # TODO
+    # $client = Cro::HTTP::Client.new: content-type => 'application/json';
+
+    # Serialization
+    $client = Cro::HTTP::Client.new: body-serializers => [];
+    throws-like {
+        await $client.get("$base/",
+                          content-type => 'text/plain',
+                          body => 'String');
+    },
+    X::Cro::HTTP::BodySerializerSelector::NoneApplicable,
+    'Request to server without serializers ends up with client error';
+
+    $client = Cro::HTTP::Client.new: body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+
+    given await $client.get("$base/json",
+                            content-type => 'application/json',
+                            body => %body) -> $resp {
+        is await($resp.body-text), 'works', 'Response body is correct';
+    }
+    throws-like {
+        await $client.get("$base/json", content-type => 'text/plain',
+                          body => "Calling the Rain")
+    },
+    X::Cro::HTTP::BodySerializerSelector::NoneApplicable,
+    'Request with incorrect content-type is rejected';
+
+    $client = Cro::HTTP::Client.new: body-serializers => [Cro::HTTP::BodySerializer::JSON.new],
+                                     add-body-serializers => [Cro::HTTP::BodySerializer::StrFallback.new];
+
+    given await $client.get("$base/json",
+                            content-type => 'application/json',
+                            body => %body) -> $resp {
+        is await($resp.body-text), 'works', 'Request for main serializer works';
+    };
+    given await $client.get("$base/str", content-type => 'text/plain',
+                            body => 'Calling the Rain') -> $resp {
+        is await($resp.body-text), 'Calling the Rain', 'Request for additional serializer works';
+    };
+
+    # Parsing
+    $client = Cro::HTTP::Client.new: body-parsers => [];
+
+    given await $client.get("$base/str",
+                            content-type => 'text/plain',
+                            body => 'Funeral Dreams') -> $resp {
+        throws-like { await($resp.body) },
+        X::Cro::HTTP::BodyParserSelector::NoneApplicable,
+        'Attempt to get body without any parsers fails';
+    };
+
+    $client = Cro::HTTP::Client.new: body-parsers => [Cro::HTTP::BodyParser::TextFallback.new];
+
+    given await $client.get("$base/json",
+                            content-type => 'application/json',
+                            body => %body) -> $resp {
+        is await($resp.body), "works", 'Response body is correct'
+    };
+
+    given await $client.get("$base/get-json", content-type => 'text/plain',
+                            body => "Calling the Rain") -> $resp {
+        throws-like { await($resp.body) },
+        X::Cro::HTTP::BodyParserSelector::NoneApplicable,
+        'Attempt to get body without any parsers fails';
+    }
+
+    $client = Cro::HTTP::Client.new: body-parsers => [Cro::HTTP::BodyParser::TextFallback.new],
+                                     add-body-parsers => [Cro::HTTP::BodyParser::JSON.new];
+    given await $client.get("$base/json",
+                            content-type => 'application/json',
+                            body => %body) -> $resp {
+        is await($resp.body), "works", 'Main response parser works'
+    };
+
+    given await $client.get("$base/get-json", content-type => 'text/plain',
+                            body => "Calling the Rain") -> $resp {
+        is await($resp.body), {:42truth}, 'Additional response parser works'
     }
 }
 
