@@ -815,4 +815,39 @@ parses 'An media type with the +json suffix decodes JSON body',
 # practice.  It is RECOMMENDED that all HTTP senders and recipients
 # support, at a minimum, request-line lengths of 8000 octets.
 
+sub test-request-to-blob($req) {
+    my ($headers, $body) = $req.split(/\n\n/, 2);
+    $headers .= subst("\n", "\r\n", :g);
+    "$headers\r\n\r\n$body".encode('latin-1');
+}
+
+my $test-request1 = q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-Type: text/plain
+    Content-Length: 51
+
+    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
+    REQUEST
+
+my $test-request2 = q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-Type: text/plain
+    Content-Length: 50
+
+    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghi
+    REQUEST
+
+my $req = Cro::HTTP::RequestParser.new;
+my $fake-in = Supplier.new;
+my Int $counter = 0;
+$req.transformer($fake-in.Supply).tap: -> $request {
+    $counter++;
+}
+my $request-blob1 = test-request-to-blob($test-request1);
+my $request-blob2 = test-request-to-blob($test-request2);
+my $message = Cro::TCP::Message.new(data => ($request-blob1 ~ $request-blob2));
+$fake-in.emit($message);
+$fake-in.done();
+is $counter, 2, 'Multiple requests for one parser';
+
 done-testing;
