@@ -26,15 +26,17 @@ class Cro::HTTP::RawBodyParser::ContentLength does Cro::HTTP::RawBodyParser {
         supply {
             my int $expected = $message.header('content-length').Int;
             whenever $raw-blobs -> $blob {
-                if $blob.elems > $expected {
-                    die "Unexpected over-length body (pipelining/keepalive NYI)"
-                }
-                $expected -= $blob.elems;
-                emit $blob;
-                if $expected == 0 {
-                    .keep(Blob.allocate(0)) with $leftover;
-                    done;
-                }
+		my $rest = Blob.allocate(0);
+		if $blob.elems > $expected {
+		    $rest = $blob.subbuf($expected);
+		    $blob .= subbuf(0, $expected);
+		}
+
+		.keep($rest) with $leftover;
+		emit $blob;
+		done if $blob.elems == $expected;
+		$expected -= $blob.elems;
+
                 LAST {
                     if $expected != 0 {
                         die X::Cro::HTTP::RawBodyParser::ContentLength::TooShort.new;
