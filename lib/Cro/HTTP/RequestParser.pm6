@@ -1,4 +1,3 @@
-use Cro::Transform;
 use Cro::TCP;
 use Cro::HTTP::Exception;
 use Cro::HTTP::RawBodyParserSelector;
@@ -36,6 +35,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
 
             whenever $in -> Cro::TCP::Message $packet {
                 $header-decoder.add-bytes($packet.data) unless $expecting == Body;
+                my $leftover = Promise.new;
                 loop {
                     $_ = $expecting;
                     when RequestLine {
@@ -87,7 +87,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                                 my $raw-body-parser = $!raw-body-parser-selector.select($request);
                                 $raw-body-byte-stream = Supplier::Preserving.new;
                                 $request.set-body-byte-stream($raw-body-parser.parser($request,
-                                    $raw-body-byte-stream.Supply));
+                                    $raw-body-byte-stream.Supply, $leftover));
                                 $raw-body-byte-stream.emit($header-decoder.consume-all-bytes());
                                 emit $request;
                                 $expecting = Body;
@@ -109,8 +109,19 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         }
                     }
                     when Body {
-                        $raw-body-byte-stream.emit($packet.data);
-                        last;
+                        if $leftover.status ~~ Planned {
+                            $raw-body-byte-stream.emit($packet.data);
+                            last;
+                        } elsif $leftover.status ~~ Kept {
+                            my $length = $request.header('content-length');
+                            $raw-body-byte-stream.emit($packet.data.subbuf(0, $length));
+                            $raw-body-byte-stream.?done;
+                            # We processed one request, starting the next
+                            $request = Cro::HTTP::Request.new;
+                            $header-decoder.add-bytes($leftover.result);
+                            $expecting = RequestLine;
+                            next;
+                        }
                     }
                 }
                 LAST {
