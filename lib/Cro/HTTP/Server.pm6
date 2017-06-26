@@ -1,53 +1,18 @@
 use Cro;
+use Cro::HTTP::Internal;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::ResponseSerializer;
 use Cro::SSL;
 use Cro::TCP;
 
-my class RequestParserExtension does Cro::Transform {
-    has $.body-parsers;
-    has $.add-body-parsers;
-
+my class RequestParserExtension is ParserExtension {
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Request }
-
-    method transformer(Supply $pipeline --> Supply) {
-        supply {
-            whenever $pipeline -> $request {
-                if $.body-parsers.defined {
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @$.body-parsers);
-                }
-                if $.add-body-parsers.defined {
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @$.add-body-parsers,
-                                                                                               next => $request.body-parser-selector);
-                }
-                emit $request;
-            }
-        }
-    }
 }
 
-my class ResponseSerializerExtension does Cro::Transform {
-    has $.body-serializers;
-    has $.add-body-serializers;
-
+my class ResponseSerializerExtension is SerializerExtension {
     method consumes() { Cro::HTTP::Response }
     method produces() { Cro::HTTP::Response }
-
-    method transformer(Supply $pipeline --> Supply) {
-        supply {
-            whenever $pipeline -> $response {
-                if $.body-serializers.defined {
-                    $response.body-serializer-selector = Cro::HTTP::BodySerializerSelector::List.new(serializers => @$.body-serializers);
-                }
-                if $.add-body-serializers.defined {
-                    $response.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(serializers => @$.add-body-serializers,
-                                                                                                        next => $response.body-serializer-selector);
-                }
-                emit $response;
-            }
-        }
-    }
 }
 
 class Cro::HTTP::Server does Cro::Service {

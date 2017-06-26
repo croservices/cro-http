@@ -1,4 +1,5 @@
 use Cro::HTTP::Client::CookieJar;
+use Cro::HTTP::Internal;
 use Cro::HTTP::Header;
 use Cro::HTTP::Request;
 use Cro::HTTP::RequestSerializer;
@@ -8,50 +9,14 @@ use Cro::SSL;
 use Cro::Uri;
 use Cro;
 
-my class ResponseParserExtension does Cro::Transform {
-    has $.body-parsers;
-    has $.add-body-parsers;
-
+my class ResponseParserExtension is ParserExtension {
     method consumes() { Cro::HTTP::Response }
     method produces() { Cro::HTTP::Response }
-
-    method transformer(Supply $pipeline --> Supply) {
-        supply {
-            whenever $pipeline -> $response {
-                if $.body-parsers.defined {
-                    $response.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @$.body-parsers);
-                }
-                if $.add-body-parsers.defined {
-                    $response.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @$.add-body-parsers,
-                                                                                                next => $response.body-parser-selector);
-                }
-                emit $response;
-            }
-        }
-    }
 }
 
-my class RequestSerializerExtension does Cro::Transform {
-    has $.body-serializers;
-    has $.add-body-serializers;
-
+my class RequestSerializerExtension is SerializerExtension {
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Request }
-
-    method transformer(Supply $pipeline --> Supply) {
-        supply {
-            whenever $pipeline -> $request {
-                if $.body-serializers.defined {
-                    $request.body-serializer-selector = Cro::HTTP::BodySerializerSelector::List.new(serializers => @$.body-serializers);
-                }
-                if $.add-body-serializers.defined {
-                    $request.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(serializers => @$.add-body-serializers,
-                                                                                                       next => $request.body-serializer-selector);
-                }
-                emit $request;
-            }
-        }
-    }
 }
 
 class X::Cro::HTTP::Error is Exception {
