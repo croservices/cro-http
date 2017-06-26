@@ -109,17 +109,17 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         }
                     }
                     when Body {
+                        $raw-body-byte-stream.emit($packet.data);
                         if $leftover.status ~~ Planned {
-                            $raw-body-byte-stream.emit($packet.data);
                             last;
                         } elsif $leftover.status ~~ Kept {
                             my $length = $request.header('content-length');
                             $raw-body-byte-stream.emit($packet.data.subbuf(0, $length));
-                            $raw-body-byte-stream.?done;
                             # We processed one request, starting the next
                             $request = Cro::HTTP::Request.new;
                             $header-decoder.add-bytes($leftover.result);
                             $expecting = RequestLine;
+                            $leftover = Promise.new;
                             next;
                         }
                     }

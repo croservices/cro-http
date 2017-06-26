@@ -29,7 +29,6 @@ class Cro::HTTP::RawBodyParser::ContentLength does Cro::HTTP::RawBodyParser {
                 if $blob.elems > $expected {
                     emit $blob.subbuf(0, $expected);
                     .keep($blob.subbuf($expected)) with $leftover;
-                    $expected = 0;
                     done;
                 } else {
                     emit $blob;
