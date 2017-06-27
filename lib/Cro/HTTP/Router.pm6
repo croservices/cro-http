@@ -5,6 +5,8 @@ use Cro::HTTP::BodySerializer;
 use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
+use IO::Path::ChildSecure;
+use Cro::HTTP::MimeTypes;
 
 class X::Cro::HTTP::Router::OnlyInHandler is Exception {
     has $.what;
@@ -535,5 +537,38 @@ module Cro::HTTP::Router {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
         $resp.status = $status;
+    }
+
+    sub static(Str $base, @path?, :$mime-types) is export {
+        my $resp = $*CRO-ROUTER-RESPONSE //
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+        my $child = '.';
+        with @path {
+            for @path {
+                $child = $child.IO.add: $_;
+            }
+        }
+
+        my %fallback = $mime-types // {};
+        my $ext = $child eq '' ?? $base.IO.extension: :parts(^5) !! $child.IO.extension: :parts(^5);
+        my $content-type = %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
+
+        my sub get_or_404($path) {
+            if $path.IO.e {
+                content $content-type, slurp($path, :bin);
+            } else {
+                $resp.status = 404;
+            }
+        }
+
+        if $child eq '.' {
+            get_or_404($base);
+        } else {
+            with $base.IO.&child-secure: $child {
+                get_or_404($_);
+            } else {
+                $resp.status = 403;
+            }
+        }
     }
 }

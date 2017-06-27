@@ -1417,4 +1417,56 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $app = route {
+        get -> {
+            static 't/samples/index.html'
+        }
+
+        get -> 'css', *@path {
+            static 't/samples/css', @path;
+        }
+        get -> 'downloads', *@path {
+            static 't/samples/', @path, mime-types => {
+                'rh' => 'text/plain'
+            }
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is body-text($r), "<HTML></HTML>\n", 'Static index is fine';
+        is $r.status, 200, 'Static sets correct status code';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/css/my/dark.css');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is body-text($r), "Rules are here!\n", 'Files with long path work';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/css/non-existent.css');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is $r.status, 404, '404 for static works';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/css/../../../passwd');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is $r.status, 403, '403 for static works';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/downloads/notes.rh');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is $r.header('content-type'), 'text/plain', 'Content-type was setted correctly';
+        is body-text($r), 'Notes', 'Custom extension works';
+        is $r.status, 200, '200 for static works';
+    }
+}
+
 done-testing;
