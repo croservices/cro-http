@@ -117,7 +117,6 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                             $header-decoder.add-bytes($leftover.result);
                             $expecting = RequestLine;
                             $leftover = Promise.new;
-                            next;
                         }
                     }
                 }
