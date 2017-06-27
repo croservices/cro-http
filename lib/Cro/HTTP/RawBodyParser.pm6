@@ -27,19 +27,15 @@ class Cro::HTTP::RawBodyParser::ContentLength does Cro::HTTP::RawBodyParser {
             my int $expected = $message.header('content-length').Int;
             whenever $raw-blobs -> $blob {
                 if $blob.elems > $expected {
-                    emit $blob.subbuf(0, $expected);
-                    .keep($blob.subbuf($expected)) with $leftover;
+                    emit $blob.subbuf(0, $expected); # we get message
+                    .keep($blob.subbuf($expected)) with $leftover; # and something else
                     done;
                 } else {
                     emit $blob;
                     $expected -= $blob.elems;
                     if $expected == 0 {
-                        with $leftover {
-                            if .status ~~ Planned {
-                                .keep(Blob.allocate(0))
-                            }
-                        }
-                        done;
+                        .keep(Blob.allocate(0)) with $leftover;
+                        done; # We get all message
                     }
                 }
 
