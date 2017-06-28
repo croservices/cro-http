@@ -2,7 +2,6 @@ use Cro::TCP;
 use Cro::HTTP::Exception;
 use Cro::HTTP::RawBodyParserSelector;
 use Cro::HTTP::Request;
-use Cro::Workarounds;
 
 class Cro::HTTP::RequestParser does Cro::Transform {
     has %!allowed-methods;
@@ -32,7 +31,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
         supply {
             my enum Expecting <RequestLine Header Body>;
 
-            my $header-decoder = StreamingDecoder.new('iso-8859-1');
+            my $header-decoder = Encoding::Registry.find('iso-8859-1').decoder();
             $header-decoder.set-line-separators(["\r\n", "\n"]); # XXX Hack; toss \n
 
             my $expecting;
@@ -105,7 +104,8 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                                 $request.set-body-byte-stream(preserve(
                                     $raw-body-parser.parser($request,
                                         $raw-body-byte-stream.Supply, $leftover)));
-                                $raw-body-byte-stream.emit($header-decoder.consume-all-bytes());
+                                my int $count = $header-decoder.bytes-available();
+                                $raw-body-byte-stream.emit($header-decoder.consume-exactly-bytes($count));
                                 emit $request;
                                 if $leftover.status == Kept {
                                     fresh-message;
