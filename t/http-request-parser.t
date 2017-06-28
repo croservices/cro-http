@@ -821,18 +821,20 @@ sub messages($desc, $mess1, $mess2, @checks1, @checks2) {
     my Int $counter = 0;
     my $test-completed = Promise.new;
     $parser.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap: -> $request {
+        my $body = $request.body-text.result;
         if $counter == 0 {
             for @checks1.kv -> $i, $check {
-                ok $check($request), "check first {$i + 1}";
+                ok $check($body), "check first {$i + 1}";
             }
+
         } else {
             for @checks2.kv -> $i, $check {
-                ok $check($request), "check second {$i + 1}";
+                ok $check($body), "check second {$i + 1}";
             }
         }
         $counter++;
         $test-completed.keep(True) if $counter == 2;
-    }
+    };
 
     start {
         my $req-blob1 = test-request-to-tcp-message($mess1);
@@ -843,7 +845,9 @@ sub messages($desc, $mess1, $mess2, @checks1, @checks2) {
     }
 
     await Promise.anyof($test-completed, Promise.in(10));
-    unless $test-completed {
+    if $test-completed {
+        pass $desc;
+    } else {
         flunk $desc;
     }
 }
@@ -862,7 +866,25 @@ messages 'Two separate packages are parsed', q:to/REQUEST/,
     REQUEST
     q:to/REQUEST/,
     REQUEST
-    ([*.body-text.result eq 'Fields, Flowers, Rails']),
-    ([*.body-text.result eq 'Gear Of Despondency']);
+    ([* eq 'Fields, Flowers, Rails']),
+    ([* eq 'Gear Of Despondency']);
+
+messages 'Two separate packages are parsed, RequestLine in the first', q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-Type: text/plain
+    Content-Length: 22
+
+    Fields, Flowers, Rails
+    POST /bar HTTP/1.1
+    REQUEST
+    q:to/REQUEST/,
+    Content-Type: text/plain
+    Content-Length: 19
+
+    Gear Of Despondency
+    REQUEST
+    ([* eq 'Fields, Flowers, Rails']),
+    ([* eq 'Gear Of Despondency']);
+
 
 done-testing;
