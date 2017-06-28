@@ -22,6 +22,12 @@ class Cro::HTTP::RequestParser does Cro::Transform {
     method consumes() { Cro::TCP::Message }
     method produces() { Cro::HTTP::Request }
 
+    sub preserve(Supply:D $s) {
+        my $p = Supplier::Preserving.new;
+        $s.tap: { $p.emit($_) }, done => -> { $p.done }, quit => { $p.quit($_) };
+        $p.Supply
+    }
+
     method transformer(Supply:D $in) {
         supply {
             my enum Expecting <RequestLine Header Body>;
@@ -94,27 +100,19 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                             || $request.has-header('transfer-encoding')
                             || $request.has-header('upgrade') {
                                 my $raw-body-parser = $!raw-body-parser-selector.select($request);
-                                $raw-body-byte-stream = Supplier::Preserving.new;
-                                $request.set-body-byte-stream($raw-body-parser.parser($request,
-                                    $raw-body-byte-stream.Supply, $leftover));
+                                $raw-body-byte-stream = Supplier.new;
+                                $request.set-body-byte-stream(preserve(
+                                    $raw-body-parser.parser($request,
+                                        $raw-body-byte-stream.Supply, $leftover)));
                                 $raw-body-byte-stream.emit($header-decoder.consume-all-bytes());
                                 emit $request;
-                                $expecting = Body;
-                                await Promise.anyof($leftover, Promise.in(10));
-                                # There are three basic cases:
-                                # body will be in next package: promise is yet to fire, hence next
-                                # body is in this package: it is consumed, hence last
-                                # body and next message part is here: promise is kept with message part:
-                                # hence we recycle the loop
-                                if $leftover.status ~~ Planned {
-                                    next; # All body is yet to be consumed
-                                } elsif $leftover.status ~~ Kept {
-                                    # my $res = $leftover.result;
-                                    if $leftover.result == Blob.allocate(0) {
-                                        last;
-                                    } else {
-                                        recycle; next;
-                                    }
+                                if $leftover.status == Kept {
+                                    recycle;
+                                    next;
+                                }
+                                else {
+                                    $expecting = Body;
+                                    last;
                                 }
                             } else {
                                 emit $request;
@@ -133,15 +131,12 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                     }
                     when Body {
                         $raw-body-byte-stream.emit($packet.data);
-
-                        if $leftover.status ~~ Planned {
-                            last; # we need another package to finish message
-                        } elsif $leftover.status ~~ Kept {
-                            if $leftover.result eq Blob.allocate(0) {
-                                last; # all body was consumed, no new data
-                            } else {
-                                recycle; next;
-                            }
+                        if $leftover.status == Kept {
+                            recycle;
+                            next;
+                        }
+                        else {
+                            last;
                         }
                     }
                 }
