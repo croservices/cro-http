@@ -133,6 +133,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                     when Body {
                         $raw-body-byte-stream.emit($packet.data);
                         if $leftover.status == Kept {
+                            last if $leftover.result eq Blob.allocate(0);
                             fresh-message;
                             next;
                         }
