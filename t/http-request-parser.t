@@ -815,7 +815,41 @@ parses 'An media type with the +json suffix decodes JSON body',
 # practice.  It is RECOMMENDED that all HTTP senders and recipients
 # support, at a minimum, request-line lengths of 8000 octets.
 
-my $request = q:to/REQUEST/,
+sub messages($desc, $mess1, $mess2, @checks1, @checks2) {
+    my $parser = Cro::HTTP::RequestParser.new;
+    my $fake-in = Supplier.new;
+    my Int $counter = 0;
+    my $test-completed = Promise.new;
+    $parser.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap: -> $request {
+        if $counter == 0 {
+            for @checks1.kv -> $i, $check {
+                ok $check($request), "check first {$i + 1}";
+            }
+        } else {
+            for @checks2.kv -> $i, $check {
+                ok $check($request), "check second {$i + 1}";
+            }
+        }
+        $counter++;
+        $request.body-text.result.Str;
+        $test-completed.keep(True) if $counter == 2;
+    }
+
+    start {
+        my $req-blob1 = test-request-to-tcp-message($mess1);
+        my $req-blob2 = test-request-to-tcp-message($mess2) if $mess2;
+        $fake-in.emit($req-blob1);
+        $fake-in.emit($req-blob2) if $mess2;
+        $fake-in.done();
+    }
+
+    await Promise.anyof($test-completed, Promise.in(10));
+    unless $test-completed {
+        flunk $desc;
+    }
+}
+
+messages 'Two separate packages are parsed', q:to/REQUEST/,
     POST /bar HTTP/1.1
     Content-Type: text/plain
     Content-Length: 51
@@ -827,29 +861,8 @@ my $request = q:to/REQUEST/,
 
     abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
     REQUEST
-
-my $req = Cro::HTTP::RequestParser.new;
-my $fake-in = Supplier.new;
-my Int $counter = 0;
-my $test-completed = Promise.new;
-$req.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap: -> $request {
-    $counter++;
-    # We need to manually use result, otherwise whenever would not fire
-    $request.body-text.result.Str;
-    $test-completed.keep(True) if $counter == 2;
-}, quit => { say "Failed" ; $test-completed.keep(True); };
-
-start {
-    my $message = test-request-to-tcp-message($request);
-    $fake-in.emit($message);
-    $fake-in.done();
-}
-
-await Promise.anyof($test-completed, Promise.in(10));
-unless $test-completed {
-    diag 'Fail';
-}
-
-is $counter, 2, 'Multiple requests for one parser';
+    q:to/REQUEST/,
+    REQUEST
+    (), ();
 
 done-testing;
