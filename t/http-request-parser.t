@@ -836,7 +836,7 @@ $req.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap: -> $request {
     $counter++;
     # We need to manually use result, otherwise whenever would not fire
     $request.body-text.result.Str;
-    $test-completed.keep(True);
+    $test-completed.keep(True) if $counter == 2;
 }, quit => { say "Failed" ; $test-completed.keep(True); };
 
 start {
