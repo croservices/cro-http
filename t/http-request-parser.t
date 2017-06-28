@@ -886,5 +886,21 @@ messages 'Two separate packages are parsed, RequestLine in the first', q:to/REQU
     ([* eq 'Fields, Flowers, Rails']),
     ([* eq 'Gear Of Despondency']);
 
+messages 'Two separate packages are parsed, RequestLine and part of header in the first', q:to/REQUEST/,
+    POST /bar HTTP/1.1
+    Content-Type: text/plain
+    Content-Length: 22
+
+    Fields, Flowers, Rails
+    POST /bar HTTP/1.1
+    Content-Type: text/plain
+    REQUEST
+    q:to/REQUEST/,
+    Content-Length: 19
+
+    Gear Of Despondency
+    REQUEST
+    ([* eq 'Fields, Flowers, Rails']),
+    ([* eq 'Gear Of Despondency']);
 
 done-testing;
