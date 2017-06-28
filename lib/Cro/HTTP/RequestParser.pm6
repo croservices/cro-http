@@ -31,23 +31,24 @@ class Cro::HTTP::RequestParser does Cro::Transform {
     method transformer(Supply:D $in) {
         supply {
             my enum Expecting <RequestLine Header Body>;
-            my $expecting = RequestLine;
 
             my $header-decoder = StreamingDecoder.new('iso-8859-1');
             $header-decoder.set-line-separators(["\r\n", "\n"]); # XXX Hack; toss \n
 
-            my $request = Cro::HTTP::Request.new;
+            my $expecting;
+            my $request;
             my $raw-body-byte-stream;
-            my $leftover = Promise.new;
+            my $leftover;
 
-            my sub recycle() {
-                $request = Cro::HTTP::Request.new;
-                # We need a new bytestream for a new message that will serve as a body
-                $raw-body-byte-stream = Supplier::Preserving.new;
+            my sub fresh-message() {
                 $expecting = RequestLine;
-                $header-decoder.add-bytes($leftover.result);
+                $request = Cro::HTTP::Request.new;
+                # We need a new bytestream for a new message, it will serve as a body
+                $raw-body-byte-stream = Supplier.new;
+                $header-decoder.add-bytes($leftover.result) with $leftover;
                 $leftover = Promise.new;
             }
+            fresh-message;
 
             whenever $in -> Cro::TCP::Message $packet {
                 $header-decoder.add-bytes($packet.data) unless $expecting == Body;
@@ -107,7 +108,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                                 $raw-body-byte-stream.emit($header-decoder.consume-all-bytes());
                                 emit $request;
                                 if $leftover.status == Kept {
-                                    recycle;
+                                    fresh-message;
                                     next;
                                 }
                                 else {
@@ -132,7 +133,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                     when Body {
                         $raw-body-byte-stream.emit($packet.data);
                         if $leftover.status == Kept {
-                            recycle;
+                            fresh-message;
                             next;
                         }
                         else {
