@@ -831,7 +831,6 @@ sub messages($desc, $mess1, $mess2, @checks1, @checks2) {
             }
         }
         $counter++;
-        $request.body-text.result.Str;
         $test-completed.keep(True) if $counter == 2;
     }
 
@@ -852,17 +851,18 @@ sub messages($desc, $mess1, $mess2, @checks1, @checks2) {
 messages 'Two separate packages are parsed', q:to/REQUEST/,
     POST /bar HTTP/1.1
     Content-Type: text/plain
-    Content-Length: 51
+    Content-Length: 22
 
-    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
+    Fields, Flowers, Rails
     POST /bar HTTP/1.1
     Content-Type: text/plain
-    Content-Length: 51
+    Content-Length: 19
 
-    abcdefghijabcdefghijabcdefghijabcdefghijabcdefghij
+    Gear Of Despondency
     REQUEST
     q:to/REQUEST/,
     REQUEST
-    (), ();
+    ([*.body-text.result eq 'Fields, Flowers, Rails']),
+    ([*.body-text.result eq 'Gear Of Despondency']);
 
 done-testing;
