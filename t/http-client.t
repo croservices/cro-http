@@ -364,6 +364,13 @@ constant %key-cert := {
     given await $client.post("$base/post-307-relative", body => 'Heights') -> $resp {
         is await($resp.body), 'Heights', '307 relative redirect carries request body';
     }
+
+    throws-like { my $client = Cro::HTTP::Client.new(auth =>
+                                                     {username => "User",
+                                                      password => "Password",
+                                                      bearer => "Token"}) },
+    X::Cro::HTTP::Client::InvalidAuth,
+    'Client cannot accept basic and bearer authentication simultaneously';
 }
 
 done-testing;

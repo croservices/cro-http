@@ -1,3 +1,4 @@
+use Base64;
 use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Internal;
 use Cro::HTTP::Header;
@@ -50,6 +51,14 @@ class X::Cro::HTTP::Client::TooManyRedirects is Exception {
     }
 }
 
+class X::Cro::HTTP::Client::InvalidAuth is Exception {
+    has $.reason;
+
+    method message() {
+        "Authentication was failed: {$!reason}"
+    }
+}
+
 class Cro::HTTP::Client {
     has @.headers;
     has $.cookie-jar;
@@ -59,18 +68,22 @@ class Cro::HTTP::Client {
     has $.add-body-parsers;
     has $.content-type;
     has $.follow;
+    has %.auth;
 
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
-                    :$!follow) {
+                    :$!follow, :%!auth) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
         when $cookie-jar ~~ Cro::HTTP::Client::CookieJar {
             $!cookie-jar = $cookie-jar;
         }
-        # throw?
+        if (%!auth<username>:exists) && (%!auth<password>:exists) {
+            my $reason = 'Both basic and bearer authentication methods cannot be used';
+            die X::Cro::HTTP::Client::InvalidAuth.new(:$reason) if %!auth<bearer>:exists;
+        }
     }
 
     multi method get($url, %options --> Supply) {
@@ -131,7 +144,7 @@ class Cro::HTTP::Client {
 
         supply {
             whenever $pipeline.out {
-                if .status < 400 {
+                if 200 <= .status < 400 {
                     my $follow;
                     if self {
                         $follow = %options<follow> // $!follow // 5;
@@ -160,10 +173,23 @@ class Cro::HTTP::Client {
                                                        $parsed-url) if self && $.cookie-jar.defined;
                         .emit
                     }
+                } elsif 400 <= .status < 500 {
+                    my $auth;
+                    if self {
+                        $auth = %options<auth> // %!auth;
+                    } else {
+                        $auth = %options<auth> // {};
+                    }
+                    if .status == 401 && (%options<auth><if-asked>:exists) {
+                        my %opts = %options;
+                        %opts<auth><if-asked>:delete;
+                        whenever self!request($method, $parsed-url, %options) { .emit };
+                    } else {
+                        die X::Cro::HTTP::Error::Client.new(response => $_);
+                    }
+
                 } elsif .status >= 500 {
                     die X::Cro::HTTP::Error::Server.new(response => $_);
-                } else {
-                    die X::Cro::HTTP::Error::Client.new(response => $_);
                 }
             }
         }
@@ -196,6 +222,9 @@ class Cro::HTTP::Client {
             $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);
             $.cookie-jar.add-to-request($request, $url) if $.cookie-jar;
+            if %!auth && !(%options<auth>:exists) {
+                self!form-authentication($request, %!auth, %options<if-asked>:exists);
+            }
         }
         my Bool $body-set = False;
 
@@ -222,9 +251,23 @@ class Cro::HTTP::Client {
             when 'headers' {
                 self!set-headers($request, $value.List) if $value ~~ Iterable;
             }
+            when 'auth' {
+                self!form-authentication: $request, %$value, %$value<if-asked>:exists;
+            }
         }
         return $request;
     }
+
+    method !form-authentication($request, %data, Bool $skip) {
+        return if $skip;
+        if %data<username>:exists {
+            my $hash = encode-base64("{%data<username>}:{%data<password>}", :str);
+            $request.append-header('Authorization', "Basic $hash");
+        } else {
+            $request.append-header('Authorization', "Bearer {%data<bearer>}");
+        }
+    }
+
     method !set-headers($request, @headers) {
         for @headers {
             if not ($_ ~~ Cro::HTTP::Header || $_ ~~ Pair) {
