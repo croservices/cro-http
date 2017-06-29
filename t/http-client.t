@@ -1,3 +1,4 @@
+use Base64;
 use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Response;
 use Test;
@@ -103,6 +104,12 @@ constant %key-cert := {
         }
         post -> 'post-307-relative' {
             redirect :permanent, "/str";
+        }
+        get -> 'auth-echo', :$Authorization! is header {
+            content 'text/plain', "$Authorization";
+        }
+        get -> 'auth-echo', {
+            response.status = 401;
         }
     }
 
@@ -371,6 +378,31 @@ constant %key-cert := {
                                                       bearer => "Token"}) },
     X::Cro::HTTP::Client::InvalidAuth,
     'Client cannot accept basic and bearer authentication simultaneously';
+
+    $client = Cro::HTTP::Client.new(auth => {
+                                           username => 'User',
+                                           password => 'Password'});
+
+    given await $client.get("$base/auth-echo") -> $resp {
+        is await($resp.body), "Basic {encode-base64('User:Password', :str)}", 'Basic authentication header is set';
+    }
+
+    given await $client.get("$base/auth-echo", auth => {
+                                   username => 'Jack',
+                                   password => 'Password'}) -> $resp {
+        is await($resp.body), "Basic {encode-base64('Jack:Password', :str)}", 'Basic authentication header can be overriden';
+    }
+
+    given await $client.get("$base/auth-echo", auth => {
+                                   bearer => 'secret'}) -> $resp {
+        is await($resp.body), "Bearer secret", 'Bearer authentication works';
+    }
+
+    given await $client.get("$base/auth-echo", auth => {
+                                   bearer => 'secret',
+                                   if-asked => True}) -> $resp {
+        is await($resp.body), "Bearer secret", 'if-asked works properly';
+    }
 }
 
 done-testing;
