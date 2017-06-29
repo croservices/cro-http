@@ -44,6 +44,12 @@ class X::Cro::HTTP::Client::IncorrectHeaderType is Exception {
     }
 }
 
+class X::Cro::HTTP::Client::TooManyRedirects is Exception {
+    method message() {
+        "Too many redirect"
+    }
+}
+
 class Cro::HTTP::Client {
     has @.headers;
     has $.cookie-jar;
@@ -52,10 +58,12 @@ class Cro::HTTP::Client {
     has $.body-parsers;
     has $.add-body-parsers;
     has $.content-type;
+    has $.follow;
 
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
                     :$!body-serializers, :$!add-body-serializers,
-                    :$!body-parsers, :$!add-body-parsers) {
+                    :$!body-parsers, :$!add-body-parsers,
+                    :$!follow) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -114,12 +122,34 @@ class Cro::HTTP::Client {
         my $request-object = self!assemble-request($method, $parsed-url, %options);
         $pipeline.in.emit($request-object);
         $pipeline.in.done();
+        my $redirect-codes = set(301, 302, 303, 307, 308);
         supply {
             whenever $pipeline.out {
                 if .status < 400 {
-                    $.cookie-jar.add-from-response($_,
-                                                   $parsed-url) if self && $.cookie-jar.defined;
-                    .emit
+                    my $follow;
+                    if self {
+                        $follow = %options<follow> // $!follow // 5;
+                    } else {
+                        $follow = %options<follow> // 5;
+                    }
+                    if .status ⊂ $redirect-codes && ($follow !=== False) {
+                        my $remain = $follow === True ?? 4 !! $follow.Int - 1;
+                        die X::Cro::HTTP::Client::TooManyRedirects.new if $remain < 0;
+                        my $new-method = .status == 302|303 ?? 'GET' !! $method;
+                        my %new-opts = %options;
+                        %new-opts<follow> = $remain;
+                        if .status == 302|303 {
+                            %new-opts<body>:delete;
+                            %new-opts<content-type>:delete;
+                            %new-opts<content-length>:delete;
+                        }
+                        my $req = self.request($new-method, .header('location'), %new-opts);
+                        whenever $req { .emit };
+                    } else {
+                        $.cookie-jar.add-from-response($_,
+                                                       $parsed-url) if self && $.cookie-jar.defined;
+                        .emit
+                    }
                 } elsif .status >= 500 {
                     die X::Cro::HTTP::Error::Server.new(response => $_);
                 } else {

@@ -41,6 +41,11 @@ constant %key-cert := {
                 content 'text/plain', "$str";
             }
         }
+        post -> 'str' {
+            request-body-text -> $str {
+                content 'text/plain', "$str";
+            }
+        }
         get -> 'blob' {
             request-body-blob -> $blob {
                 content 'image/jpeg', $blob.reverse;
@@ -83,6 +88,18 @@ constant %key-cert := {
         }
         get -> 'third-pass', {
             content 'text/plain', 'Nice try';
+        }
+        get -> 'eternal-redirect' {
+            redirect :permanent, "http://localhost:{HTTP_TEST_PORT}/eternal-redirect";
+        }
+        get -> 'single-redirect' {
+            redirect :permanent, "http://localhost:{HTTP_TEST_PORT}/str";
+        }
+        post -> 'get-303' {
+            redirect :see-other, "http://localhost:{HTTP_TEST_PORT}/";
+        }
+        post -> 'post-307' {
+            redirect :permanent, "http://localhost:{HTTP_TEST_PORT}/str";
         }
     }
 
@@ -314,6 +331,31 @@ constant %key-cert := {
     given await $client.get("$base/get-json", content-type => 'text/plain',
                             body => "Calling the Rain") -> $resp {
         is await($resp.body), {:42truth}, 'Additional response parser works'
+    }
+
+    $client = Cro::HTTP::Client.new(:!follow);
+
+    given await $client.get("$base/single-redirect") -> $resp {
+        is $resp.status, 308, 'Get redirect response';
+    }
+
+    $client = Cro::HTTP::Client.new;
+
+    throws-like { await $client.get("$base/eternal-redirect") },
+        X::Cro::HTTP::Client::TooManyRedirects,
+        'Client detects too many redirects';
+
+    given await $client.get("$base/single-redirect",
+                            body => 'The Seed') -> $resp {
+        is await($resp.body), 'The Seed', 'Single permanent redirect works';
+    }
+
+    given await $client.post("$base/get-303", body => 'Lines') -> $resp {
+        is await($resp.body), 'Home', '303 redirect works'
+    }
+
+    given await $client.post("$base/post-307", body => 'Heights') -> $resp {
+        is await($resp.body), 'Heights', '307 redirect carries request body';
     }
 }
 
