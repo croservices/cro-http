@@ -101,6 +101,9 @@ constant %key-cert := {
         post -> 'post-307' {
             redirect :permanent, "http://localhost:{HTTP_TEST_PORT}/str";
         }
+        post -> 'post-307-relative' {
+            redirect :permanent, "/str";
+        }
     }
 
     my $http-server = Cro::HTTP::Server.new(
@@ -356,6 +359,10 @@ constant %key-cert := {
 
     given await $client.post("$base/post-307", body => 'Heights') -> $resp {
         is await($resp.body), 'Heights', '307 redirect carries request body';
+    }
+
+    given await $client.post("$base/post-307-relative", body => 'Heights') -> $resp {
+        is await($resp.body), 'Heights', '307 relative redirect carries request body';
     }
 }
 

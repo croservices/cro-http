@@ -123,6 +123,14 @@ class Cro::HTTP::Client {
         $pipeline.in.emit($request-object);
         $pipeline.in.done();
         my $redirect-codes = set(301, 302, 303, 307, 308);
+
+        sub construct-url($path) {
+            my $url = $parsed-url.scheme ~ '://';
+            $url ~= $parsed-url.host;
+            $url ~= ':' ~ $parsed-url.port if $parsed-url.port;
+            $url ~ $path;
+        }
+
         supply {
             whenever $pipeline.out {
                 if .status < 400 {
@@ -143,7 +151,12 @@ class Cro::HTTP::Client {
                             %new-opts<content-type>:delete;
                             %new-opts<content-length>:delete;
                         }
-                        my $req = self.request($new-method, .header('location'), %new-opts);
+                        my $new-url;
+                        $new-url = .header('location').starts-with('/')
+                                   ?? construct-url($_.header('location'))
+                                   !! .header('location');
+                        say $new-url;
+                        my $req = self.request($new-method, $new-url, %new-opts);
                         whenever $req { .emit };
                     } else {
                         $.cookie-jar.add-from-response($_,
