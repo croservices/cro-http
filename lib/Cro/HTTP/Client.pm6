@@ -125,10 +125,8 @@ class Cro::HTTP::Client {
         my $redirect-codes = set(301, 302, 303, 307, 308);
 
         sub construct-url($path) {
-            my $url = $parsed-url.scheme ~ '://';
-            $url ~= $parsed-url.host;
-            $url ~= ':' ~ $parsed-url.port if $parsed-url.port;
-            $url ~ $path;
+            my $pos = $parsed-url.Str.index('/', 8);
+            $parsed-url.Str.comb[0..$pos-1].join ~ $path;
         }
 
         supply {
@@ -155,7 +153,6 @@ class Cro::HTTP::Client {
                         $new-url = .header('location').starts-with('/')
                                    ?? construct-url($_.header('location'))
                                    !! .header('location');
-                        say $new-url;
                         my $req = self.request($new-method, $new-url, %new-opts);
                         whenever $req { .emit };
                     } else {
