@@ -183,7 +183,7 @@ class Cro::HTTP::Client {
                     if .status == 401 && (%options<auth><if-asked>:exists) {
                         my %opts = %options;
                         %opts<auth><if-asked>:delete;
-                        whenever self!request($method, $parsed-url, %options) { .emit };
+                        whenever self.request($method, $parsed-url, %options) { .emit };
                     } else {
                         die X::Cro::HTTP::Error::Client.new(response => $_);
                     }
