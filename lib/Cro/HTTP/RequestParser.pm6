@@ -83,7 +83,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         if $header-line eq '' {
                             if $request.has-header('content-length')
                             || $request.has-header('transfer-encoding')
-                            || $request.has-header('upgrade') {
+                            || ($request.has-header('connection') && $request.header('connection') eq 'Upgrade') {
                                 my $raw-body-parser = $!raw-body-parser-selector.select($request);
                                 $raw-body-byte-stream = Supplier::Preserving.new;
                                 $request.set-body-byte-stream($raw-body-parser.parser($request,
