@@ -33,7 +33,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                 }
 
                 if $response.has-header('content-length')
-                || ($response.has-header('connection') && $response.header('connection') eq 'Upgrade') {
+                || $response.has-header('upgrade') {
                     # Has Content-length header, so already all available; no need
                     # for chunked.
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
