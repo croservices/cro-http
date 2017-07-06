@@ -81,8 +81,9 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         # If it's a blank line, then we've a request, and
                         # the rest will be the body. Otherwise, parse header.
                         if $header-line eq '' {
-                            if $request.has-header('content-length') ||
-                                    $request.has-header('transfer-encoding') {
+                            if $request.has-header('content-length')
+                            || $request.has-header('transfer-encoding')
+                            || $request.has-header('upgrade') {
                                 my $raw-body-parser = $!raw-body-parser-selector.select($request);
                                 $raw-body-byte-stream = Supplier::Preserving.new;
                                 $request.set-body-byte-stream($raw-body-parser.parser($request,

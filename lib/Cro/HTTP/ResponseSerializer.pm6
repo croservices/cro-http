@@ -11,7 +11,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
             whenever $response-stream -> Cro::HTTP::Response $response {
                 # No body expected or allowed for 204/200.
                 my int $status = $response.status;
-                if $status == 204 || $status < 200 {
+                if $status == 204 || ($status < 200 && $status != 101) {
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
                     done;
                 }
@@ -32,7 +32,8 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                     $body-byte-stream = $response.body-byte-stream;
                 }
 
-                if $response.has-header('content-length') {
+                if $response.has-header('content-length')
+                || ($response.has-header('connection') && $response.header('connection') eq 'Upgrade') {
                     # Has Content-length header, so already all available; no need
                     # for chunked.
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
