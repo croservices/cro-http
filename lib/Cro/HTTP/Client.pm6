@@ -144,7 +144,7 @@ class Cro::HTTP::Client {
 
         supply {
             whenever $pipeline.out {
-                if 200 <= .status < 400 {
+                if 200 <= .status < 400 || .status == 101 {
                     my $follow;
                     if self {
                         $follow = %options<follow> // $!follow // 5;

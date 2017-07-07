@@ -14,7 +14,8 @@ class Cro::HTTP::RequestSerializer does Cro::Transform {
                     # headers, as this is the point that a content-length header
                     # may be added in.
                     my $body-byte-stream = $request.body-byte-stream;
-                    if $request.has-header('content-length') {
+                    if $request.has-header('content-length')
+                    || $request.has-header('upgrade') {
                         # Has Content-length header, so already all available; no need
                         # for chunked.
                         emit Cro::TCP::Message.new(data => $request.Str.encode('latin-1'));
