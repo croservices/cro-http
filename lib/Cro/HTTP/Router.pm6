@@ -539,6 +539,19 @@ module Cro::HTTP::Router {
         $resp.status = $status;
     }
 
+    sub cache-control(*%opts) is export {
+        my $resp = $*CRO-ROUTER-RESPONSE //
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+        $resp.remove-header('Cache-Control');
+        die if (%opts<public>, %opts<private>, %opts<no-cache>).grep(Bool).elems != 1;
+        my Str $cache = %opts.List.map(
+            {
+                if $_.key eq 'max-age'|'s-maxage' { "{.key}={.value}"}
+                else { "{.key}" }
+            }).join(', ');
+        $resp.append-header('Cache-Control', $cache);
+    }
+
     sub static(Str $base, @path?, :$mime-types) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);

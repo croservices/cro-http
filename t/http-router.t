@@ -1469,4 +1469,22 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $app = route {
+        get -> {
+            cache-control :public, :max-age(600);
+            content 'text/plain', 'Response';
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is $r.has-header('cache-control'), True, 'Cache-Control header is set';
+        ok $r.header('cache-control') ~~ /'max-age=600'/, 'max-age is added';
+        ok $r.header('cache-control') ~~ /'public'/, 'public directive is added';
+    }
+}
+
 done-testing;
