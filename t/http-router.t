@@ -1,6 +1,4 @@
 use Cro;
-use Cro::HTTP::BodyParser;
-use Cro::HTTP::BodySerializer;
 use Cro::HTTP::Request;
 use Cro::HTTP::Router;
 use Test;
