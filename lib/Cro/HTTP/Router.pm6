@@ -539,15 +539,22 @@ module Cro::HTTP::Router {
         $resp.status = $status;
     }
 
-    sub cache-control(*%opts) is export {
+    sub cache-control(:$public, :$private, :$no-cache, :$no-store,
+                      Int :$max-age, Int :$s-maxage,
+                      :$must-revalidate, :$proxy-revalidate,
+                      :$no-transform) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
         $resp.remove-header('Cache-Control');
-        die if (%opts<public>, %opts<private>, %opts<no-cache>).grep(Bool).elems != 1;
-        my Str $cache = %opts.List.map(
+        die if ($public, $private, $no-cache).grep(Bool).elems != 1;
+        my @headers = (:$public, :$private, :$no-cache, :$no-store,
+                       :$max-age, :$s-maxage,
+                       :$must-revalidate, :$proxy-revalidate,
+                       :$no-transform);
+        my $cache = @headers.map(
             {
-                if $_.key eq 'max-age'|'s-maxage' { "{.key}={.value}"}
-                else { "{.key}" }
+                if .key eq 'max-age'|'s-maxage' { "{.key}={.value}" if .value }
+                else { "{.key}" if .value }
             }).join(', ');
         $resp.append-header('Cache-Control', $cache);
     }
