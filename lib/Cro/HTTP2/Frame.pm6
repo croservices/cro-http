@@ -70,7 +70,7 @@ class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
     has Blob $.debug;
 }
 
-class Cro::HTTP2::Frame::WindowUpdage does Cro::HTTP2::Frame {
+class Cro::HTTP2::Frame::WindowUpdate does Cro::HTTP2::Frame {
     has UInt $.increment;
 }
 
