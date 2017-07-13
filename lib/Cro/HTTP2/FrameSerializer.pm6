@@ -25,7 +25,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
         when Cro::HTTP2::Frame::Data {
             $buf.append: .padding-length if .padded;
             $buf.append: .data;
-            $buf.append: 0 xx .padding-length if .padded;   
+            $buf.append: 0 xx .padding-length if .padded;
         }
         when Cro::HTTP2::Frame::Headers {
             $buf.append: .padding-length if .padded;
@@ -34,7 +34,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
             }
             $buf.append: .weight if .priority;
             $buf.append: .headers;
-            $buf.append: 0 xx .padding-length if .padded;   
+            $buf.append: 0 xx .padding-length if .padded;
         }
         when Cro::HTTP2::Frame::Priority {
             my $num = .dependency;
@@ -67,12 +67,12 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
                 $buf.append: (($num +> $_) +& 0xFF);
             }
             $buf.append: .headers;
-            $buf.append: 0 xx .padding-length if .padded;   
+            $buf.append: 0 xx .padding-length if .padded;
         }
         when Cro::HTTP2::Frame::Ping {
             if .payload.elems < 8 {
                 my $suffix = Buf.new([0x0 xx (8 - .payload.elems)]);
-                $buf.append: .payload; $buf.append: $suffix; 
+                $buf.append: .payload; $buf.append: $suffix;
             } elsif .payload.elems == 8 {
                 $buf.append: .payload;
             } else {
