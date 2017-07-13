@@ -16,8 +16,8 @@ class Cro::HTTP2::Frame::Data does Cro::HTTP2::Frame {
     has UInt $.padding-length;
     has Blob $.data;
 
-    method end-stream(--> Bool) { $!flags +& 0x1 }
-    method padded(--> Bool) { $!flags +& 0x8 }
+    method end-stream(--> Bool) { $!flags +& 0x1 != 0 }
+    method padded(--> Bool) { $!flags +& 0x8 != 0 }
 }
 
 class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
@@ -27,10 +27,10 @@ class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
     has UInt $.weight;
     has Blob $.headers;
 
-    method end-stream(--> Bool) { $!flags +& 0x1 }
-    method end-headers(--> Bool) { $!flags +& 0x4 }
-    method padded(--> Bool) { $!flags +& 0x8 }
-    method priority(--> Bool) { $!flags +& 0x20 }
+    method end-stream(--> Bool) { $!flags +& 0x1 != 0 }
+    method end-headers(--> Bool) { $!flags +& 0x4 != 0 }
+    method padded(--> Bool) { $!flags +& 0x8 != 0 }
+    method priority(--> Bool) { $!flags +& 0x20 != 0 }
 }
 
 class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
@@ -46,7 +46,7 @@ class Cro::HTTP2::Frame::RstStream does Cro::HTTP2::Frame {
 class Cro::HTTP2::Frame::Settings does Cro::HTTP2::Frame {
     has @.settings;
 
-    method ack(--> Bool) { $!flags +& 0x1 }
+    method ack(--> Bool) { $!flags +& 0x1 != 0 }
 }
 
 class Cro::HTTP2::Frame::PushPromise does Cro::HTTP2::Frame {
@@ -54,14 +54,14 @@ class Cro::HTTP2::Frame::PushPromise does Cro::HTTP2::Frame {
     has UInt $.promised-sid;
     has Blob $.headers;
 
-    method end-headers(--> Bool) { $!flags +& 0x4 }
-    method padded(--> Bool) { $!flags +& 0x8 }
+    method end-headers(--> Bool) { $!flags +& 0x4 != 0 }
+    method padded(--> Bool) { $!flags +& 0x8 != 0 }
 }
 
 class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
     has Blob $.payload;
 
-    method ack(--> Bool) { $!flags +& 0x1 }
+    method ack(--> Bool) { $!flags +& 0x1 != 0 }
 }
 
 class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
@@ -78,7 +78,7 @@ class Cro::HTTP2::Frame::WindowUpdate does Cro::HTTP2::Frame {
 class Cro::HTTP2::Frame::Continuation does Cro::HTTP2::Frame {
     has Blob $.headers;
 
-    method end-headers(--> Bool) { $!flags +& 0x4 }
+    method end-headers(--> Bool) { $!flags +& 0x4 != 0 }
 }
 
 class Cro::HTTP2::Frame::Unknown does Cro::HTTP2::Frame {
