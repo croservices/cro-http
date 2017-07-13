@@ -1,3 +1,7 @@
+enum Settings <SETTINGS_HEADER_TABLE_SIZE SETTINGS_ENABLE_PUSH
+               SETTINGS_MAX_CONCURRENT_STREAMS SETTINGS_INITIAL_WINDOW_SIZE
+               SETTINGS_MAX_FRAME_SIZE SETTINGS_MAX_HEADER_LIST_SIZE>;
+
 enum ErrorCode <NO_ERROR PROTOCOL_ERROR
                 INTERNAL_ERROR FLOW_CONTROL_ERROR
                 SETTINGS_TIMEOUT STREAM_CLOSED
@@ -34,7 +38,7 @@ class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
 }
 
 class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
-    has UInt $.exclusive;
+    has Bool $.exclusive;
     has UInt $.dependency;
     has UInt $.weight;
 }
