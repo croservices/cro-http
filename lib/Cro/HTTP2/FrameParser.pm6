@@ -91,13 +91,12 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
     }
     my multi sub payload(4, Buf $data is rw, $length, *%header) {
         my $sets = $length div 6;
-        my ($identifier, $value, Pair @settings);
+        my @settings;
 
         for 0...($sets-1) {
-            $identifier = ($data[$_*6 + 0] +< 8) +| $data[$_*6 + 1];
-            $value = ($data[$_*6 + 2] +< 24) +| ($data[$_*6 + 3] +< 16) +| ($data[$_*6 + 4] +< 8) +| $data[$_*6 + 5];
-            my Pair $p = $identifier => $value;
-            @settings.append: ($p);
+            my $identifier = ($data[$_*6 + 0] +< 8) +| $data[$_*6 + 1];
+            my $value = ($data[$_*6 + 2] +< 24) +| ($data[$_*6 + 3] +< 16) +| ($data[$_*6 + 4] +< 8) +| $data[$_*6 + 5];
+            @settings.append: $identifier => $value;
         }
         Cro::HTTP2::Frame::Settings.new(:@settings, |%header);
     }
