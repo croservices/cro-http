@@ -25,7 +25,8 @@ class Cro::HTTP::Server does Cro::Service {
                     :$before-parse, :$before,
                     :$after, :$after-serialize,
                     :$add-body-parsers, :$body-parsers,
-                    :$add-body-serializers, :$body-serializers) {
+                    :$add-body-serializers, :$body-serializers,
+                    :$label = "HTTP($port)") {
         my $listener = %ssl
             ?? Cro::SSL::Listener.new(
                   |(:$host with $host),
@@ -44,6 +45,7 @@ class Cro::HTTP::Server does Cro::Service {
 
         return Cro.compose(
             service-type => self.WHAT,
+            :$label,
             $listener,
             |@before-parse,
             Cro::HTTP::RequestParser.new,
