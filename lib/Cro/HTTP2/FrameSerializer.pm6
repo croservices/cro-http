@@ -29,8 +29,9 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
         }
         when Cro::HTTP2::Frame::Headers {
             $buf.append: .padding-length if .padded;
+            my $priority = .priority;
             for 16, 8...0 {
-                $buf.append: ((.dependency +> $_) +& 0xFF) if .priority;
+                $buf.append: ((.dependency +> $_) +& 0xFF) if $priority;
             }
             $buf.append: .weight if .priority;
             $buf.append: .headers;
@@ -112,7 +113,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
                 my $num = .headers.elems;
                 $num += .padding-length + 1 if .padded;
                 $num += 5 if .priority;
-                for 24, 16...0 { $buf[$i] = ($num +> $_) +& 0xFF; $i++; }
+                for 16, 8...0 { $buf[$i] = ($num +> $_) +& 0xFF; $i++; }
             }
             when Cro::HTTP2::Frame::Priority {
                 for 16, 8...0 { $buf[$i] = (5 +> $_) +& 0xFF; $i++; }
