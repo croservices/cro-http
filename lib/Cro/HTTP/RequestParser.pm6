@@ -35,7 +35,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
             my $raw-body-byte-stream;
 
             whenever $in -> Cro::TCP::Message $packet {
-                $header-decoder.add-bytes($packet.data);
+                $header-decoder.add-bytes($packet.data) unless $expecting == Body;
                 loop {
                     $_ = $expecting;
                     when RequestLine {
