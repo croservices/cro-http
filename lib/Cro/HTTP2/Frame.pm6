@@ -10,24 +10,26 @@ enum ErrorCode <NO_ERROR PROTOCOL_ERROR
                 CONNECT_ERROR ENCHANCE_YOUR_CALM
                 INADEQUATE_SECURITY HTTP_1_1_REQUIRED>;
 
+class X::Cro::HTTP2::Error is Exception {
+    has $.code;
+
+    method message() { "$!code" }
+}
+
 role Cro::HTTP2::Frame {
-    has int $.type;
-    has int $.flags;
-    has int $.stream-identifier;
+    has Int $.type;
+    has Int $.flags;
+    has Int $.stream-identifier;
 }
 
 class Cro::HTTP2::Frame::Data does Cro::HTTP2::Frame {
-    has $.padding-length;
+    has UInt $.padding-length;
     has Blob $.data;
 
     method end-stream(--> Bool) { $!flags +& 0x1 != 0 }
     method padded(--> Bool) { $!flags +& 0x8 != 0 }
 
-    method new(:$type = 0, :$flags, :$stream-identifier,
-               :$padding-length, :$data) {
-        self.bless(:$type, :$flags, :$stream-identifier,
-                   :$padding-length, :$data);
-    }
+    submethod TWEAK() { $!type = 0; }
 }
 
 class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
@@ -42,13 +44,7 @@ class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
     method padded(--> Bool) { $!flags +& 0x8 != 0 }
     method priority(--> Bool) { $!flags +& 0x20 != 0 }
 
-    method new(:$flags, :$stream-identifier,
-               :$padding-length, :$exclusive,
-               :$dependency, :$weight, :$headers) {
-        self.bless(type => 1, :$flags, :$stream-identifier,
-                   :$padding-length, :$exclusive,
-               :$dependency, :$weight, :$headers);
-    }
+    submethod TWEAK() { $!type = 1; }
 }
 
 class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
@@ -56,20 +52,18 @@ class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
     has UInt $.dependency;
     has UInt $.weight;
 
-    method new(:$flags, :$stream-identifier,
-               :$exclusive, :$dependency, :$weight) {
-        self.bless(type => 2, :$flags, :$stream-identifier,
-                   :$exclusive, :$dependency, :$weight);
+    submethod TWEAK() {
+        $!type = 2;
+        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
 class Cro::HTTP2::Frame::RstStream does Cro::HTTP2::Frame {
     has ErrorCode $.error-code;
 
-    method new(:$flags, :$stream-identifier,
-               :$error-code) {
-        self.bless(type => 3, :$flags, :$stream-identifier,
-                   :$error-code);
+    submethod TWEAK() {
+        $!type = 3;
+        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
@@ -78,11 +72,7 @@ class Cro::HTTP2::Frame::Settings does Cro::HTTP2::Frame {
 
     method ack(--> Bool) { $!flags +& 0x1 != 0 }
 
-    method new(:$flags, :$stream-identifier,
-               :@settings) {
-        self.bless(type => 4, :$flags, :$stream-identifier,
-                   :@settings);
-    }
+    submethod TWEAK() { $!type = 4; }
 }
 
 class Cro::HTTP2::Frame::PushPromise does Cro::HTTP2::Frame {
@@ -93,11 +83,7 @@ class Cro::HTTP2::Frame::PushPromise does Cro::HTTP2::Frame {
     method end-headers(--> Bool) { $!flags +& 0x4 != 0 }
     method padded(--> Bool) { $!flags +& 0x8 != 0 }
 
-    method new(:$flags, :$stream-identifier,
-               :$padding-length, :$promised-sid, :$headers) {
-        self.bless(type => 5, :$flags, :$stream-identifier,
-                   :$padding-length, :$promised-sid, :$headers);
-    }
+    submethod TWEAK() { $!type = 5; }
 }
 
 class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
@@ -105,11 +91,7 @@ class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
 
     method ack(--> Bool) { $!flags +& 0x1 != 0 }
 
-    method new(:$flags, :$stream-identifier,
-               :$payload) {
-        self.bless(type => 6, :$flags, :$stream-identifier,
-                   :$payload);
-    }
+    submethod TWEAK() { $!type = 6; }
 }
 
 class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
@@ -117,20 +99,18 @@ class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
     has ErrorCode $.error-code;
     has Blob $.debug;
 
-    method new(:$flags, :$stream-identifier,
-               :$last-sid, :$error-code, :$debug) {
-        self.bless(type => 7, :$flags, :$stream-identifier,
-                   :$last-sid, :$error-code, :$debug);
+    submethod TWEAK() {
+        $!type = 7;
+        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
 class Cro::HTTP2::Frame::WindowUpdate does Cro::HTTP2::Frame {
     has UInt $.increment;
 
-    method new(:$flags, :$stream-identifier,
-               :$increment) {
-        self.bless(type => 8, :$flags, :$stream-identifier,
-                   :$increment);
+    submethod TWEAK() {
+        $!type = 8;
+        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
@@ -139,11 +119,7 @@ class Cro::HTTP2::Frame::Continuation does Cro::HTTP2::Frame {
 
     method end-headers(--> Bool) { $!flags +& 0x4 != 0 }
 
-    method new(:$flags, :$stream-identifier,
-               :$headers) {
-        self.bless(type => 9, :$flags, :$stream-identifier,
-                   :$headers);
-    }
+    submethod TWEAK() { $!type = 9; }
 }
 
 class Cro::HTTP2::Frame::Unknown does Cro::HTTP2::Frame {
