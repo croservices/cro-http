@@ -54,7 +54,7 @@ class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 2;
-        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
+        die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
@@ -63,7 +63,7 @@ class Cro::HTTP2::Frame::RstStream does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 3;
-        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
+        die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
@@ -76,7 +76,7 @@ class Cro::HTTP2::Frame::Settings does Cro::HTTP2::Frame {
 }
 
 class Cro::HTTP2::Frame::PushPromise does Cro::HTTP2::Frame {
-    has $.padding-length;
+    has UInt $.padding-length;
     has UInt $.promised-sid;
     has Blob $.headers;
 
@@ -91,7 +91,14 @@ class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
 
     method ack(--> Bool) { $!flags +& 0x1 != 0 }
 
-    submethod TWEAK() { $!type = 6; }
+    submethod TWEAK() {
+        $!type = 6;
+        if $!payload.elems < 8 {
+            $!payload = $!payload ~ Blob.new((0x0 xx (8 - $!payload.elems)))
+        } elsif $!payload.elems > 8 {
+            die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
+        }
+    }
 }
 
 class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
@@ -101,7 +108,7 @@ class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 7;
-        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
+        die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
@@ -110,7 +117,7 @@ class Cro::HTTP2::Frame::WindowUpdate does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 8;
-        die X::Cro::HTTP2::Error.new(error => INTERNAL_ERROR) if $!flags != 0;
+        die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
     }
 }
 
