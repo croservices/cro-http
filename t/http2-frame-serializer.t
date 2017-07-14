@@ -1,5 +1,6 @@
 use Cro::TCP;
 use Cro::HTTP2::FrameSerializer;
+use Cro::HTTP2::FrameParser;
 use Cro::HTTP2::Frame;
 use Test;
 
@@ -12,18 +13,18 @@ ok Cro::HTTP2::FrameSerializer.produces === Cro::TCP::Message,
 
 sub test-example($frame, $result, $desc) {
     my $serializer = Cro::HTTP2::FrameSerializer.new;
-    # my $parser = Cro::WebSocket::FrameParser.new(mask-required => $mask);
+    my $parser = Cro::HTTP2::FrameParser.new;
     my $fake-in-s = Supplier.new;
-    # my $fake-in-p = Supplier.new;
+    my $fake-in-p = Supplier.new;
     my $complete = Promise.new;
     $serializer.transformer($fake-in-s.Supply).schedule-on($*SCHEDULER).tap: -> $message {
         ok $message.data eq $result, $desc;
-        # $parser.transformer($fake-in-p.Supply).schedule-on($*SCHEDULER).tap: -> $newframe {
-        #     is-deeply $newframe, $frame, $desc;
+        $parser.transformer($fake-in-p.Supply).schedule-on($*SCHEDULER).tap: -> $newframe {
+            is-deeply $newframe, $frame, $desc;
             $complete.keep;
-        # }
-        # $fake-in-p.emit($message);
-        # $fake-in-p.done;
+        }
+        $fake-in-p.emit($message);
+        $fake-in-p.done;
     }
     start {
         $fake-in-s.emit($frame);
@@ -38,19 +39,32 @@ test-example Cro::HTTP2::Frame::Data.new(flags => 1, stream-identifier => 1,
              0x01, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61]),
     'Simple data frame';
 
-
 test-example Cro::HTTP2::Frame::Data.new(flags => 9, stream-identifier => 1,
-                                         padded => True, data => 'testdata'.encode,
+                                         data => 'testdata'.encode,
                                          padding-length => 10),
     Buf.new([0x00, 0x00, 0x13, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01,
              0x0A, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61,
              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]), # padding
     'Simple data frame with padding';
 
+test-example Cro::HTTP2::Frame::Headers.new(flags => 1, stream-identifier => 1,
+                                            headers => 'testdata'.encode),
+    Buf.new([0x00, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x00,
+             0x01, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61]),
+    'Simple headers frame';
+
+test-example Cro::HTTP2::Frame::Headers.new(flags => 9, stream-identifier => 1,
+                                         headers => 'testdata'.encode,
+                                         padding-length => 10),
+    Buf.new([0x00, 0x00, 0x13, 0x01, 0x09, 0x00, 0x00, 0x00, 0x01,
+             0x0A, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61,
+             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]), # padding
+    'Simple headers frame with padding';
+
 test-example Cro::HTTP2::Frame::Priority.new(flags => 0, stream-identifier => 1,
-                                             dependency => 3, weight => 20, exclusive => True),
-    Buf.new([0x00, 0x00, 0x05, 0x02, 0x00, 0x00, 0x00,
-             0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x14]),
+                                             dependency => 4, weight => 64, exclusive => True),
+    Buf.new([0x00, 0x00, 0x05, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+             0x80, 0x00, 0x00, 0x04, 0x40]),
     'Simple priority frame';
 
 test-example Cro::HTTP2::Frame::RstStream.new(flags => 0, stream-identifier => 1,
@@ -97,7 +111,7 @@ test-example Cro::HTTP2::Frame::Ping.new(flags => 1, stream-identifier => 0,
 
 dies-ok {
     test-example Cro::HTTP2::Frame::Ping.new(flags => 1,
-                                             stream-identifier => 30)
+                                             stream-identifier => 30, payload => Blob.new)
 }, 'Ping stream-identifier cannot be non-zero';
 
 dies-ok {
@@ -113,8 +127,8 @@ test-example Cro::HTTP2::Frame::Goaway.new(flags => 0, stream-identifier => 0,
     'Simple GoAway frame';
 
 dies-ok {
-    test-example Cro::HTTP2::Frame::Ping.new(flags => 1,
-                                             stream-identifier => 30)
+    test-example Cro::HTTP2::Frame::Goaway.new(flags => 1,
+                                             stream-identifier => 30, payload => Blob.new)
 }, 'Goaway stream-identifier cannot be non-zero';
 
 test-example Cro::HTTP2::Frame::WindowUpdate.new(flags => 0, stream-identifier => 0,
