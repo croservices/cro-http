@@ -38,8 +38,10 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
         }
         when Cro::HTTP2::Frame::Priority {
             my $num = .dependency;
+            my $ex = .exclusive;
             for 24, 16...0 {
                 $buf.append: (($num +> $_) +& 0xFF);
+                $buf[$buf.elems-1] = $buf[$buf.elems-1] +| 0x80 if $_ == 24 && $ex;
             }
             $buf.append: .weight;
         }
