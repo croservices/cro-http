@@ -29,7 +29,10 @@ class Cro::HTTP2::Frame::Data does Cro::HTTP2::Frame {
     method end-stream(--> Bool) { $!flags +& 0x1 != 0 }
     method padded(--> Bool) { $!flags +& 0x8 != 0 }
 
-    submethod TWEAK() { $!type = 0; }
+    submethod TWEAK() {
+        $!type = 0;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
+    }
 }
 
 class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
@@ -44,7 +47,10 @@ class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
     method padded(--> Bool) { $!flags +& 0x8 != 0 }
     method priority(--> Bool) { $!flags +& 0x20 != 0 }
 
-    submethod TWEAK() { $!type = 1; }
+    submethod TWEAK() {
+        $!type = 1;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
+    }
 }
 
 class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
@@ -55,6 +61,7 @@ class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
     submethod TWEAK() {
         $!type = 2;
         die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
     }
 }
 
@@ -84,7 +91,10 @@ class Cro::HTTP2::Frame::PushPromise does Cro::HTTP2::Frame {
     method end-headers(--> Bool) { $!flags +& 0x4 != 0 }
     method padded(--> Bool) { $!flags +& 0x8 != 0 }
 
-    submethod TWEAK() { $!type = 5; }
+    submethod TWEAK() {
+        $!type = 5;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
+    }
 }
 
 class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
@@ -94,6 +104,7 @@ class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 6;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier != 0;
         if $!payload.elems < 8 {
             $!payload = $!payload ~ Blob.new((0x0 xx (8 - $!payload.elems)))
         } elsif $!payload.elems > 8 {

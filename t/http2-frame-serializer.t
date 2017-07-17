@@ -85,9 +85,9 @@ my @settings = SETTINGS_HEADER_TABLE_SIZE.value => 4096,
                SETTINGS_INITIAL_WINDOW_SIZE.value => 65535,
                SETTINGS_MAX_FRAME_SIZE.value => 16384,
                SETTINGS_MAX_HEADER_LIST_SIZE.value => 65535;
-test-example Cro::HTTP2::Frame::Settings.new(flags => 1, stream-identifier => 0,
+test-example Cro::HTTP2::Frame::Settings.new(flags => 0, stream-identifier => 0,
                                              :@settings),
-    Buf.new([0x00, 0x00, 0x24, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00,
+    Buf.new([0x00, 0x00, 0x24, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x01, 0x00, 0x00, 0x10, 0x00,
              0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x03, 0x00, 0x00, 0x00, 0x64,
@@ -96,12 +96,6 @@ test-example Cro::HTTP2::Frame::Settings.new(flags => 1, stream-identifier => 0,
              0x00, 0x06, 0x00, 0x00, 0xFF, 0xFF]),
     'Simple Settings frame';
 
-dies-ok {
-    test-example Cro::HTTP2::Frame::Settings.new(flags => 1,
-                                                 stream-identifier => 30,
-                                                 :@settings)
-}, 'Settings stream-identifier cannot be non-zero';
-
 test-example Cro::HTTP2::Frame::PushPromise.new(flags => 4, stream-identifier => 1,
                                                 promised-sid => 4, headers => 'hello world'.encode),
     Buf.new([0x00, 0x00, 0x0F, 0x05, 0x04, 0x00, 0x00, 0x00, 0x01,
@@ -109,16 +103,19 @@ test-example Cro::HTTP2::Frame::PushPromise.new(flags => 4, stream-identifier =>
              0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64]),
     'Simple PushPromise frame';
 
+test-example Cro::HTTP2::Frame::PushPromise.new(flags => 8, stream-identifier => 1,
+                                                padding-length => 1,
+                                                promised-sid => 4, headers => 'hello world'.encode),
+    Buf.new([0x00, 0x00, 0x11, 0x05, 0x08, 0x00, 0x00, 0x00, 0x01,
+             0x01, 0x00, 0x00, 0x00, 0x04,
+             0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x00]),
+    'PushPromise frame with padding';
+
 test-example Cro::HTTP2::Frame::Ping.new(flags => 1, stream-identifier => 0,
                                          payload => Blob.new([0x1, 0x2])),
     Buf.new([0x00, 0x00, 0x08, 0x06, 0x01, 0x00, 0x00, 0x00, 0x00,
              0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
     'Simple Ping frame';
-
-dies-ok {
-    test-example Cro::HTTP2::Frame::Ping.new(flags => 1,
-                                             stream-identifier => 30, payload => Blob.new)
-}, 'Ping stream-identifier cannot be non-zero';
 
 dies-ok {
     test-example Cro::HTTP2::Ping::Settings.new(flags => 1,
@@ -138,11 +135,6 @@ test-example Cro::HTTP2::Frame::Goaway.new(flags => 0, stream-identifier => 0,
     Buf.new([0x00, 0x00, 0x0D, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x02, 0x68, 0x65, 0x6c, 0x6c, 0x6f]),
     'GoAway frame with a custom error treats it as INTERNAL_ERROR';
-
-dies-ok {
-    test-example Cro::HTTP2::Frame::Goaway.new(flags => 1, stream-identifier => 30,
-                                               last-sid => 64, error-code => 0, payload => Blob.new)
-}, 'Goaway stream-identifier cannot be non-zero';
 
 test-example Cro::HTTP2::Frame::WindowUpdate.new(flags => 0, stream-identifier => 0,
                                                  increment => 512),
