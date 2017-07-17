@@ -47,7 +47,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
             $buf.append: .weight;
         }
         when Cro::HTTP2::Frame::RstStream {
-            my $num = .error-code;
+            my $num = ErrorCode(.error-code) // INTERNAL_ERROR;
             for 24, 16...0 {
                 $buf.append: (($num +> $_) +& 0xFF);
             }
@@ -85,7 +85,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
         when Cro::HTTP2::Frame::Goaway {
             my $num = .last-sid;
             for 24, 16...0 { $buf.append: (($num +> $_) +& 0xFF); }
-            $num = .error-code;
+            $num = ErrorCode(.error-code) // INTERNAL_ERROR;
             for 24, 16...0 { $buf.append: (($num +> $_) +& 0xFF); }
             $buf.append: .debug;
         }

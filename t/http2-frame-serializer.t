@@ -20,7 +20,7 @@ sub test-example($frame, $result, $desc) {
     $serializer.transformer($fake-in-s.Supply).schedule-on($*SCHEDULER).tap: -> $message {
         ok $message.data eq $result, $desc;
         $parser.transformer($fake-in-p.Supply).schedule-on($*SCHEDULER).tap: -> $newframe {
-            is-deeply $newframe, $frame, $desc;
+            is-deeply $newframe, $frame, $desc ~ ' is parsed back';
             $complete.keep;
         }
         $fake-in-p.emit($message);
@@ -72,6 +72,12 @@ test-example Cro::HTTP2::Frame::RstStream.new(flags => 0, stream-identifier => 1
     Buf.new([0x00, 0x00, 0x04, 0x03, 0x00, 0x00, 0x00,
              0x00, 0x01, 0x00, 0x00, 0x00, 0x02]),
     'Simple RstStream frame';
+
+test-example Cro::HTTP2::Frame::RstStream.new(flags => 0, stream-identifier => 1,
+                                              error-code => 35),
+    Buf.new([0x00, 0x00, 0x04, 0x03, 0x00, 0x00, 0x00,
+             0x00, 0x01, 0x00, 0x00, 0x00, 0x02]),
+    'RstStream frame with a custom error treats it as INTERNAL_ERROR';
 
 my @settings = SETTINGS_HEADER_TABLE_SIZE.value => 4096,
                SETTINGS_ENABLE_PUSH.value => 0,
@@ -126,9 +132,16 @@ test-example Cro::HTTP2::Frame::Goaway.new(flags => 0, stream-identifier => 0,
              0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x07, 0x68, 0x65, 0x6c, 0x6c, 0x6f]),
     'Simple GoAway frame';
 
+test-example Cro::HTTP2::Frame::Goaway.new(flags => 0, stream-identifier => 0,
+                                           last-sid => 64, error-code => 50,
+                                           debug => 'hello'.encode),
+    Buf.new([0x00, 0x00, 0x0D, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
+             0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x02, 0x68, 0x65, 0x6c, 0x6c, 0x6f]),
+    'GoAway frame with a custom error treats it as INTERNAL_ERROR';
+
 dies-ok {
-    test-example Cro::HTTP2::Frame::Goaway.new(flags => 1,
-                                             stream-identifier => 30, payload => Blob.new)
+    test-example Cro::HTTP2::Frame::Goaway.new(flags => 1, stream-identifier => 30,
+                                               last-sid => 64, error-code => 0, payload => Blob.new)
 }, 'Goaway stream-identifier cannot be non-zero';
 
 test-example Cro::HTTP2::Frame::WindowUpdate.new(flags => 0, stream-identifier => 0,

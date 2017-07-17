@@ -86,7 +86,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
     }
     my multi sub payload(3, Buf $data is rw, $length, *%header) {
         my $error-code = ($data[0] +< 24) +| ($data[1] +< 16) +| ($data[2] +< 8) +| $data[3];
-        $error-code = ErrorCode($error-code);
+        $error-code = ErrorCode($error-code) // INTERNAL_ERROR;
         Cro::HTTP2::Frame::RstStream.new(:$error-code, |%header);
     }
     my multi sub payload(4, Buf $data is rw, $length, *%header) {
@@ -133,7 +133,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                    +| ($data[5] +< 16)
                    +| ($data[6] +< 8)
                    +|  $data[7];
-        $error-code = ErrorCode($error-code);
+        $error-code = ErrorCode($error-code) // INTERNAL_ERROR;
         $debug = utf8.new: $data.subbuf(8, $length);
         Cro::HTTP2::Frame::Goaway.new(:$last-sid, :$error-code, :$debug, |%header);
     }

@@ -59,10 +59,11 @@ class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
 }
 
 class Cro::HTTP2::Frame::RstStream does Cro::HTTP2::Frame {
-    has ErrorCode $.error-code;
+    has UInt $.error-code;
 
     submethod TWEAK() {
         $!type = 3;
+        $!error-code = ErrorCode($!error-code) // INTERNAL_ERROR;
         die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
     }
 }
@@ -103,11 +104,12 @@ class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
 
 class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
     has UInt $.last-sid;
-    has ErrorCode $.error-code;
+    has UInt $.error-code;
     has Blob $.debug;
 
     submethod TWEAK() {
         $!type = 7;
+        $!error-code = ErrorCode($!error-code) // INTERNAL_ERROR;
         die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
     }
 }
