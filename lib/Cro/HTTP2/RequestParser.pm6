@@ -23,14 +23,14 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                 }
                 when .type ~~ Cro::HTTP2::Frame::Headers {
                     my @headers = $decoder.decode-headers(.headers);
-                    my @real-headers = @headers.grep({ not .name eq any($pseud-headers) });
+                    my @real-headers = @headers.grep({ not .name eq any($pseudo-headers) });
                     $request.method = @headers.grep({ .name eq ':method' })[0].value;
                     $request.target = @headers.grep({ .name eq ':path' })[0].value;
                     $request.http-version = 'http/2';
                     for @real-headers {
                         $request.append-header(.name => .value);
                     }
-                    emit $request if $frame.end-headers;
+                    emit $request if .end-headers;
                 }
                 when .type ~~  Cro::HTTP2::Frame::Priority {
                     die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $state !~~ Init;
@@ -58,7 +58,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                     for @headers {
                         $request.append-header(.name => .value);
                     }
-                    emit $request if $frame.end-headers;
+                    emit $request if .end-headers;
                 }
             }
         }
