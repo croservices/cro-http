@@ -5,7 +5,7 @@ use HTTP::HPACK;
 
 my constant $pseudo-headers = <:method :scheme :authority :path :status>;
 
-class Cro::HTTP::RequestParser does Cro::Transform {
+class Cro::HTTP2::RequestParser does Cro::Transform {
     method consumes() { Cro::HTTP2::Frame  }
     method produces() { Cro::HTTP::Request }
 
