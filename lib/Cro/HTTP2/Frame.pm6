@@ -31,7 +31,8 @@ class Cro::HTTP2::Frame::Data does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 0;
-        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if !$!stream-identifier.defined
+                                                             || $!stream-identifier == 0;
     }
 }
 
@@ -49,7 +50,8 @@ class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 1;
-        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if !$!stream-identifier.defined
+                                                             || $!stream-identifier == 0;
     }
 }
 
@@ -61,7 +63,8 @@ class Cro::HTTP2::Frame::Priority does Cro::HTTP2::Frame {
     submethod TWEAK() {
         $!type = 2;
         die X::Cro::HTTP2::Error.new(code => INTERNAL_ERROR) if $!flags != 0;
-        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if !$!stream-identifier.defined
+                                                             || $!stream-identifier == 0;
     }
 }
 
@@ -93,7 +96,8 @@ class Cro::HTTP2::Frame::PushPromise does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 5;
-        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier == 0;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if !$!stream-identifier.defined
+                                                             || $!stream-identifier == 0;
     }
 }
 
@@ -104,7 +108,8 @@ class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
 
     submethod TWEAK() {
         $!type = 6;
-        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $!stream-identifier != 0;
+        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if !$!stream-identifier.defined
+                                                             || $!stream-identifier == 0;
         if $!payload.elems < 8 {
             $!payload = $!payload ~ Blob.new((0x0 xx (8 - $!payload.elems)))
         } elsif $!payload.elems > 8 {
