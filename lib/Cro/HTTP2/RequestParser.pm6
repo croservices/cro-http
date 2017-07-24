@@ -16,6 +16,9 @@ my class Stream {
 }
 
 class Cro::HTTP2::RequestParser does Cro::Transform {
+    has $.ping;
+    has $.settings;
+
     method consumes() { Cro::HTTP2::Frame  }
     method produces() { Cro::HTTP::Request }
 
@@ -104,28 +107,18 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                     }
                 }
                 when Cro::HTTP2::Frame::Priority {
-                    my $state = %streams{.stream-identifier}.state;
-                    die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $state !~~ header-init|data;
                 }
                 when Cro::HTTP2::Frame::RstStream {
-                    my $state = %streams{.stream-identifier}.state;
-                    die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $state !~~ header-init|data;
                 }
                 when Cro::HTTP2::Frame::Settings {
-                    my $state = %streams{.stream-identifier}.state;
-                    die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $state !~~ header-init|data;
+                    $!settings.emit: $_;
                 }
                 when Cro::HTTP2::Frame::Ping {
-                    my $state = %streams{.stream-identifier}.state;
-                    die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $state !~~ header-init|data;
+                    $!ping.emit: $_;
                 }
                 when Cro::HTTP2::Frame::Goaway {
-                    my $state = %streams{.stream-identifier}.state;
-                    die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $state !~~ header-init|data;
                 }
                 when Cro::HTTP2::Frame::WindowUpdate {
-                    my $state = %streams{.stream-identifier}.state;
-                    die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $state !~~ header-init|data;
                 }
                 when Cro::HTTP2::Frame::Continuation {
                     if .stream-identifier > $curr-sid

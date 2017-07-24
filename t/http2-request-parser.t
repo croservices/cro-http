@@ -7,10 +7,19 @@ use Test;
 my $encoder = HTTP::HPACK::Encoder.new;
 my ($buf, @headers);
 
-sub test(@frames, $count, $desc, @checks, :$fail) {
-    my $parser = Cro::HTTP2::RequestParser;
-    my $fake-in = Supplier.new;
+sub test(@frames, $count, $desc, @checks, :$fail, :$test-supplies) {
+    my ($ping, $settings);
     my $test-completed = Promise.new;
+    with $test-supplies {
+        $ping = Supplier.new;
+        $settings = Supplier.new;
+        $ping.Supply.tap: -> $ping {
+            $test-completed.keep;
+            $test-supplies.keep;
+        };
+    }
+    my $parser = Cro::HTTP2::RequestParser.new(:$ping);
+    my $fake-in = Supplier.new;
     my $counter = 0;
     $parser.transformer($fake-in.Supply).tap:
     -> $request {
@@ -34,7 +43,7 @@ sub test(@frames, $count, $desc, @checks, :$fail) {
         pass $desc;
     } else {
         die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $fail;
-        flunk $desc;
+        flunk $desc unless $test-supplies;
     }
 }
 
@@ -233,5 +242,17 @@ throws-like {
           [(*.method eq 'POST'),
            (*.target eq '/resource')]], fail => True;
 }, X::Cro::HTTP2::Error, 'Unfinished header cannot be interrupted';
+
+my $p = Promise.new;
+test (Cro::HTTP2::Frame::Ping.new(
+             stream-identifier => 0,
+             flags => 0,
+             payload => 'Liberate'.encode)).List,
+     0, 'Ping',
+     [], test-supplies => $p;
+await Promise.anyof($p, Promise.in(5));
+if $p.status ~~ Kept {
+    pass 'Ping is sent';
+}
 
 done-testing;
