@@ -109,7 +109,7 @@ class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
     submethod TWEAK() {
         $!type = 6;
         die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if !$!stream-identifier.defined
-                                                             || $!stream-identifier == 0;
+                                                             || $!stream-identifier != 0;
         if $!payload.elems < 8 {
             $!payload = $!payload ~ Blob.new((0x0 xx (8 - $!payload.elems)))
         } elsif $!payload.elems > 8 {
