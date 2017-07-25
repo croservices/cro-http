@@ -3,6 +3,9 @@ use Cro::HTTP2::Frame;
 use Cro::Transform;
 
 class Cro::HTTP2::FrameSerializer does Cro::Transform {
+    has Supply $.settings;
+    has $!MAX-FRAME-SIZE;
+
     method consumes() { Cro::HTTP2::Frame }
     method produces() { Cro::TCP::Message }
 
@@ -11,6 +14,16 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
             enum State <Header Payload>;
             my $buffer;
             my $expecting = Header;
+
+            if $.settings {
+                whenever $.settings {
+                    for $_.kv -> ($code, $value) {
+                        if $code == 5 {
+                            $!MAX-FRAME-SIZE = $value;
+                        }
+                    }
+                }
+            }
 
             whenever $in -> Cro::HTTP2::Frame $message {
                 my $result;
