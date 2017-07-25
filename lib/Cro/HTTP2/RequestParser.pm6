@@ -60,13 +60,14 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                 when Cro::HTTP2::Frame::Headers {
                     if .stream-identifier > $curr-sid {
                         $curr-sid = .stream-identifier;
-                        %streams{$curr-sid} = Stream.new(sid => $curr-sid,
-                                                         state => header-init,
-                                                         request => Cro::HTTP::Request.new(
-                                                             http2-stream-id => .stream-identifier
-                                                         ),
-                                                         stream-end => False,
-                                                         body => Supplier::Preserving.new);
+                        %streams{$curr-sid} = Stream.new(
+                            sid => $curr-sid,
+                            state => header-init,
+                            request => Cro::HTTP::Request.new(
+                                http2-stream-id => .stream-identifier
+                            ),
+                            stream-end => False,
+                            body => Supplier::Preserving.new);
                         %streams{$curr-sid}.request.http-version = 'http/2';
                     }
                     my $request = %streams{.stream-identifier}.request;
