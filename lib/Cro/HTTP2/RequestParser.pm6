@@ -13,6 +13,7 @@ my class Stream {
     has $.request;
     has Bool $.stream-end is rw;
     has Supplier $.body;
+    has Buf $.headers is rw;
 }
 
 class Cro::HTTP2::RequestParser does Cro::Transform {
@@ -73,18 +74,11 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                     my $request = %streams{.stream-identifier}.request;
                     $request.set-body-byte-stream(%streams{.stream-identifier}.body.Supply);
 
-                    my @headers = $decoder.decode-headers(.headers);
-                    my @real-headers = @headers.grep({ not .name eq any($pseudo-headers) });
-
-                    for @real-headers {
-                        $request.append-header(.name => .value);
-                    }
-
-                    unless $request.method {
-                        $request.method = @headers.grep({ .name eq ':method' })[0].value;
-                    }
-                    unless $request.target {
-                        $request.target = @headers.grep({ .name eq ':path'   })[0].value;
+                    if .end-headers {
+                        self!set-headers($decoder, $request, .headers);
+                    } else {
+                        %streams{.stream-identifier}.headers = (%streams{.stream-identifier}.headers // Buf.new)
+                                                             ~ .headers;
                     }
 
                     if .end-headers && .end-stream {
@@ -126,15 +120,19 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                     || %streams{.stream-identifier}.state !~~ header-c {
                         die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR)
                     }
-
                     my $request = %streams{.stream-identifier}.request;
-                    my @headers = $decoder.decode-headers(.headers);
-                    for @headers {
-                        $request.append-header(.name => .value);
-                    }
 
                     # Unbreak lock
                     ($breakable, $break) = (True, 0) if .end-headers;
+
+                    if .end-headers {
+                        my $headers = %streams{.stream-identifier}.headers ~ .headers;
+                        self!set-headers($decoder, $request, $headers);
+                        %streams{.stream-identifier}.headers = Buf.new;
+                    } else {
+                        %streams{.stream-identifier}.headers = (%streams{.stream-identifier}.headers // Buf.new)
+                                                             ~ .headers;
+                    }
 
                     if %streams{.stream-identifier}.stream-end && .end-headers {
                         if $request.target && $request.method {
@@ -148,5 +146,13 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                 }
             }
         }
+    }
+
+    method !set-headers($decoder, $request, $headers) {
+        my @headers = $decoder.decode-headers($headers);
+        $request.method = @headers.grep({ .name eq ':method' })[0].value unless $request.method;
+        $request.target = @headers.grep({ .name eq ':path'   })[0].value unless $request.target;
+        my @real-headers = @headers.grep({ not .name eq any($pseudo-headers) });
+        for @real-headers { $request.append-header(.name => .value) }
     }
 }

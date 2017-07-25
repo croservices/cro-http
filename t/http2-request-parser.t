@@ -72,14 +72,15 @@ $encoder = HTTP::HPACK::Encoder.new;
            HTTP::HPACK::Header.new(name => 'content-length', value => '123'),
            HTTP::HPACK::Header.new(name => 'foo', value => 'bar');
 
+$buf = $encoder.encode-headers(@headers);
 test (Cro::HTTP2::Frame::Headers.new(
              stream-identifier => 3,
              flags => 1,
-             headers => $encoder.encode-headers(@headers[0..2])),
+             headers => $buf.subbuf(0, 10)),
       Cro::HTTP2::Frame::Continuation.new(
              stream-identifier => 3,
              flags => 4,
-             headers => $encoder.encode-headers(@headers[3..5]))),
+             headers => $buf.subbuf(10))),
      1, 'Headers + Continuation',
      [(*.method eq 'POST'),
       (*.target eq '/resource'),
@@ -103,15 +104,16 @@ test (Cro::HTTP2::Frame::Headers.new(
       (*.body-blob.result eq $payload)];
 
 $encoder = HTTP::HPACK::Encoder.new;
+$buf = $encoder.encode-headers(@headers);
 $payload = Buf.new(<0 1>.pick xx 20);
 test (Cro::HTTP2::Frame::Headers.new(
              stream-identifier => 3,
              flags => 0,
-             headers => $encoder.encode-headers(@headers[0..2])),
+             headers => $buf.subbuf(0,10)),
       Cro::HTTP2::Frame::Continuation.new(
              stream-identifier => 3,
              flags => 4,
-             headers => $encoder.encode-headers(@headers[3..5])),
+             headers => $buf.subbuf(10)),
       Cro::HTTP2::Frame::Data.new(
              stream-identifier => 3,
              flags => 1,
@@ -125,15 +127,16 @@ test (Cro::HTTP2::Frame::Headers.new(
        (*.body-blob.result eq $payload)];
 
 $encoder = HTTP::HPACK::Encoder.new;
+$buf = $encoder.encode-headers(@headers[0..5]);
 $payload = Buf.new(<0 1>.pick xx 20);
 test (Cro::HTTP2::Frame::Headers.new(
              stream-identifier => 3,
              flags => 0,
-             headers => $encoder.encode-headers(@headers[0..2])),
+             headers => $buf.subbuf(0,10)),
       Cro::HTTP2::Frame::Continuation.new(
              stream-identifier => 3,
              flags => 4,
-             headers => $encoder.encode-headers(@headers[3..5])),
+             headers => $buf.subbuf(10)),
       Cro::HTTP2::Frame::Data.new(
              stream-identifier => 3,
              flags => 0,
@@ -141,7 +144,7 @@ test (Cro::HTTP2::Frame::Headers.new(
       Cro::HTTP2::Frame::Headers.new(
              stream-identifier => 3,
              flags => 5,
-             headers => $encoder.encode-headers([@headers[6]]))),
+             headers => $encoder.encode-headers(@headers[5].List))),
      1, 'Headers + Continuation + Data + Headers',
      [(*.method eq 'POST'),
       (*.target eq '/resource'),
@@ -199,14 +202,15 @@ test (Cro::HTTP2::Frame::Headers.new(
        (*.body-blob.result eq $payload ~ $payload)]];
 
 $encoder = HTTP::HPACK::Encoder.new;
+$buf = $encoder.encode-headers(@headers);
 test (Cro::HTTP2::Frame::Headers.new(
           stream-identifier => 3,
           flags => 0,
-          headers => $encoder.encode-headers(@headers[0..3])),
+          headers => $buf.subbuf(0, 10)),
       Cro::HTTP2::Frame::Continuation.new(
           stream-identifier => 3,
           flags => 4,
-          headers => $encoder.encode-headers(@headers[3..5])),
+          headers => $buf.subbuf(10)),
       Cro::HTTP2::Frame::Headers.new(
           stream-identifier => 5,
           flags => 5,
