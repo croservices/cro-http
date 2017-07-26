@@ -8,9 +8,9 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
     method produces() { Cro::HTTP2::Frame   }
 
     method transformer(Supply:D $in) {
-        my $encoder = HTTP::HPACK::Encoder.new;
         supply {
             whenever $in -> Cro::HTTP::Response $resp {
+                my $encoder = HTTP::HPACK::Encoder.new;
                 my @headers = $resp.headers.map({ HTTP::HPACK::Header.new(
                                                         name  => .name,
                                                         value => .value.Str) });
