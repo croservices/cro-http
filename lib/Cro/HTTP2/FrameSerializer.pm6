@@ -4,32 +4,60 @@ use Cro::Transform;
 
 class Cro::HTTP2::FrameSerializer does Cro::Transform {
     has Supply $.settings;
-    has $!MAX-FRAME-SIZE;
+    has $!MAX-FRAME-SIZE = 2 ** 14;
 
     method consumes() { Cro::HTTP2::Frame }
     method produces() { Cro::TCP::Message }
 
     method transformer(Supply:D $in) {
         supply {
+            sub send-message($frame) {
+                my $result = self!form-header($frame);
+                self!serializer($result, $frame);
+                emit Cro::TCP::Message.new(data => $result);
+            }
+
             enum State <Header Payload>;
             my $buffer;
             my $expecting = Header;
 
-            if $.settings {
+            with $.settings {
                 whenever $.settings {
-                    for $_.kv -> ($code, $value) {
-                        if $code == 5 {
-                            $!MAX-FRAME-SIZE = $value;
+                    for .settings -> $pair {
+                        if $pair.key == 5 {
+                            $!MAX-FRAME-SIZE = $pair.value;
                         }
                     }
                 }
             }
 
-            whenever $in -> Cro::HTTP2::Frame $message {
-                my $result;
-                $result = self!form-header($message);
-                self!serializer($result, $message);
-                emit Cro::TCP::Message.new(data => $result);
+            whenever $in -> Cro::HTTP2::Frame $frame {
+                if $frame ~~ Cro::HTTP2::Frame::Headers {
+                    if $frame.headers + 9 > $!MAX-FRAME-SIZE {
+                        my $headers = $frame.headers;
+                        my $flag = $frame.flags == 4 ?? 0 !! 1;
+                        # Send header
+                        send-message($frame.clone(
+                                            flags => $flag,
+                                            headers => $headers.subbuf(0, $!MAX-FRAME-SIZE-9)));
+                        $headers = $headers.subbuf($!MAX-FRAME-SIZE-9);
+                        while $headers.elems > 0 {
+                            my $sent = $headers.elems < $!MAX-FRAME-SIZE-9
+                                    ?? $headers.elems
+                                    !! $!MAX-FRAME-SIZE-9;
+                            send-message(Cro::HTTP2::Frame::Continuation.new(
+                                                stream-identifier => $frame.stream-identifier,
+                                                flags => $headers.elems < $!MAX-FRAME-SIZE-9 ?? 1 !! 0,
+                                                headers => $headers.subbuf(0, $sent)
+                            ));
+                            $headers .= subbuf($sent);
+                        }
+                    } else {
+                        send-message($frame);
+                    }
+                } else {
+                    send-message($frame);
+                }
             }
         }
     }
