@@ -52,14 +52,14 @@ test [$req], 1, 'Header',
        (*.headers eq $encoder.encode-headers(@headers))],];
 
 @headers = HTTP::HPACK::Header.new(name => 'Content-Type', value => 'image/jpeg'),
-           HTTP::HPACK::Header.new(name => 'Content-Length', value => '123'),
+           HTTP::HPACK::Header.new(name => 'Content-length', value => '123'),
            HTTP::HPACK::Header.new(name => ':status', value => '200');
 $body = Buf.new: <0 1>.pick xx 123;
 
 $req = Cro::HTTP::Response.new(:200status,
                                request => Cro::HTTP::Request.new(:5http2-stream-id));
 $req.append-header('Content-Type' => 'image/jpeg');
-$req.append-header('Content-Length' => '123');
+$req.append-header('Content-length' => '123');
 $req.set-body: $body;
 test [$req], 2, 'Header + Data',
      [[(* ~~ Cro::HTTP2::Frame::Headers),

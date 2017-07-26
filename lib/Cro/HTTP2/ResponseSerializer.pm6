@@ -10,7 +10,21 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
     method transformer(Supply:D $in) {
         supply {
             whenever $in -> Cro::HTTP::Response $resp {
+                my $body-byte-stream;
                 my $encoder = HTTP::HPACK::Encoder.new;
+                if $resp.has-body {
+                    try {
+                        CATCH {
+                            when X::Cro::HTTP::BodySerializerSelector::NoneApplicable {
+                                $resp.status = 500;
+                                $resp.remove-header({ True });
+                                $resp.append-header('Content-Length', 0);
+                                $body-byte-stream = supply {};
+                            }
+                        }
+                        $body-byte-stream = $resp.body-byte-stream;
+                    }
+                }
                 my @headers = $resp.headers.map({ HTTP::HPACK::Header.new(
                                                         name  => .name,
                                                         value => .value.Str) });
@@ -24,19 +38,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                 );
 
                 if $resp.has-body {
-                    my $body-byte-stream;
-                    try {
-                        CATCH {
-                            when X::Cro::HTTP::BodySerializerSelector::NoneApplicable {
-                                $resp.status = 500;
-                                $resp.remove-header({ True });
-                                $resp.append-header('Content-length', 0);
-                                $body-byte-stream = supply {};
-                            }
-                        }
-                        $body-byte-stream = $resp.body-byte-stream;
-                    }
-                    my $counter = $resp.header('Content-length');
+                    my $counter = $resp.header('Content-Length');
                     whenever $body-byte-stream {
                         $counter -= .elems;
                         emit Cro::HTTP2::Frame::Data.new(
