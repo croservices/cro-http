@@ -9,6 +9,12 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
 
     method transformer(Supply:D $in) {
         supply {
+            sub emit-data($flags, $stream-identifier, $data) {
+                emit Cro::HTTP2::Frame::Data.new(
+                    :$flags, :$stream-identifier, :$data
+                );
+            }
+
             whenever $in -> Cro::HTTP::Response $resp {
                 my $body-byte-stream;
                 my $encoder = HTTP::HPACK::Encoder.new;
@@ -38,14 +44,24 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                 );
 
                 if $resp.has-body {
-                    my $counter = $resp.header('Content-Length');
-                    whenever $body-byte-stream {
-                        $counter -= .elems;
-                        emit Cro::HTTP2::Frame::Data.new(
-                            flags => $counter == 0 ?? 1 !! 0,
-                            stream-identifier => $resp.request.http2-stream-id,
-                            data => $_
-                        );
+                    with $resp.header('Content-Length') {
+                        my $counter = $_;
+                        whenever $body-byte-stream {
+                            $counter -= .elems;
+                            die 'Content-Length setting is incorrect: too small' if $counter < 0;
+                            emit-data($counter == 0 ?? 1 !! 0,
+                                      $resp.request.http2-stream-id, $_);
+                            LAST {
+                                die 'Content-Length setting is incorrect: too big' if $counter > 0;
+                            }
+                        }
+                    } else {
+                        whenever $body-byte-stream {
+                            emit-data(0, $resp.request.http2-stream-id, $_);
+                            LAST {
+                                emit-data(1, $resp.request.http2-stream-id, Buf.new);
+                            }
+                        }
                     }
                 }
             }

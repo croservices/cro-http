@@ -9,7 +9,7 @@ my ($req, @headers, $body);
 my $decoder = HTTP::HPACK::Decoder.new;
 my $encoder = HTTP::HPACK::Encoder.new;
 
-sub test(@requests, $count, $desc, *@checks) {
+sub test(@requests, $count, $desc, *@checks, :$fail) {
     my $test-completed = Promise.new;
     my $serializer = Cro::HTTP2::ResponseSerializer.new;
     my $fake-in = Supplier.new;
@@ -35,7 +35,8 @@ sub test(@requests, $count, $desc, *@checks) {
     if $test-completed.status ~~ Kept {
         pass $desc;
     } else {
-        flunk $desc;
+        die if $fail;
+        flunk $desc unless $fail;
     }
 }
 
@@ -70,5 +71,52 @@ test [$req], 2, 'Header + Data',
        (*.flags == 1),
        (*.stream-identifier == 5),
        (*.data eq $body)]];
+
+$encoder = HTTP::HPACK::Encoder.new;
+@headers = HTTP::HPACK::Header.new(name => 'Content-Type', value => 'image/jpeg'),
+           HTTP::HPACK::Header.new(name => ':status', value => '200');
+$body = Supplier::Preserving.new;
+my $random = Buf.new: <0 1>.pick xx 150;
+$body.emit: $random;
+$body.done;
+$req = Cro::HTTP::Response.new(:200status,
+                               request => Cro::HTTP::Request.new(:5http2-stream-id));
+$req.append-header('Content-Type' => 'image/jpeg');
+$req.set-body: $body.Supply;
+test [$req], 3, 'Header + Data - Content-Length unspecified',
+     [[(* ~~ Cro::HTTP2::Frame::Headers),
+       (*.flags == 4),
+       (*.stream-identifier == 5),
+       (*.headers eq $encoder.encode-headers(@headers))],
+      [(* ~~ Cro::HTTP2::Frame::Data),
+       (*.flags == 0),
+       (*.stream-identifier == 5),
+       (*.data eq $random)],
+      [(* ~~ Cro::HTTP2::Frame::Data),
+       (*.flags == 1),
+       (*.stream-identifier == 5),
+       (*.data eq Buf.new)]];
+
+dies-ok {
+    my $body = Supplier::Preserving.new;
+    $body.emit: Buf.new: <0 1>.pick xx 100;
+    $body.done;
+    $req = Cro::HTTP::Response.new(:200status,
+                                   request => Cro::HTTP::Request.new(:5http2-stream-id));
+    $req.append-header('Content-length' => '123');
+    $req.set-body: $body.Supply;
+    test [$req], 3, 'Header + Data', [], :fail;
+}, 'Too small body throws';
+
+dies-ok {
+    my $body = Supplier::Preserving.new;
+    $body.emit: Buf.new: <0 1>.pick xx 123;
+    $body.done;
+    $req = Cro::HTTP::Response.new(:200status,
+                                   request => Cro::HTTP::Request.new(:5http2-stream-id));
+    $req.append-header('Content-length' => '100');
+    $req.set-body: $body.Supply;
+    test [$req], 3, 'Header + Data', [], :fail;
+}, 'Too big body throws';
 
 done-testing;
