@@ -28,7 +28,25 @@ class Cro::HTTP::Server does Cro::Service {
                     :$add-body-serializers, :$body-serializers,
                     :$http,
                     :$label = "HTTP($port)") {
-        %ssl<http> = $http if %ssl && $http;
+        if $http && %ssl {
+            if $http == <1.1 2> && supports-alpn() {
+                die 'HTTP/2 is specified, however ALPN is not supported';
+            } elsif $_ == <1.1 2> {
+                %ssl<alpn> = <h2 http/1.1>
+            } elsif $_ == <1.1> {
+                %ssl<alpn> = <http/1.1>
+            } else {
+                die 'Unrecognized value for :$http parameter';
+            }
+        }
+        if %ssl {
+            if supports-alpn() {
+                %ssl<alpn> = <h2 http/1.1>
+            } else {
+                %ssl<alpn> = <http/1.1>
+            }
+        }
+
         my $listener = %ssl
             ?? Cro::SSL::Listener.new(
                   |(:$host with $host),
