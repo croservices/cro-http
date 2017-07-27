@@ -123,7 +123,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
                 die INTERNAL_ERROR;
             }
         }
-        when Cro::HTTP2::Frame::Goaway {
+        when Cro::HTTP2::Frame::GoAway {
             my $num = .last-sid;
             for 24, 16...0 { $buf.append: (($num +> $_) +& 0xFF); }
             $num = ErrorCode(.error-code) // INTERNAL_ERROR;
@@ -175,7 +175,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
             when Cro::HTTP2::Frame::Ping {
                 for 16, 8...0 { $buf[$i] = (8 +> $_) +& 0xFF; $i++; }
             }
-            when Cro::HTTP2::Frame::Goaway {
+            when Cro::HTTP2::Frame::GoAway {
                 my $num = .debug.elems + 8;
                 for 16, 8...0 { $buf[$i] = ($num +> $_) +& 0xFF; $i++; }
             }
@@ -196,7 +196,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
         my $num = .stream-identifier;
         die PROTOCOL_ERROR if $num != 0 && $_ ~~ Cro::HTTP2::Frame::Settings;
         die PROTOCOL_ERROR if $num != 0 && $_ ~~ Cro::HTTP2::Frame::Ping;
-        die PROTOCOL_ERROR if $num != 0 && $_ ~~ Cro::HTTP2::Frame::Goaway;
+        die PROTOCOL_ERROR if $num != 0 && $_ ~~ Cro::HTTP2::Frame::GoAway;
         for 24, 16...0 {
             $buf[$i] = ($num +> $_) +& 0xFF; $i++;
         }

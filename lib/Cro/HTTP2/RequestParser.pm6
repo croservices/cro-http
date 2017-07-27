@@ -111,7 +111,7 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                 when Cro::HTTP2::Frame::Ping {
                     $!ping.emit: $_;
                 }
-                when Cro::HTTP2::Frame::Goaway {
+                when Cro::HTTP2::Frame::GoAway {
                 }
                 when Cro::HTTP2::Frame::WindowUpdate {
                 }

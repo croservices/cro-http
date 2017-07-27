@@ -118,7 +118,7 @@ class Cro::HTTP2::Frame::Ping does Cro::HTTP2::Frame {
     }
 }
 
-class Cro::HTTP2::Frame::Goaway does Cro::HTTP2::Frame {
+class Cro::HTTP2::Frame::GoAway does Cro::HTTP2::Frame {
     has UInt $.last-sid;
     has UInt $.error-code;
     has Blob $.debug;

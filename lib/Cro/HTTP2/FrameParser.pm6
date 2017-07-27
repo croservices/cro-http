@@ -147,7 +147,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                    +|  $data[7];
         $error-code = ErrorCode($error-code) // INTERNAL_ERROR;
         $debug = utf8.new: $data.subbuf(8, $length);
-        Cro::HTTP2::Frame::Goaway.new(:$last-sid, :$error-code, :$debug, |%header);
+        Cro::HTTP2::Frame::GoAway.new(:$last-sid, :$error-code, :$debug, |%header);
     }
     my multi sub payload(8, Buf $data is rw, $length, *%header) {
         die X::Cro::HTTP2::Error.new(code => FRAME_SIZE_ERROR) if $length != 4;

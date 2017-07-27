@@ -150,14 +150,14 @@ dies-ok {
                                                 payload => Blob.new(0x0 xx 10));
 }, 'Ping payload cannot be more than 8 bytes';
 
-test-example Cro::HTTP2::Frame::Goaway.new(flags => 0, stream-identifier => 0,
+test-example Cro::HTTP2::Frame::GoAway.new(flags => 0, stream-identifier => 0,
                                            last-sid => 64, error-code => REFUSED_STREAM,
                                            debug => 'hello'.encode),
     Buf.new([0x00, 0x00, 0x0D, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x07, 0x68, 0x65, 0x6c, 0x6c, 0x6f]),
     'Simple GoAway frame';
 
-test-example Cro::HTTP2::Frame::Goaway.new(flags => 0, stream-identifier => 0,
+test-example Cro::HTTP2::Frame::GoAway.new(flags => 0, stream-identifier => 0,
                                            last-sid => 64, error-code => 50,
                                            debug => 'hello'.encode),
     Buf.new([0x00, 0x00, 0x0D, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,

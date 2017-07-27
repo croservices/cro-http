@@ -30,7 +30,7 @@ dies-ok { Cro::HTTP2::Frame::Ping.new(
                 payload => Blob.new) },
     'Ping stream-identifier cannot be non-zero';
 
-dies-ok { Cro::HTTP2::Frame::Goaway.new(
+dies-ok { Cro::HTTP2::Frame::GoAway.new(
                 flags => 1, stream-identifier => 30,
                 last-sid => 64, error-code => 0, payload => Blob.new) },
     'GOAWAY Frame stream-identifier cannot be non-zero';
