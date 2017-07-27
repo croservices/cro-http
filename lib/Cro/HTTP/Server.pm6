@@ -26,7 +26,9 @@ class Cro::HTTP::Server does Cro::Service {
                     :$after, :$after-serialize,
                     :$add-body-parsers, :$body-parsers,
                     :$add-body-serializers, :$body-serializers,
+                    :$http,
                     :$label = "HTTP($port)") {
+        %ssl<http> = $http if %ssl && $http;
         my $listener = %ssl
             ?? Cro::SSL::Listener.new(
                   |(:$host with $host),
