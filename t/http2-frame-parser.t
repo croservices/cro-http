@@ -37,11 +37,16 @@ sub test-dying($data, $exception, $code, $desc) {
 }
 
 sub test-example($buffer, $result, $desc) {
-    my $parser = Cro::HTTP2::FrameParser.new;
+    my $settings = Supplier::Preserving.new;
+    my $parser = Cro::HTTP2::FrameParser.new(settings => $settings);
     my $serializer = Cro::HTTP2::FrameSerializer.new;
     my $fake-in-p = Supplier.new;
     my $fake-in-s = Supplier.new;
     my $complete = Promise.new;
+    $settings.Supply.tap: -> $settings {
+        is-deeply $settings, $result, $desc;
+        $complete.keep;
+    }
     $parser.transformer($fake-in-p.Supply).schedule-on($*SCHEDULER).tap: -> $frame {
         is-deeply $frame, $result, $desc;
         $serializer.transformer($fake-in-s.Supply).schedule-on($*SCHEDULER).tap: -> $message {
@@ -129,12 +134,6 @@ test-dying Buf.new([0x00, 0x00, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01,
            X::Cro::HTTP2::Error, FRAME_SIZE_ERROR,
            'RST_STREAM Frame length is always 4 bytes';
 
-test-example Buf.new([0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00]),
-             Cro::HTTP2::Frame::Settings.new(
-                 flags => 0, stream-identifier => 0,
-                 headers => buf8.new),
-             'SETTINGS frame with zero content';
-
 test-dying Buf.new([0x00, 0x00, 0x01, 0x04, 0x01, 0x00, 0x00, 0x00, 0x01,
                     0x00]),
            X::Cro::HTTP2::Error, FRAME_SIZE_ERROR,
@@ -155,5 +154,10 @@ test-dying Buf.new([0x00, 0x00, 0x03, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
            X::Cro::HTTP2::Error, FRAME_SIZE_ERROR,
            'WindowIncrement Frame length is always 4';
 
+test-example Buf.new([0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00]),
+              Cro::HTTP2::Frame::Settings.new(
+                  flags => 0,
+                  stream-identifier => 0),
+              'SETTINGS frame with zero content is emitted correctly';
 
 done-testing;

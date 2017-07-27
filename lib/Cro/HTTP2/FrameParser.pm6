@@ -3,6 +3,9 @@ use Cro::HTTP2::Frame;
 use Cro::Transform;
 
 class Cro::HTTP2::FrameParser does Cro::Transform {
+    has $.settings;
+    has $.ping;
+
     method consumes() { Cro::TCP::Message }
     method produces() { Cro::HTTP2::Frame }
 
@@ -37,7 +40,14 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                     }
                     when Payload {
                         if $data.elems >= $length {
-                            emit payload($type, $data, $length, :$flags, stream-identifier => $sid);
+                            my $result = payload($type, $data, $length, :$flags, stream-identifier => $sid);
+                            if $result ~~ Cro::HTTP2::Frame::Settings {
+                                $!settings.emit($result);
+                            } elsif $result ~~ Cro::HTTP2::Frame::Ping {
+                                $!ping.emit($result);
+                            } else {
+                                emit $result;
+                            }
                             $data .= subbuf($length);
                             $expecting = Header; next if $data.elems > 0;
                         } else {
