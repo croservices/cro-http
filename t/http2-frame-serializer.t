@@ -179,10 +179,19 @@ test-example Cro::HTTP2::Frame::Continuation.new(flags => 4, stream-identifier =
 # Too long header
 my $headers = Buf.new(<0 1>.pick xx 15);
 test-multi Cro::HTTP2::Frame::Headers.new(flags => 5, stream-identifier => 1, :$headers),
-           [Buf.new(Buf.new([0x00, 0x00, 0x0b, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01])
-                    ~ $headers.subbuf(0, 11)),
-            Buf.new(Buf.new([0x00, 0x00, 0x04, 0x09, 0x01, 0x00, 0x00, 0x00, 0x01])
-                    ~ $headers.subbuf(11))],
+           [Buf.new([0x00, 0x00, 0x0b, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01])
+            ~ $headers.subbuf(0, 11),
+            Buf.new([0x00, 0x00, 0x04, 0x09, 0x01, 0x00, 0x00, 0x00, 0x01])
+                    ~ $headers.subbuf(11)],
            2, 20, 'Too long Headers frame is splitted';
+
+my $data = Buf.new(<0 1>.pick xx 15);
+test-multi Cro::HTTP2::Frame::Data.new(flags => 1, stream-identifier => 1, :$data),
+           [Buf.new([0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01])
+                    ~ $data.subbuf(0, 11),
+            Buf.new([0x00, 0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01])
+                    ~ $data.subbuf(11)],
+           2, 20, 'Too long Data frame is splitted';
+
 
 done-testing;
