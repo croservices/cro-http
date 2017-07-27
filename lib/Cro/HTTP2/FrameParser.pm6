@@ -29,6 +29,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                             $length = ($data[0] +< 16) +| ($data[1] +< 8) +| $data[2];
                             $type = $data[3];
                             $flags = $data[4];
+                            $data[5] +&= 0x7F; # Reset first bit
                             $sid = ($data[5] +< 24) +| ($data[6] +< 16) +| ($data[7] +< 8) +| $data[8];
                             $data .= subbuf(9); # Header is parsed;
                             $expecting = Payload; next;
@@ -86,7 +87,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
     my multi sub payload(2, Buf $data is rw, $length, *%header) {
         die X::Cro::HTTP2::Error.new(code => FRAME_SIZE_ERROR) if $length != 5;
         my $exclusive = $data[0] +& (1 +< 7) != 0;
-        $data[0] = $data[0] +& 0x79; # Reset first bit.
+        $data[0] +&= 0x7F; # Reset first bit.
         my $dep = ($data[0] +< 24) +| ($data[1] +< 16) +| ($data[2] +< 8) +| $data[3];
         my $weight = $data[4];
         Cro::HTTP2::Frame::Priority.new(:$exclusive, dependency => $dep, :$weight, |%header);
