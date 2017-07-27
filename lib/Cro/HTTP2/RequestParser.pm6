@@ -150,8 +150,15 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
 
     method !set-headers($decoder, $request, $headers) {
         my @headers = $decoder.decode-headers($headers);
-        $request.method = @headers.grep({ .name eq ':method' })[0].value unless $request.method;
-        $request.target = @headers.grep({ .name eq ':path'   })[0].value unless $request.target;
+        my $fields = 0;
+        for @headers {
+            if .name eq ':method' {
+                $request.method = .value unless $request.method; $fields++;
+            } elsif .name eq ':path' {
+                $request.target = .value unless $request.target; $fields++;
+            }
+            last if $fields == 2;
+        }
         my @real-headers = @headers.grep({ not .name eq any($pseudo-headers) });
         for @real-headers { $request.append-header(.name => .value) }
     }
