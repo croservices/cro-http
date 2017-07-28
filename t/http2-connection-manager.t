@@ -19,8 +19,14 @@ class HTTPHello does Cro::Transform {
     }
 }
 
+constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
+constant %key-cert := {
+    private-key-file => 't/certs-and-keys/server-key.pem',
+    certificate-file => 't/certs-and-keys/server-crt.pem'
+};
+
 my Cro::Service $http2-service = Cro.compose(
-    Cro::SSL::Listener.new(port => 8000),
+    Cro::SSL::Listener.new(port => 8000, ssl => %key-cert),
     Cro::HTTP2::ConnectionManager.new(app => HTTPHello)
 );
 
