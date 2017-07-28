@@ -25,9 +25,9 @@ class Cro::HTTP2::ConnectionManager does Cro::Sink {
             my $settings = Supplier::Preserving.new;
             my $ping = Supplier::Preserving.new;
             my $fp = Cro::HTTP2::FrameParser.new(:$settings, :$ping);
-            my $fs = Cro::HTTP2::FrameSerializer(settings => $settings.Supply,
-                                                 ping => $ping.Supply);
-            my $to-sink = Cro.compose($fp, $!transformer, $fs);
+            my $fs = Cro::HTTP2::FrameSerializer.new(settings => $settings.Supply,
+                                                     ping => $ping.Supply);
+            my $to-sink = Cro.compose($fp, $!transformer, $fs).transformer($messages);
             my $sink = $connection.replier.sinker($to-sink);
             $sink.tap: quit => { .note };
         }
