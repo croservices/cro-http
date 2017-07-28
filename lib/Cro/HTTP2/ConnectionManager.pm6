@@ -1,4 +1,5 @@
 use Cro;
+use Cro::SSL;
 use Cro::HTTP2::FrameParser;
 use Cro::HTTP2::FrameSerializer;
 use Cro::HTTP2::RequestParser;
@@ -7,7 +8,7 @@ use Cro::HTTP2::ResponseSerializer;
 class Cro::HTTP2::ConnectionManager does Cro::Sink {
     has Cro::Transform $!transformer;
 
-    method consumes() { Cro::Connection:U }
+    method consumes() { Cro::SSL::ServerConnection }
 
     submethod BUILD(:$app) {
         my @components = (
