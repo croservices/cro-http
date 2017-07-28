@@ -21,6 +21,7 @@ class HTTPHello does Cro::Transform {
 
 constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
 constant %key-cert := {
+    alpn => 'h2',
     private-key-file => 't/certs-and-keys/server-key.pem',
     certificate-file => 't/certs-and-keys/server-crt.pem'
 };
