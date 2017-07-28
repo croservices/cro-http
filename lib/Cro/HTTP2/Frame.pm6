@@ -1,3 +1,5 @@
+use Cro::Message;
+
 enum Settings (:SETTINGS_HEADER_TABLE_SIZE(1) :SETTINGS_ENABLE_PUSH(2)
                :SETTINGS_MAX_CONCURRENT_STREAMS(3) :SETTINGS_INITIAL_WINDOW_SIZE(4)
                :SETTINGS_MAX_FRAME_SIZE(5) :SETTINGS_MAX_HEADER_LIST_SIZE(6));
@@ -16,7 +18,7 @@ class X::Cro::HTTP2::Error is Exception {
     method message() { "$!code" }
 }
 
-role Cro::HTTP2::Frame {
+role Cro::HTTP2::Frame does Cro::Message {
     has Int $.type;
     has Int $.flags;
     has Int $.stream-identifier;
