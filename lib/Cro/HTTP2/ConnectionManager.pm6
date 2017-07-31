@@ -28,8 +28,8 @@ class Cro::HTTP2::ConnectionManager does Cro::Sink {
     method sinker(Supply:D $incoming) {
         $incoming.do: -> $connection {
             my $messages = $connection.incoming;
-            my $settings = Supplier::Preserving.new;
-            my $ping = Supplier::Preserving.new;
+            my $settings = Supplier.new;
+            my $ping = Supplier.new;
             my $fp = Cro::HTTP2::FrameParser.new(:$settings, :$ping);
             my $fs = Cro::HTTP2::FrameSerializer.new(settings => $settings.Supply,
                                                      ping => $ping.Supply);
