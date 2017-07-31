@@ -32,8 +32,8 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                     }
                 }
                 my @headers = $resp.headers.map({ HTTP::HPACK::Header.new(
-                                                        name  => .name,
-                                                        value => .value.Str) });
+                                                        name  => .name.lc,
+                                                        value => .value.Str.lc) });
                 @headers.push: HTTP::HPACK::Header.new(
                     name => ':status',
                     value => $resp.status.Str);
