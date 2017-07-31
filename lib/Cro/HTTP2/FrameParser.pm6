@@ -35,6 +35,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                     if $data eq utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
                                          46,48,13,10,13,10,83,77,13,10,13,10) {
                         $!settings.emit(True);
+                        $data = Buf.new;
                         $preface = True;
                     } else {
                         die X::Cro::HTTP2::IncorrectPreface.new;
