@@ -97,6 +97,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
     }
     my multi sub payload(1, Buf $data is rw, $length, *%header) {
         my $padded = %header<flags> +& 0x8 == 0x8;
+        my $priority = %header<flags> +& 0x8 == 0x20;
         my $padding-length = $data[0] if $padded;
         with $padding-length {
             die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $_ >= $length;
@@ -105,13 +106,17 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
         # `-1` here is first byte that is padding-length
         ?? $data.subbuf(1, $length - $padding-length - 1)
         !! $data.subbuf(0, $length);
-        my ($dependency, $weight, $headers);
-        my $exclusive = $payload[0] +& (1 +< 7) != 0;
-        if $exclusive {
-            $dependency = ($data[0] +< 24) +| ($data[1] +< 16) +| ($data[2] +< 8) +| $data[3];
-            $weight = $data[4];
+        my ($dependency, $weight, $headers, $exclusive);
+        if $priority {
+            $exclusive = $payload[0] +& (1 +< 7) != 0;
+            if $exclusive {
+                $dependency = ($data[0] +< 24) +| ($data[1] +< 16) +| ($data[2] +< 8) +| $data[3];
+                $weight = $data[4];
+            }
+        } else {
+            $exclusive = False;
         }
-        $headers = utf8.new: $payload.subbuf($exclusive ?? 5 !! 0, $length);
+        $headers = Buf.new: $payload.subbuf($exclusive ?? 5 !! 0, $length);
         Cro::HTTP2::Frame::Headers.new(padding-length => $padding-length // UInt,
                                        dependency => $dependency // UInt,
                                        weight => $weight // UInt,
