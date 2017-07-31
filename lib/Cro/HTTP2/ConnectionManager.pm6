@@ -10,11 +10,17 @@ class Cro::HTTP2::ConnectionManager does Cro::Sink {
 
     method consumes() { Cro::SSL::ServerConnection }
 
-    submethod BUILD(:$app) {
+    submethod BUILD(:$app,
+                    :$before-parse = (), :$before = (),
+                    :$after = (), :$after-serializer = ()) {
         my @components = (
+            |$before-parse,
             Cro::HTTP2::RequestParser.new,
+            |$before,
             $app,
-            Cro::HTTP2::ResponseSerializer.new
+            |$after,
+            Cro::HTTP2::ResponseSerializer.new,
+            |$after-serializer
         );
         $!transformer = Cro.compose(service-type => self.WHAT, @components);
     }
