@@ -2,6 +2,10 @@ use Cro::TCP;
 use Cro::HTTP2::Frame;
 use Cro::Transform;
 
+class X::Cro::HTTP2::Disconnect is Exception {
+    method message() { "Connection unexpectedly closed in the middle of frame" }
+}
+
 class Cro::HTTP2::FrameParser does Cro::Transform {
     has $.settings;
     has $.ping;
@@ -54,6 +58,9 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                             $buffer.append: $data;
                         }
                     }
+                }
+                LAST {
+                    die X::Cro::HTTP2::Disconnect.new if $expecting != Header;
                 }
             }
         }
