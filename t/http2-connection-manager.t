@@ -9,8 +9,8 @@ class HTTPHello does Cro::Transform {
     method transformer($request-stream) {
         supply {
             whenever $request-stream -> $request {
-                given Cro::HTTP::Response.new(:200status) {
-                    .append-header('Content-type', 'text/html');
+                given Cro::HTTP::Response.new(:200status, :$request) {
+                    .append-header('content-type', 'text/html');
                     .set-body("<strong>Hello from Cro!</strong>");
                     .emit;
                 }
