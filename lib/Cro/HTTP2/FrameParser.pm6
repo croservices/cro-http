@@ -62,7 +62,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                         if $data.elems >= $length {
                             my $result = payload($type, $data, $length, :$flags, stream-identifier => $sid);
                             if $result ~~ Cro::HTTP2::Frame::Settings {
-                                $!settings.emit($result);
+                                $!settings.emit($result) unless $flags +& 1;
                             } elsif $result ~~ Cro::HTTP2::Frame::Ping {
                                 $!ping.emit($result);
                             } else {
