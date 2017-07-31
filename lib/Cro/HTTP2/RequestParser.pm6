@@ -25,7 +25,7 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
 
     method transformer(Supply:D $in) {
 
-        my $curr-sid = 1;
+        my $curr-sid = 0;
         my $decoder = HTTP::HPACK::Decoder.new;
         my %streams;
         my ($breakable, $break) = (True, $curr-sid);
