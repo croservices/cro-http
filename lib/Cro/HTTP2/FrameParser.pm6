@@ -6,6 +6,10 @@ class X::Cro::HTTP2::Disconnect is Exception {
     method message() { "Connection unexpectedly closed in the middle of frame" }
 }
 
+class X::Cro::HTTP2::IncorrectPreface is Exception {
+    method message() { "Client's HTTP/2 preface value is incorrect" }
+}
+
 class Cro::HTTP2::FrameParser does Cro::Transform {
     has $.settings;
     has $.ping;
@@ -20,11 +24,22 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
             my $buffer = Buf.new;
             my $length;
             my ($type, $flags, $sid);
+            my $preface = False;
             my Expecting $expecting = Header;
 
             whenever $in -> Cro::TCP::Message $packet {
                 my $data = $buffer ~ $packet.data;
                 $buffer = Buf.new;
+
+                unless $preface {
+                    if $data eq utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
+                                         46,48,13,10,13,10,83,77,13,10,13,10) {
+                        $!settings.emit(True);
+                        $preface = True;
+                    } else {
+                        die X::Cro::HTTP2::IncorrectPreface.new;
+                    }
+                }
 
                 loop {
                     $_ = $expecting;

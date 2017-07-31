@@ -53,9 +53,14 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
 
             with $.settings {
                 whenever $.settings {
-                    for .settings -> $pair {
-                        if $pair.key == SETTINGS_MAX_FRAME_SIZE {
-                            $!MAX-FRAME-SIZE = $pair.value;
+                    when Bool { # Preface case
+                        # Emit server negotiated settings
+                    }
+                    default {
+                        for .settings -> $pair {
+                            if $pair.key == SETTINGS_MAX_FRAME_SIZE {
+                                $!MAX-FRAME-SIZE = $pair.value;
+                            }
                         }
                     }
                 }
