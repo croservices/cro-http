@@ -13,7 +13,7 @@ ok Cro::HTTP2::FrameSerializer.produces === Cro::TCP::Message,
 
 sub test-example($frame, $result, $desc) {
     my $serializer = Cro::HTTP2::FrameSerializer.new;
-    my $parser = Cro::HTTP2::FrameParser.new;
+    my $parser = Cro::HTTP2::FrameParser.new(settings => Supplier.new);
     my $fake-in-s = Supplier.new;
     my $fake-in-p = Supplier.new;
     my $complete = Promise.new;
@@ -23,14 +23,25 @@ sub test-example($frame, $result, $desc) {
             is-deeply $newframe, $frame, $desc ~ ' is parsed back';
             $complete.keep;
         }
-        $fake-in-p.emit($message);
-        $fake-in-p.done;
+        # Preface
+        if $frame ~~ Cro::HTTP2::Frame::Settings|Cro::HTTP2::Frame::Ping {
+            $complete.keep
+        } else {
+            $fake-in-p.emit: Cro::TCP::Message.new(
+                data => utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
+                                 46,48,13,10,13,10,83,77,13,10,13,10));
+            $fake-in-p.emit($message);
+            $fake-in-p.done;
+        }
     }
     start {
         $fake-in-s.emit($frame);
         $fake-in-s.done;
     }
     await Promise.anyof($complete, Promise.in(5));
+    if $complete.status != Kept {
+        flunk "$desc is not parsed back!";
+    }
 }
 
 sub test-multi($frame, @result, $size, $max-frame-size, $desc) {
@@ -76,13 +87,13 @@ test-example Cro::HTTP2::Frame::Data.new(flags => 9, stream-identifier => 1,
     'Simple data frame with padding';
 
 test-example Cro::HTTP2::Frame::Headers.new(flags => 1, stream-identifier => 1,
-                                            headers => 'testdata'.encode),
+                                            headers => Buf.new('testdata'.encode)),
     Buf.new([0x00, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x00,
              0x01, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61]),
     'Simple headers frame';
 
 test-example Cro::HTTP2::Frame::Headers.new(flags => 9, stream-identifier => 1,
-                                            headers => 'testdata'.encode,
+                                            headers => Buf.new('testdata'.encode),
                                             padding-length => 10),
     Buf.new([0x00, 0x00, 0x13, 0x01, 0x09, 0x00, 0x00, 0x00, 0x01,
              0x0A, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61,
@@ -179,19 +190,20 @@ test-example Cro::HTTP2::Frame::Continuation.new(flags => 4, stream-identifier =
 # Too long header
 my $headers = Buf.new(<0 1>.pick xx 15);
 test-multi Cro::HTTP2::Frame::Headers.new(flags => 5, stream-identifier => 1, :$headers),
-           [Buf.new([0x00, 0x00, 0x0b, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01])
+           [Buf.new([0x00, 0x00, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00]),
+            Buf.new([0x00, 0x00, 0x0b, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01])
             ~ $headers.subbuf(0, 11),
             Buf.new([0x00, 0x00, 0x04, 0x09, 0x01, 0x00, 0x00, 0x00, 0x01])
                     ~ $headers.subbuf(11)],
-           2, 20, 'Too long Headers frame is splitted';
+           3, 20, 'Too long Headers frame is splitted';
 
 my $data = Buf.new(<0 1>.pick xx 15);
 test-multi Cro::HTTP2::Frame::Data.new(flags => 1, stream-identifier => 1, :$data),
-           [Buf.new([0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01])
+           [Buf.new([0x00, 0x00, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00]),
+            Buf.new([0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01])
                     ~ $data.subbuf(0, 11),
             Buf.new([0x00, 0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01])
                     ~ $data.subbuf(11)],
-           2, 20, 'Too long Data frame is splitted';
-
+           3, 20, 'Too long Data frame is splitted';
 
 done-testing;
