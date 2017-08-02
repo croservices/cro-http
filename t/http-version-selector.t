@@ -28,7 +28,7 @@ constant %key-cert := {
 
 my Cro::Service $http2-service = Cro.compose(
     Cro::SSL::Listener.new(port => 8000, |%key-cert),
-    Cro::HTTP::VersionSelector.new(app => HTTPHello)
+    Cro::HTTP::VersionSelector.new(application => HTTPHello)
 );
 
 $http2-service.start;

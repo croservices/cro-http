@@ -1,8 +1,19 @@
-use Cro::SSL;
 use Cro::HTTP2::ConnectionManager;
+use Cro::HTTP::Internal;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::ResponseSerializer;
+use Cro::SSL;
 use Cro;
+
+my class RequestParserExtension is ParserExtension {
+    method consumes() { Cro::HTTP::Request }
+    method produces() { Cro::HTTP::Request }
+}
+
+my class ResponseSerializerExtension is SerializerExtension {
+    method consumes() { Cro::HTTP::Response }
+    method produces() { Cro::HTTP::Response }
+}
 
 class Cro::HTTP::VersionSelector does Cro::Sink {
     has $!http1;
@@ -12,16 +23,27 @@ class Cro::HTTP::VersionSelector does Cro::Sink {
 
     method consumes() { Cro::SSL::ServerConnection }
 
-    submethod BUILD(:$app) {
+    submethod BUILD(:$application,
+                    :$before-parse = (), :$before = (),
+                    :$after = (), :$after-serialize = (),
+                    :$add-body-parsers, :$body-parsers,
+                    :$add-body-serializers, :$body-serializers
+                   ) {
         $!http2-supplier = Supplier.new;
-        $!http2 = Cro::HTTP2::ConnectionManager.new(:$app).sinker($!http2-supplier.Supply);
+        $!http2 = Cro::HTTP2::ConnectionManager.new(:$application).sinker($!http2-supplier.Supply);
         $!http1-supplier = Supplier.new;
         $!http1 = Cro::ConnectionManager.new(
             connection-type => Cro::SSL::ServerConnection,
             components => (
+                |$before-parse,
                 Cro::HTTP::RequestParser.new,
-                $app,
-                Cro::HTTP::ResponseSerializer.new
+                RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
+                |$before,
+                $application,
+                ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
+                |$after,
+                Cro::HTTP::ResponseSerializer.new,
+                |$after-serialize
             )
         ).sinker($!http1-supplier.Supply);
         $!http1.tap: quit => { .note };

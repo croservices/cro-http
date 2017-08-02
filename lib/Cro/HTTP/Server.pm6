@@ -22,60 +22,85 @@ class Cro::HTTP::Server does Cro::Service {
 
     only method new(Cro::Transform :$application!,
                     :$host, :$port, :%ssl,
-                    :$before-parse, :$before,
-                    :$after, :$after-serialize,
+                    :$before-parse = (), :$before = (),
+                    :$after = (), :$after-serialize = (),
                     :$add-body-parsers, :$body-parsers,
                     :$add-body-serializers, :$body-serializers,
                     :$http,
                     :$label = "HTTP($port)") {
-        if $http && %ssl {
-            if $http == <1.1 2> && supports-alpn() {
-                die 'HTTP/2 is specified, however ALPN is not supported';
-            } elsif $_ == <1.1 2> {
-                %ssl<alpn> = <h2 http/1.1>
-            } elsif $_ == <1.1> {
-                %ssl<alpn> = <http/1.1>
+
+        my %args = :$application,
+                   :$add-body-parsers, :$body-parsers,
+                   :$add-body-serializers, :$body-serializers,
+                   :$before-parse, :$before,
+                   :$after, :$after-serialize;
+        my $http-val = $http ?? $http !! ();
+
+        sub pack2(:$http2-only) {
+            my $listener = Cro::SSL::Listener.new(|(:$host with $host), |(:$port with $port), |%ssl);
+            if $http2-only {
+                return Cro.compose(
+                    service-type => self.WHAT,
+                    :$label,
+                    $listener,
+                    Cro::HTTP2::ConnectionManager(|%args)
+                )
             } else {
-                die 'Unrecognized value for :$http parameter';
+                return Cro.compose(
+                    service-type => self.WHAT,
+                    :$label,
+                    $listener,
+                    Cro::HTTP2::VersionSelector(|%args)
+                )
             }
         }
+
+        sub pack1($listener) {
+            Cro.compose(
+                service-type => self.WHAT,
+                :$label,
+                $listener,
+                |$before-parse,
+                Cro::HTTP::RequestParser.new,
+                RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
+                |$before,
+                $application,
+                ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
+                |$after,
+                Cro::HTTP::ResponseSerializer.new,
+                |$after-serialize
+            )
+        }
+
         if %ssl {
-            if supports-alpn() {
-                %ssl<alpn> = <h2 http/1.1>
+            if $http-val == <2> {
+                die 'HTTP?2 is requested, but ALPN is not supported' unless supports-alpn;
+                %ssl<alpn> = <h2>;
+                return pack2(:http2-only);
+            } elsif $http-val == <1.1 2> {
+                die 'HTTP?2 is requested, but ALPN is not supported' unless supports-alpn;
+                %ssl<alpn> = <h2 http/1.1>;
+                return pack2(:!http2-only);
+            } elsif so $http-val == <1.1>|() {
+                %ssl<alpn> = supports-alpn() ?? <h2 http/1.1> !! <http/1.1>;
+                my $listener = Cro::SSL::Listener.new(
+                    |(:$host with $host),
+                    |(:$port with $port),
+                    |%ssl);
+                return pack1($listener);
             } else {
-                %ssl<alpn> = <http/1.1>
+                die "Incorrect :$http parameter was passed to the server: $http-val"
             }
         }
-
-        my $listener = %ssl
-            ?? Cro::SSL::Listener.new(
-                  |(:$host with $host),
-                  |(:$port with $port),
-                  |%ssl
-               )
-            !! Cro::TCP::Listener.new(
-                  |(:$host with $host),
-                  |(:$port with $port)
-               );
-
-        my @before = self!convert-middleware($before);
-        my @after = self!convert-middleware($after);
-        my @before-parse = self!convert-middleware($before-parse);
-        my @after-serialize = self!convert-middleware($after-serialize);
-
-        return Cro.compose(
-            service-type => self.WHAT,
-            :$label,
-            $listener,
-            |@before-parse,
-            Cro::HTTP::RequestParser.new,
-            RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
-            |@before,
-            $application,
-            ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
-            |@after,
-            Cro::HTTP::ResponseSerializer.new,
-            |@after-serialize
-        )
+        else {
+            if so $http-val == <1.1>|() {
+                my $listener = Cro::TCP::Listener.new(
+                    |(:$host with $host),
+                    |(:$port with $port));
+                return pack1($listener);
+            } else {
+                die "Incorrect :\$http parameter was passed to the server: $http-val"
+            }
+        }
     }
 }
