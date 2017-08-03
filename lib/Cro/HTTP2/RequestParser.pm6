@@ -72,7 +72,6 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                             if $request.method && $request.target {
                                 %streams{.stream-identifier}.body.done;
                                 emit $request;
-                                proceed; # We don't need to change state flags.
                             } else {
                                 die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                             }
@@ -119,8 +118,9 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                             } else {
                                 die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                             }
+                        } else {
+                            %streams{.stream-identifier}.state = data;
                         }
-                        %streams{.stream-identifier}.state = data;
                     } else {
                         %streams{.stream-identifier}.headers ~= .headers;
                     }
