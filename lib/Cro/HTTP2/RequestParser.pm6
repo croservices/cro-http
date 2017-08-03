@@ -33,60 +33,56 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                     proceed;
                 }
                 when Cro::HTTP2::Frame::Data {
+                    my $stream = %streams{.stream-identifier};
                     if .stream-identifier > $curr-sid
-                    ||  %streams{.stream-identifier}.state !~~ data
-                    || !%streams{.stream-identifier}.message.method
-                    || !%streams{.stream-identifier}.message.target {
+                    ||  $stream.state !~~ data
+                    || !$stream.message.method
+                    || !$stream.message.target {
                         die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                     }
 
-                    my $stream = %streams{.stream-identifier};
-                    my $request = $stream.message;
                     $stream.body.emit: .data;
                     if .end-stream {
                         $stream.body.done;
-                        emit $request;
+                        emit $stream.message;
                     }
                 }
                 when Cro::HTTP2::Frame::Headers {
                     if .stream-identifier > $curr-sid {
                         $curr-sid = .stream-identifier;
+                        my $body = Supplier::Preserving.new;
                         %streams{$curr-sid} = Stream.new(
                             sid => $curr-sid,
                             state => header-init,
                             message => Cro::HTTP::Request.new(
-                                http2-stream-id => .stream-identifier
+                                http2-stream-id => .stream-identifier,
+                                http-version => 'http/2'
                             ),
-                            stream-end => False,
-                            body => Supplier::Preserving.new);
-                        %streams{$curr-sid}.message.http-version = 'http/2';
+                            stream-end => .end-stream,
+                            :$body,
+                            headers => Buf.new);
+                        %streams{.stream-identifier}.message.set-body-byte-stream($body.Supply);
                     }
                     my $request = %streams{.stream-identifier}.message;
-                    $request.set-body-byte-stream(%streams{.stream-identifier}.body.Supply);
 
                     if .end-headers {
                         self!set-headers($decoder, $request, .headers);
-                    } else {
-                        %streams{.stream-identifier}.headers = (%streams{.stream-identifier}.headers // Buf.new)
-                                                             ~ .headers;
-                    }
-
-                    if .end-headers && .end-stream {
-                        # Request is complete without body
-                        if $request.method && $request.target {
-                            %streams{.stream-identifier}.body.done;
-                            emit $request;
-                            proceed; # We don't need to change state flags.
+                        if .end-stream {
+                            # Request is complete without body
+                            if $request.method && $request.target {
+                                %streams{.stream-identifier}.body.done;
+                                emit $request;
+                                proceed; # We don't need to change state flags.
+                            } else {
+                                die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
+                            }
                         } else {
-                            die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
+                            %streams{.stream-identifier}.state = data;
                         }
-                    }
-
-                    if .end-headers {
-                        %streams{.stream-identifier}.state = data;
                     } else {
-                        ($breakable, $break) = (False, .stream-identifier);
-                        %streams{.stream-identifier}.stream-end = .end-stream;
+                        %streams{.stream-identifier}.headers ~= .headers;
+                        # No meaning in lock if we're locked already
+                        ($breakable, $break) = (False, .stream-identifier) if $breakable;
                         %streams{.stream-identifier}.body.done if .end-stream;
                         %streams{.stream-identifier}.state = header-c;
                     }
@@ -112,27 +108,22 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                     }
                     my $request = %streams{.stream-identifier}.message;
 
-                    # Unbreak lock
-                    ($breakable, $break) = (True, 0) if .end-headers;
-
                     if .end-headers {
+                        ($breakable, $break) = (True, 0);
                         my $headers = %streams{.stream-identifier}.headers ~ .headers;
                         self!set-headers($decoder, $request, $headers);
                         %streams{.stream-identifier}.headers = Buf.new;
-                    } else {
-                        %streams{.stream-identifier}.headers = (%streams{.stream-identifier}.headers // Buf.new)
-                                                             ~ .headers;
-                    }
-
-                    if %streams{.stream-identifier}.stream-end && .end-headers {
-                        if $request.target && $request.method {
-                            emit $request;
-                            proceed;
-                        } else {
-                            die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
+                        if %streams{.stream-identifier}.stream-end {
+                            if $request.target && $request.method {
+                                emit $request;
+                            } else {
+                                die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
+                            }
                         }
+                        %streams{.stream-identifier}.state = data;
+                    } else {
+                        %streams{.stream-identifier}.headers ~= .headers;
                     }
-                    %streams{.stream-identifier}.state = data if .end-headers;
                 }
             }
         }
