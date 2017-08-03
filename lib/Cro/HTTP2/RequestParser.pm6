@@ -1,20 +1,10 @@
 use Cro::HTTP2::Frame;
+use Cro::HTTP::Internal;
 use Cro::HTTP::Request;
 use Cro::Transform;
 use HTTP::HPACK;
 
 my constant $pseudo-headers = <:method :scheme :authority :path :status>;
-
-my enum State <header-init header-c data>;
-
-my class Stream {
-    has Int $.sid;
-    has State $.state is rw;
-    has $.request;
-    has Bool $.stream-end is rw;
-    has Supplier $.body;
-    has Buf $.headers is rw;
-}
 
 class Cro::HTTP2::RequestParser does Cro::Transform {
     has $.ping;
