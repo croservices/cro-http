@@ -35,13 +35,13 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                 when Cro::HTTP2::Frame::Data {
                     if .stream-identifier > $curr-sid
                     ||  %streams{.stream-identifier}.state !~~ data
-                    || !%streams{.stream-identifier}.request.method
-                    || !%streams{.stream-identifier}.request.target {
+                    || !%streams{.stream-identifier}.message.method
+                    || !%streams{.stream-identifier}.message.target {
                         die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                     }
 
                     my $stream = %streams{.stream-identifier};
-                    my $request = $stream.request;
+                    my $request = $stream.message;
                     $stream.body.emit: .data;
                     if .end-stream {
                         $stream.body.done;
@@ -54,14 +54,14 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                         %streams{$curr-sid} = Stream.new(
                             sid => $curr-sid,
                             state => header-init,
-                            request => Cro::HTTP::Request.new(
+                            message => Cro::HTTP::Request.new(
                                 http2-stream-id => .stream-identifier
                             ),
                             stream-end => False,
                             body => Supplier::Preserving.new);
-                        %streams{$curr-sid}.request.http-version = 'http/2';
+                        %streams{$curr-sid}.message.http-version = 'http/2';
                     }
-                    my $request = %streams{.stream-identifier}.request;
+                    my $request = %streams{.stream-identifier}.message;
                     $request.set-body-byte-stream(%streams{.stream-identifier}.body.Supply);
 
                     if .end-headers {
@@ -110,7 +110,7 @@ class Cro::HTTP2::RequestParser does Cro::Transform {
                     || %streams{.stream-identifier}.state !~~ header-c {
                         die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR)
                     }
-                    my $request = %streams{.stream-identifier}.request;
+                    my $request = %streams{.stream-identifier}.message;
 
                     # Unbreak lock
                     ($breakable, $break) = (True, 0) if .end-headers;

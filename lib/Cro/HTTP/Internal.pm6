@@ -54,7 +54,7 @@ enum State <header-init header-c data>;
 class Stream {
     has Int $.sid;
     has State $.state is rw;
-    has $.request;
+    has $.message;
     has Bool $.stream-end is rw;
     has Supplier $.body;
     has Buf $.headers is rw;
