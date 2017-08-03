@@ -6,7 +6,6 @@ use HTTP::HPACK;
 use Test;
 
 my ($resp, @headers, $body);
-my $decoder = HTTP::HPACK::Decoder.new;
 my $encoder = HTTP::HPACK::Encoder.new;
 
 sub test($response, $count, $desc, *@checks, :$fail) {
