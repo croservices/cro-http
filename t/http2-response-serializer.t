@@ -5,11 +5,11 @@ use Cro::HTTP::Response;
 use HTTP::HPACK;
 use Test;
 
-my ($req, @headers, $body);
+my ($resp, @headers, $body);
 my $decoder = HTTP::HPACK::Decoder.new;
 my $encoder = HTTP::HPACK::Encoder.new;
 
-sub test($request, $count, $desc, *@checks, :$fail) {
+sub test($response, $count, $desc, *@checks, :$fail) {
     my $test-completed = Promise.new;
     my $serializer = Cro::HTTP2::ResponseSerializer.new;
     my $fake-in = Supplier.new;
@@ -26,7 +26,7 @@ sub test($request, $count, $desc, *@checks, :$fail) {
         $test-completed.break;
     }
     start {
-        $fake-in.emit($request);
+        $fake-in.emit($response);
         $fake-in.done;
     }
     await Promise.anyof($test-completed, Promise.in(5));
@@ -41,11 +41,11 @@ sub test($request, $count, $desc, *@checks, :$fail) {
 @headers = HTTP::HPACK::Header.new(name => ':status', value => '304'),
            HTTP::HPACK::Header.new(name => 'etag', value => 'xyzzy');
 
-$req = Cro::HTTP::Response.new(:304status,
+$resp = Cro::HTTP::Response.new(:304status,
                                request => Cro::HTTP::Request.new(:5http2-stream-id));
-$req.append-header('etag' => 'xyzzy');
+$resp.append-header('etag' => 'xyzzy');
 $encoder = HTTP::HPACK::Encoder.new;
-test $req, 1, 'Header',
+test $resp, 1, 'Header',
      [[(* ~~ Cro::HTTP2::Frame::Headers),
        (*.flags == 5),
        (*.stream-identifier == 5),
@@ -56,12 +56,12 @@ test $req, 1, 'Header',
            HTTP::HPACK::Header.new(name => 'content-length', value => '123');
 $body = Buf.new: <0 1>.pick xx 123;
 
-$req = Cro::HTTP::Response.new(:200status,
+$resp = Cro::HTTP::Response.new(:200status,
                                request => Cro::HTTP::Request.new(:5http2-stream-id));
-$req.append-header('content-type' => 'image/jpeg');
-$req.append-header('content-length' => '123');
-$req.set-body: $body;
-test $req, 2, 'Header + Data',
+$resp.append-header('content-type' => 'image/jpeg');
+$resp.append-header('content-length' => '123');
+$resp.set-body: $body;
+test $resp, 2, 'Header + Data',
      [[(* ~~ Cro::HTTP2::Frame::Headers),
        (*.flags == 4),
        (*.stream-identifier == 5),
@@ -79,11 +79,11 @@ $body = Supplier::Preserving.new;
 my $random = Buf.new: <0 1>.pick xx 150;
 $body.emit: $random;
 $body.done;
-$req = Cro::HTTP::Response.new(:200status,
+$resp = Cro::HTTP::Response.new(:200status,
                                request => Cro::HTTP::Request.new(:5http2-stream-id));
-$req.append-header('content-type' => 'image/jpeg');
-$req.set-body: $body.Supply;
-test $req, 3, 'Header + Data - Content-Length unspecified',
+$resp.append-header('content-type' => 'image/jpeg');
+$resp.set-body: $body.Supply;
+test $resp, 3, 'Header + Data - Content-Length unspecified',
      [[(* ~~ Cro::HTTP2::Frame::Headers),
        (*.flags == 4),
        (*.stream-identifier == 5),
@@ -101,22 +101,22 @@ dies-ok {
     my $body = Supplier::Preserving.new;
     $body.emit: Buf.new: <0 1>.pick xx 100;
     $body.done;
-    $req = Cro::HTTP::Response.new(:200status,
+    $resp = Cro::HTTP::Response.new(:200status,
                                    request => Cro::HTTP::Request.new(:5http2-stream-id));
-    $req.append-header('Content-length' => '123');
-    $req.set-body: $body.Supply;
-    test $req, 3, 'Header + Data', [], :fail;
+    $resp.append-header('Content-length' => '123');
+    $resp.set-body: $body.Supply;
+    test $resp, 3, 'Header + Data', [], :fail;
 }, 'Too small body throws';
 
 dies-ok {
     my $body = Supplier::Preserving.new;
     $body.emit: Buf.new: <0 1>.pick xx 123;
     $body.done;
-    $req = Cro::HTTP::Response.new(:200status,
+    $resp = Cro::HTTP::Response.new(:200status,
                                    request => Cro::HTTP::Request.new(:5http2-stream-id));
-    $req.append-header('Content-length' => '100');
-    $req.set-body: $body.Supply;
-    test $req, 3, 'Header + Data', [], :fail;
+    $resp.append-header('Content-length' => '100');
+    $resp.set-body: $body.Supply;
+    test $resp, 3, 'Header + Data', [], :fail;
 }, 'Too big body throws';
 
 done-testing;
