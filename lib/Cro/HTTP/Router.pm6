@@ -64,7 +64,7 @@ module Cro::HTTP::Router {
                                 next => $req.body-parser-selector
                             );
                         }
-                        my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new();
+                        my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(request => $req);
                         if @!body-serializers {
                             $*CRO-ROUTER-RESPONSE.body-serializer-selector =
                                 Cro::HTTP::BodySerializerSelector::Prepend.new(
