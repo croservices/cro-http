@@ -51,3 +51,22 @@ test (Cro::HTTP2::Frame::Headers.new(
      [[(*.status == 302),
       (*.header('etag') eq 'xyzzy'),
       (*.header('expires') eq 'date')],];
+
+@headers = HTTP::HPACK::Header.new(name => ':status',        value => '200'),
+           HTTP::HPACK::Header.new(name => 'content-type',   value => 'image/jpeg'),
+           HTTP::HPACK::Header.new(name => 'content-length', value => '123');
+my $random = Buf.new(<0 1>.pick xx 123);
+
+test (Cro::HTTP2::Frame::Headers.new(
+             stream-identifier => 3,
+             flags => 4,
+             headers => $encoder.encode-headers(@headers)),
+      Cro::HTTP2::Frame::Data.new(
+          stream-identifier => 3,
+          flags => 1,
+          data => $random)),
+     1, 'Headers + Data',
+     [[(*.status == 200),
+      (*.header('content-type') eq 'image/jpeg'),
+      (*.header('content-length') eq '123'),
+      (*.body-blob.result == $random)],];

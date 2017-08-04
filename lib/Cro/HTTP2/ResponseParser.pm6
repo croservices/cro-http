@@ -1,3 +1,4 @@
+use Cro::HTTP2::Frame;
 use Cro::HTTP2::GeneralParser;
 use Cro::Transform;
 
@@ -11,4 +12,11 @@ class Cro::HTTP2::ResponseParser does Cro::Transform does Cro::HTTP2::GeneralPar
 
     method !get-message($sid) { Cro::HTTP::Response.new(http-version => 'http/2') }
     method !message-full($resp--> Bool) { so $resp.status }
+    method !check-data($stream, $sid, $csid) {
+        if  $sid > $csid
+        ||  $stream.state !~~ data
+        || !$stream.message.status {
+            die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
+        }
+    }
 }
