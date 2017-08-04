@@ -1,6 +1,20 @@
 use Cro::HTTP2::Frame;
-use Cro::HTTP::Internal;
+use Cro::HTTP::Response;
+use Cro::HTTP::Request;
 use HTTP::HPACK;
+
+# HTTP/2 stream
+enum State <header-init header-c data>;
+
+class Stream {
+    has Int $.sid;
+    has State $.state is rw;
+    has $.message;
+    has Bool $.stream-end is rw;
+    has Supplier $.body;
+    has Buf $.headers is rw;
+}
+
 
 role Cro::HTTP2::GeneralParser {
     has $.ping;

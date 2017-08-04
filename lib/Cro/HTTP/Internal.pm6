@@ -47,15 +47,3 @@ class SerializerExtension does Cro::Transform {
         }
     }
 }
-
-# HTTP/2 stream
-enum State <header-init header-c data>;
-
-class Stream {
-    has Int $.sid;
-    has State $.state is rw;
-    has $.message;
-    has Bool $.stream-end is rw;
-    has Supplier $.body;
-    has Buf $.headers is rw;
-}
