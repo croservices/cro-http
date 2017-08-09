@@ -26,13 +26,11 @@ my $app = route {
     my $err = open 'err'.IO, :w;
 
     use Cro::HTTP::Log::File;
-    my $logger =  Cro::HTTP::Log::File.new(:$out, :$err);
-
+    my $logger =  Cro::HTTP::Log::File.new(logs => $out, errors => $err);
     my $service = Cro::HTTP::Server.new(
         :host('localhost'), :port(TEST_PORT), application => $app,
-        after => Cro::HTTP::Log::File.new(:$out, :$err)
+        after => $logger
     );
-
     $service.start;
 
     my $completed = Promise.new;
