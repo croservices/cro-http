@@ -70,3 +70,5 @@ test (Cro::HTTP2::Frame::Headers.new(
       (*.header('content-type') eq 'image/jpeg'),
       (*.header('content-length') eq '123'),
       (*.body-blob.result == $random)],];
+
+done-testing;
