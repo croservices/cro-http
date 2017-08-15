@@ -119,7 +119,7 @@ module Cro::HTTP::Router {
                                 }
                             }
                         }
-                        emit Cro::HTTP::Response.new(:$status);
+                        emit Cro::HTTP::Response.new(:$status, request => $*CRO-ROUTER-REQUEST);
                     }
                 }
             }
