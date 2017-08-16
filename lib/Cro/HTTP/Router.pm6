@@ -83,16 +83,17 @@ module Cro::HTTP::Router {
 
                             QUIT {
                                 when X::Cro::HTTP::Router::NoRequestBodyMatch {
-                                    $*CRO-ROUTER-RESPONSE.status = 400;
-                                    emit $*CRO-ROUTER-RESPONSE;
+                                    $response.status = 400;
+                                    emit $response;
                                 }
                                 when X::Cro::HTTP::BodyParserSelector::NoneApplicable {
-                                    $*CRO-ROUTER-RESPONSE.status = 400;
-                                    emit $*CRO-ROUTER-RESPONSE;
+                                    $response.status = 400;
+                                    emit $response;
                                 }
                                 default {
-                                    $*CRO-ROUTER-RESPONSE.status = 500;
-                                    emit $*CRO-ROUTER-RESPONSE;
+                                    .note;
+                                    $response.status = 500;
+                                    emit $response;
                                 }
                             }
                         }
