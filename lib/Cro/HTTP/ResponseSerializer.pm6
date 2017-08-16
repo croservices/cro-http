@@ -9,11 +9,12 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
     method transformer(Supply $response-stream) {
         supply {
             whenever $response-stream -> Cro::HTTP::Response $response {
-                # No body expected or allowed for 204/200.
+                # No body expected or allowed for 204 or less than 200.
                 my int $status = $response.status;
                 if $status == 204 || ($status < 200 && $status != 101) {
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
-                    done;
+                    maybe-connection-close();
+                    next;
                 }
 
                 # Otherwise, obtain body. We must do it before serializing the
@@ -39,7 +40,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
                     whenever $body-byte-stream -> $data {
                         emit Cro::TCP::Message.new(:$data);
-                        LAST done;
+                        LAST maybe-connection-close();
                     }
                 }
                 else {
@@ -57,7 +58,18 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                             emit Cro::TCP::Message.new(data =>
                                 BEGIN Blob.new(ord("0"), 13, 10, 13, 10)
                             );
-                            done;
+                            maybe-connection-close();
+                        }
+                    }
+                }
+
+                # Closes the connection if the sender was using HTTP/1.0 or
+                # sent Connection: close.
+                sub maybe-connection-close() {
+                    with $response.request {
+                        done if .http-version eq '1.0';
+                        with .header('connection') {
+                            done if .lc.trim eq 'close';
                         }
                     }
                 }
