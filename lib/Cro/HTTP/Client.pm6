@@ -202,6 +202,10 @@ class Cro::HTTP::Client {
 
     method !get-pipeline(Cro::Uri $url) {
         my $secure = $url.scheme.lc eq 'https';
+        self!build-pipeline($secure, $url.host, $url.port // ($secure ?? 443 !! 80))
+    }
+
+    method !build-pipeline($secure, $host, $port) {
         my @parts =
             (RequestSerializerExtension.new(add-body-serializers => $.add-body-serializers,
                                             body-serializers => $.body-serializers) if self),
@@ -213,9 +217,7 @@ class Cro::HTTP::Client {
 
         my $connector = Cro.compose(|@parts);
         my $in = Supplier::Preserving.new;
-        my $out = $connector.establish($in.Supply,
-            host => $url.host,
-            port => $url.port // ($secure ?? 443 !! 80));
+        my $out = $connector.establish($in.Supply, :$host, :$port);
         return Pipeline.new(:$in, :$out)
     }
 
