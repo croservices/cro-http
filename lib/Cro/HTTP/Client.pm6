@@ -41,13 +41,13 @@ class X::Cro::HTTP::Client::IncorrectHeaderType is Exception {
     has $.what;
 
     method message() {
-        "Incorrect header of type {$.what.^name} was passed to Client"
+        "Incorrect header of type {$.what.^name} was passed to HTTP client"
     }
 }
 
 class X::Cro::HTTP::Client::TooManyRedirects is Exception {
     method message() {
-        "Too many redirect"
+        "Too many redirects"
     }
 }
 
@@ -55,7 +55,7 @@ class X::Cro::HTTP::Client::InvalidAuth is Exception {
     has $.reason;
 
     method message() {
-        "Authentication was failed: {$!reason}"
+        "Authentication failed: {$!reason}"
     }
 }
 
