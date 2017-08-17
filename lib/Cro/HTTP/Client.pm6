@@ -139,7 +139,6 @@ class Cro::HTTP::Client {
         my $pipeline = self!get-pipeline($parsed-url);
         my $request-object = self!assemble-request($method, $parsed-url, %options);
         $pipeline.in.emit($request-object);
-        $pipeline.in.done();
         my $redirect-codes = set(301, 302, 303, 307, 308);
 
         sub construct-url($path) {
