@@ -91,38 +91,38 @@ class Cro::HTTP::Client {
         }
     }
 
-    multi method get($url, %options --> Supply) {
+    multi method get($url, %options --> Promise) {
         self.request('GET', $url, %options)
     }
-    multi method get($url, *%options --> Supply) {
+    multi method get($url, *%options --> Promise) {
         self.request('GET', $url, %options)
     }
 
-    multi method head($url, %options --> Supply) {
+    multi method head($url, %options --> Promise) {
         self.request('HEAD', $url, %options)
     }
-    multi method head($url, *%options --> Supply) {
+    multi method head($url, *%options --> Promise) {
         self.request('HEAD', $url, %options)
     }
 
-    multi method post($url, %options --> Supply) {
+    multi method post($url, %options --> Promise) {
         self.request('POST', $url, %options)
     }
-    multi method post($url, *%options --> Supply) {
+    multi method post($url, *%options --> Promise) {
         self.request('POST', $url, %options)
     }
 
-    multi method put($url, %options --> Supply) {
+    multi method put($url, %options --> Promise) {
         self.request('PUT', $url, %options)
     }
-    multi method put($url, *%options --> Supply) {
+    multi method put($url, *%options --> Promise) {
         self.request('PUT', $url, %options)
     }
 
-    multi method delete($url, %options --> Supply) {
+    multi method delete($url, %options --> Promise) {
         self.request('DELETE', $url, %options)
     }
-    multi method delete($url, *%options --> Supply) {
+    multi method delete($url, *%options --> Promise) {
         self.request('DELETE', $url, %options)
     }
 
@@ -131,10 +131,10 @@ class Cro::HTTP::Client {
         has Supply $.out;
     }
 
-    multi method request(Str $method, $url, *%options --> Supply) {
+    multi method request(Str $method, $url, *%options --> Promise) {
         self.request($method, $url, %options)
     }
-    multi method request(Str $method, $url, %options --> Supply) {
+    multi method request(Str $method, $url, %options --> Promise) {
         my $parsed-url = $url ~~ Cro::Uri ?? $url !! Cro::Uri.parse(~$url);
         my $pipeline = self!get-pipeline($parsed-url);
         my $request-object = self!assemble-request($method, $parsed-url, %options);
@@ -146,7 +146,7 @@ class Cro::HTTP::Client {
             $parsed-url.Str.comb[0..$pos-1].join ~ $path;
         }
 
-        supply {
+        Promise(supply {
             whenever $pipeline.out {
                 if 200 <= .status < 400 || .status == 101 {
                     my $follow;
@@ -196,7 +196,7 @@ class Cro::HTTP::Client {
                     die X::Cro::HTTP::Error::Server.new(response => $_);
                 }
             }
-        }
+        })
     }
 
     method !get-pipeline(Cro::Uri $url) {
