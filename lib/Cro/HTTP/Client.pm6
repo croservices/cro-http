@@ -69,6 +69,11 @@ class Cro::HTTP::Client {
     has $.content-type;
     has $.follow;
     has %.auth;
+    has $.persistent = False; # TODO True when persistent connections done
+
+    method persistent() {
+        self ?? $!persistent !! False
+    }
 
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
                     :$!body-serializers, :$!add-body-serializers,
@@ -218,6 +223,9 @@ class Cro::HTTP::Client {
         my $target = $url.path || '/';
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
+        unless self.persistent {
+            $request.append-header('Connection', 'close');
+        }
         if self {
             $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);
