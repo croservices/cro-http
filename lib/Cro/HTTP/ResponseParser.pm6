@@ -10,19 +10,34 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
     method consumes() { Cro::TCP::Message }
     method produces() { Cro::HTTP::Response }
 
+    sub preserve(Supply:D $s) {
+        my $p = Supplier::Preserving.new;
+        $s.tap: { $p.emit($_) }, done => -> { $p.done }, quit => { $p.quit($_) };
+        $p.Supply
+    }
+
     method transformer(Supply:D $in) {
         supply {
             my enum Expecting <StatusLine Header Body>;
-            my $expecting = StatusLine;
 
             my $header-decoder = Encoding::Registry.find('iso-8859-1').decoder();
             $header-decoder.set-line-separators(["\r\n", "\n"]); # XXX Hack; toss \n
 
-            my $response = Cro::HTTP::Response.new;
+            my $expecting;
+            my $response;
             my $raw-body-byte-stream;
+            my $leftover;
+
+            my sub fresh-message() {
+                $expecting = StatusLine;
+                $response = Cro::HTTP::Response.new;
+                $header-decoder.add-bytes($leftover.result) with $leftover;
+                $leftover = Promise.new;
+            }
+            fresh-message;
 
             whenever $in -> Cro::TCP::Message $packet {
-                $header-decoder.add-bytes($packet.data);
+                $header-decoder.add-bytes($packet.data) unless $expecting == Body;
                 loop {
                     $_ = $expecting;
                     when StatusLine {
@@ -55,14 +70,21 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                         # the rest will be the body. Otherwise, parse header.
                         if $header-line eq '' {
                             my $raw-body-parser = $!raw-body-parser-selector.select($response);
-                            $raw-body-byte-stream = Supplier::Preserving.new;
-                            $response.set-body-byte-stream($raw-body-parser.parser($response,
-                                $raw-body-byte-stream.Supply));
+                            $raw-body-byte-stream = Supplier.new;
+                            $response.set-body-byte-stream(preserve(
+                                $raw-body-parser.parser($response,
+                                    $raw-body-byte-stream.Supply, $leftover)));
                             my int $count = $header-decoder.bytes-available();
                             $raw-body-byte-stream.emit($header-decoder.consume-exactly-bytes($count));
                             emit $response;
-                            $expecting = Body;
-                            last;
+                            if $leftover.status == Kept {
+                                fresh-message;
+                                next;
+                            }
+                            else {
+                                $expecting = Body;
+                                last;
+                            }
                         }
                         else {
                             my $header = Cro::HTTP::Header.parse($header-line);
@@ -71,7 +93,14 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                     }
                     when Body {
                         $raw-body-byte-stream.emit($packet.data);
-                        last;
+                        if $leftover.status == Kept {
+                            my $nothing-left = $leftover.result eq Blob.allocate(0);
+                            fresh-message;
+                            $nothing-left ?? last() !! next();
+                        }
+                        else {
+                            last;
+                        }
                     }
                 }
                 LAST {
