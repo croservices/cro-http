@@ -1,4 +1,5 @@
 use Base64;
+use OO::Monitors;
 use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Internal;
 use Cro::HTTP::Header;
@@ -60,6 +61,70 @@ class X::Cro::HTTP::Client::InvalidAuth is Exception {
 }
 
 class Cro::HTTP::Client {
+    my class Pipeline {
+        has Bool $.secure;
+        has Str $.host;
+        has Int $.port;
+        has Supplier $!in;
+        has Supply $!out;
+        has Tap $!tap;
+        has $!next-response-vow;
+        has Bool $.dead = False;
+
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
+            $!tap = supply {
+                whenever $out {
+                    my $vow = $!next-response-vow;
+                    $!next-response-vow = Nil;
+                    $vow.keep($_);
+                    LAST $!dead = True;
+                    QUIT {
+                        default {
+                            $!dead = True;
+                            if $!next-response-vow {
+                                $!next-response-vow.break($_);
+                                $!next-response-vow = Nil;
+                            }
+                        }
+                    }
+                }
+            }.tap
+        }
+
+        method send-request($request --> Promise) {
+            my $next-response-promise = Promise.new;
+            $!next-response-vow = $next-response-promise.vow;
+            $!in.emit($request);
+            return $next-response-promise;
+        }
+    }
+
+    my monitor ConnectionCache {
+        has %!cached;
+
+        method pipeline-for($secure, $host, $port) {
+            if %!cached{self!key($secure, $host, $port)} -> @available {
+                while @available {
+                    my $pipeline = @available.shift;
+                    return $pipeline unless $pipeline.dead;
+                }
+            }
+            Nil
+        }
+
+        method add-pipeline($pipeline --> Nil) {
+            with $pipeline {
+                unless .dead {
+                    push %!cached{self!key(.secure, .host, .port)}, $pipeline;
+                }
+            }
+        }
+
+        method !key($secure, $host, $port) {
+            "{$secure ?? 'https' !! 'http'}\0$host\0$port\0"
+        }
+    }
+
     has @.headers;
     has $.cookie-jar;
     has $.body-serializers;
@@ -69,7 +134,8 @@ class Cro::HTTP::Client {
     has $.content-type;
     has $.follow;
     has %.auth;
-    has $.persistent = False; # TODO True when persistent connections done
+    has $.persistent = True;
+    has $!connection-cache = ConnectionCache.new;
 
     method persistent() {
         self ?? $!persistent !! False
@@ -126,11 +192,6 @@ class Cro::HTTP::Client {
         self.request('DELETE', $url, %options)
     }
 
-    my class Pipeline {
-        has Supplier $.in;
-        has Supply $.out;
-    }
-
     multi method request(Str $method, $url, *%options --> Promise) {
         self.request($method, $url, %options)
     }
@@ -138,16 +199,24 @@ class Cro::HTTP::Client {
         my $parsed-url = $url ~~ Cro::Uri ?? $url !! Cro::Uri.parse(~$url);
         my $pipeline = self!get-pipeline($parsed-url);
         my $request-object = self!assemble-request($method, $parsed-url, %options);
-        $pipeline.in.emit($request-object);
-        my $redirect-codes = set(301, 302, 303, 307, 308);
+        my $response-promise = $pipeline.send-request($request-object);
 
+        my constant $redirect-codes = set(301, 302, 303, 307, 308);
         sub construct-url($path) {
             my $pos = $parsed-url.Str.index('/', 8);
             $parsed-url.Str.comb[0..$pos-1].join ~ $path;
         }
 
         Promise(supply {
-            whenever $pipeline.out {
+            whenever $response-promise {
+                # Consider adding the connection back into the cache to use it
+                # again.
+                if self && $!persistent {
+                    unless .http-version eq '1.0' || (.header('connection') // '').lc eq 'close' {
+                        $!connection-cache.add-pipeline($pipeline);
+                    }
+                }
+
                 if 200 <= .status < 400 || .status == 101 {
                     my $follow;
                     if self {
@@ -173,8 +242,9 @@ class Cro::HTTP::Client {
                         my $req = self.request($new-method, $new-url, %new-opts);
                         whenever $req { .emit };
                     } else {
-                        $.cookie-jar.add-from-response($_,
-                                                       $parsed-url) if self && $.cookie-jar.defined;
+                        if self && $.cookie-jar.defined {
+                            $.cookie-jar.add-from-response($_, $parsed-url);
+                        }
                         .emit
                     }
                 } elsif 400 <= .status < 500 {
@@ -191,7 +261,6 @@ class Cro::HTTP::Client {
                     } else {
                         die X::Cro::HTTP::Error::Client.new(response => $_);
                     }
-
                 } elsif .status >= 500 {
                     die X::Cro::HTTP::Error::Server.new(response => $_);
                 }
@@ -201,7 +270,12 @@ class Cro::HTTP::Client {
 
     method !get-pipeline(Cro::Uri $url) {
         my $secure = $url.scheme.lc eq 'https';
-        self!build-pipeline($secure, $url.host, $url.port // ($secure ?? 443 !! 80))
+        my $host = $url.host;
+        my $port = $url.port // ($secure ?? 443 !! 80);
+        if self && $!connection-cache.pipeline-for($secure, $host, $port) -> $pipeline {
+            return $pipeline;
+        }
+        self!build-pipeline($secure, $host, $port)
     }
 
     method !build-pipeline($secure, $host, $port) {
@@ -217,7 +291,7 @@ class Cro::HTTP::Client {
         my $connector = Cro.compose(|@parts);
         my $in = Supplier::Preserving.new;
         my $out = $connector.establish($in.Supply, :$host, :$port);
-        return Pipeline.new(:$in, :$out)
+        return Pipeline.new(:$secure, :$host, :$port, :$in, :$out)
     }
 
     method !assemble-request(Str $method, Cro::Uri $url, %options --> Cro::HTTP::Request) {
