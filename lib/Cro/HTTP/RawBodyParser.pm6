@@ -82,6 +82,7 @@ class Cro::HTTP::RawBodyParser::Chunked does Cro::HTTP::RawBodyParser {
                         }
                         elsif $length-awaited == 0 {
                             # Zero marks the last chunk.
+                            .keep($buffer) with $leftover;
                             done;
                         }
                     }
