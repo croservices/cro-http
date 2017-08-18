@@ -564,10 +564,8 @@ module Cro::HTTP::Router {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
         my $child = '.';
-        with @path {
-            for @path {
-                $child = $child.IO.add: $_;
-            }
+        for @path {
+            $child = $child.IO.add: $_;
         }
 
         my %fallback = $mime-types // {};
