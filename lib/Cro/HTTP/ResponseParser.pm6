@@ -44,6 +44,7 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                         # Try to read the status line and parse it.
                         my $status-line = $header-decoder.consume-line-chars(:chomp);
                         last unless defined $status-line;
+                        next if $status-line eq '';
                         my $parsed = $status-line.match(
                             /^ 'HTTP/'(\d'.'\d) ' ' (\d\d\d) ' ' <[\t\ \x21..\xFF]>*$/);
                         die "Malformed status line" unless $parsed;
