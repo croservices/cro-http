@@ -42,10 +42,8 @@ class Cro::HTTP::RequestParser does Cro::Transform {
             my sub fresh-message() {
                 $expecting = RequestLine;
                 $request = Cro::HTTP::Request.new;
-                # We need a new bytestream for a new message, it will serve as a body
-                $raw-body-byte-stream = Supplier.new;
                 $header-decoder.add-bytes($leftover.result) with $leftover;
-                $leftover = Promise.new;
+                $leftover = Nil;
             }
             fresh-message;
 
@@ -101,6 +99,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                             || $request.has-header('upgrade') {
                                 my $raw-body-parser = $!raw-body-parser-selector.select($request);
                                 $raw-body-byte-stream = Supplier.new;
+                                $leftover = Promise.new;
                                 $request.set-body-byte-stream(preserve(
                                     $raw-body-parser.parser($request,
                                         $raw-body-byte-stream.Supply, $leftover)));
@@ -117,7 +116,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                                 }
                             } else {
                                 emit $request;
-                                $expecting = RequestLine;
+                                fresh-message;
                             }
                         }
                         else {
