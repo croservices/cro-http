@@ -569,7 +569,7 @@ module Cro::HTTP::Router {
         }
 
         my %fallback = $mime-types // {};
-        my $ext = $child eq '' ?? $base.IO.extension: :parts(^5) !! $child.IO.extension: :parts(^5);
+        my $ext = $child eq '.' ?? $base.IO.extension !! $child.IO.extension;
         my $content-type = %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
 
         my sub get_or_404($path) {
