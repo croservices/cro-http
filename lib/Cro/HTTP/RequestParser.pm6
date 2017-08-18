@@ -80,6 +80,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         }
 
                         # Populate the request object.
+                        $request.connection = $packet.connection;
                         $request.method = @parts[0];
                         $request.target = @parts[1];
                         $request.http-version = @parts[2].substr(5);

@@ -19,6 +19,7 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     has Cro::HTTP::BodySerializerSelector $.body-serializer-selector is rw =
         Cro::HTTP::BodySerializerSelector::RequestDefault;
     has Int $.http2-stream-id;
+    has $.connection is rw;
 
     # This one is a little interesting. Per RFC 7230, "The method token
     # indicates the request method to be performed on the target resource.

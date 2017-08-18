@@ -23,9 +23,9 @@ class Cro::HTTP::Log::File does Cro::Transform {
         supply {
             whenever $pipeline -> $resp {
                 if $resp.status < 400 {
-                    $!logs.say: "[OK] {$resp.status} {$resp.request.target}";
+                    $!logs.say: "[OK] {$resp.status} {$resp.request.target} - {$resp.request.connection.peer-host}";
                 } else {
-                    $!errors.say: "[ERROR] {$resp.status} {$resp.request.target}";
+                    $!errors.say: "[ERROR] {$resp.status} {$resp.request.target} - {$resp.request.connection.peer-host}";
                 }
                 emit $resp;
             }
