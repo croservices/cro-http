@@ -18,7 +18,7 @@ class TestHttpApp does Cro::Transform {
     method transformer($request-stream) {
         supply {
             whenever $request-stream -> $request {
-                given Cro::HTTP::Response.new(:200status) {
+                given Cro::HTTP::Response.new(:200status, :$request) {
                     .append-header('Content-type', 'text/html');
                     .set-body("<strong>Hello from Cro!</strong>".encode('ascii'));
                     .emit;
