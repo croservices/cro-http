@@ -298,9 +298,6 @@ class Cro::HTTP::Client {
         my $target = $url.path || '/';
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
-        unless self.persistent {
-            $request.append-header('Connection', 'close');
-        }
         if self {
             $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);
@@ -310,7 +307,6 @@ class Cro::HTTP::Client {
             }
         }
         my Bool $body-set = False;
-
         for %options.kv -> $_, $value {
             when 'body' {
                 if !$body-set {
@@ -337,6 +333,9 @@ class Cro::HTTP::Client {
             when 'auth' {
                 self!form-authentication: $request, %$value, %$value<if-asked>:exists;
             }
+        }
+        unless self.persistent || $request.has-header('connection') {
+            $request.append-header('Connection', 'close');
         }
         return $request;
     }
