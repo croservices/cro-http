@@ -820,7 +820,7 @@ sub messages($desc, $mess1, $mess2, @checks1, @checks2) {
     my $fake-in = Supplier.new;
     my Int $counter = 0;
     my $test-completed = Promise.new;
-    $parser.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap: -> $request {
+    $parser.transformer($fake-in.Supply).tap: -> $request {
         my $body = $request.body-text.result;
         if $counter == 0 {
             for @checks1.kv -> $i, $check {
