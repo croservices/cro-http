@@ -28,6 +28,7 @@ class Cro::HTTP2::ConnectionManager does Cro::Sink {
                     :$after = (), :$after-serializer = ()) {
         my @components = (
             |$before-parse,
+            Cro::HTTP2::FrameParser,
             Cro::HTTP2::RequestParser.new,
             RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
             |$before,
@@ -35,18 +36,16 @@ class Cro::HTTP2::ConnectionManager does Cro::Sink {
             ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
             |$after,
             Cro::HTTP2::ResponseSerializer.new,
+            Cro::HTTP2::FrameSerializer,
             |$after-serializer
         );
-        $!transformer = Cro.compose(service-type => self.WHAT, @components);
+        $!transformer = Cro.compose(service-type => self.WHAT, @components, :for-connection);
     }
 
     method sinker(Supply:D $incoming) {
         $incoming.do: -> $connection {
             my $messages = $connection.incoming;
-            my $fp = Cro::HTTP2::FrameParser;
-            my $fs = Cro::HTTP2::FrameSerializer;
-            my $to-sink = Cro.compose($fp, $!transformer, $fs, :for-connection).transformer($messages);
-            my $sink = $connection.replier.sinker($to-sink);
+            my $sink = $connection.replier.sinker($!transformer.transformer($messages));
             $sink.tap: quit => { .note };
         }
     }
