@@ -5,7 +5,7 @@ class Cro::HTTP::Header {
     my grammar Header {
         token TOP {
             || <field-name> ":" <.OWS> <field-value> <.OWS> $
-            || { die "Malformed header" }
+            || { die "Malformed header '$/.orig()'" }
         }
         token field-name {
             <token> { make $<token>.ast }
