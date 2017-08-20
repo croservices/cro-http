@@ -315,6 +315,20 @@ for <" ( ) [ ] { } @ \ / \< \> , ;> -> $nope {
 	    *.status == 400;
 }
 
+parses 'Header with empty field',
+    q:to/REQUEST/,
+    GET / HTTP/1.1
+    myproto: 
+
+    REQUEST
+    *.method eq 'GET',
+    *.target eq '/',
+    *.http-version eq '1.1',
+    *.headers == 1,
+    *.headers[0].isa(Cro::HTTP::Header),
+    *.headers[0].name eq 'myproto',
+    *.headers[0].value eq '';
+
 parses 'Field value can be any printable char including latin-1 range',
     q:to/REQUEST/,
     GET / HTTP/1.1

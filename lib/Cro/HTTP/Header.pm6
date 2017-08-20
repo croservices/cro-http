@@ -15,7 +15,7 @@ class Cro::HTTP::Header {
             <field-content> { make ~$<field-content> }
         }
         token field-content {
-            <[\x21..\xFF]>+ [<[\t\ ]>+ <[\x21..\xFF]>+]*
+            [<[\x21..\xFF]>+ [<[\t\ ]>+ <[\x21..\xFF]>+]*]?
         }
         token token {
             <[A..Z a..z 0..9 ! # $ % & ' * + . ^ _ ` | ~ -]>+ { make ~$/ }
