@@ -4,6 +4,7 @@ use Cro::HTTP::Header;
 
 role Cro::HTTP::Message does Cro::Message {
     has Str $.http-version is rw;
+    has Int $.http2-stream-id is rw;
     has Cro::HTTP::Header @!headers;
     has Supply $!body-byte-stream; # Typically set when receiving from network
     has $!body;                    # Typically set when producing locally
