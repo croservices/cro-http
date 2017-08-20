@@ -6,6 +6,10 @@ use Cro::HTTP::Header;
 use Cro::HTTP::Request;
 use Cro::HTTP::RequestSerializer;
 use Cro::HTTP::ResponseParser;
+use Cro::HTTP2::FrameParser;
+use Cro::HTTP2::FrameSerializer;
+use Cro::HTTP2::RequestSerializer;
+use Cro::HTTP2::ResponseParser;
 use Cro::TCP;
 use Cro::SSL;
 use Cro::Uri;
@@ -54,9 +58,14 @@ class X::Cro::HTTP::Client::TooManyRedirects is Exception {
 
 class X::Cro::HTTP::Client::InvalidAuth is Exception {
     has $.reason;
-
     method message() {
         "Authentication failed: {$!reason}"
+    }
+}
+
+class X::Cro::HTTP::Client::InvalidVersion is Exception {
+    method message() {
+        "Invalid HTTP version argument (may be :http<1.1>, :http<2>, or :http<1.1 2>)"
     }
 }
 
@@ -99,10 +108,62 @@ class Cro::HTTP::Client {
         }
     }
 
+    my monitor Pipeline2 {
+        has Bool $.secure;
+        has Str $.host;
+        has Int $.port;
+        has Supplier $!in;
+        has Supply $!out;
+        has Tap $!tap;
+        has Bool $.dead = False;
+        has $!next-stream-id = 1;
+        has %!outstanding-stream-responses{Int};
+
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
+            $!tap = supply {
+                whenever $out -> $response {
+                    self.response($response);
+                    LAST {
+                        $!dead = True;
+                        self.break-all-responses(X::AdHoc.new(message => 'Connection to server lost'));
+                    }
+                    QUIT {
+                        default {
+                            $!dead = True;
+                            self.break-all-responses($_);
+                        }
+                    }
+                }
+            }.tap
+        }
+
+        method send-request($request --> Promise) {
+            my $stream-id = $!next-stream-id;
+            $!next-stream-id += 2;
+            $request.http2-stream-id = $stream-id;
+            my $p = Promise.new;
+            %!outstanding-stream-responses{$stream-id} = $p.vow;
+            $!in.emit($request);
+            $p
+        }
+
+        method response($response) {
+            my $vow = %!outstanding-stream-responses{$response.http2-stream-id}:delete;
+            $vow.keep($response);
+        }
+
+        method break-all-responses($error) {
+            for %!outstanding-stream-responses.values -> $vow {
+                $vow.break($error);
+            }
+            %!outstanding-stream-responses = ();
+        }
+    }
+
     my monitor ConnectionCache {
         has %!cached;
 
-        method pipeline-for($secure, $host, $port) {
+        method pipeline-for($secure, $host, $port, $http) {
             if %!cached{self!key($secure, $host, $port)} -> @available {
                 while @available {
                     my $pipeline = @available.shift;
@@ -136,6 +197,7 @@ class Cro::HTTP::Client {
     has %.auth;
     has $.persistent = True;
     has $!connection-cache = ConnectionCache.new;
+    has $.http;
 
     method persistent() {
         self ?? $!persistent !! False
@@ -144,7 +206,7 @@ class Cro::HTTP::Client {
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
-                    :$!follow, :%!auth) {
+                    :$!follow, :%!auth, :$!http) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -154,6 +216,11 @@ class Cro::HTTP::Client {
         if (%!auth<username>:exists) && (%!auth<password>:exists) {
             my $reason = 'Both basic and bearer authentication methods cannot be used';
             die X::Cro::HTTP::Client::InvalidAuth.new(:$reason) if %!auth<bearer>:exists;
+        }
+        with $!http {
+            unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
+                die X::Cro::HTTP::Client::InvalidVersion.new;
+            }
         }
     }
 
@@ -197,9 +264,16 @@ class Cro::HTTP::Client {
     }
     multi method request(Str $method, $url, %options --> Promise) {
         my $parsed-url = $url ~~ Cro::Uri ?? $url !! Cro::Uri.parse(~$url);
-        my $pipeline = self!get-pipeline($parsed-url);
+        my $http = self ?? $!http // %options<http> !! %options<http>;
+        with $http {
+            unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
+                die X::Cro::HTTP::Client::InvalidVersion.new;
+            }
+        }
+        else {
+            $http = '';
+        }
         my $request-object = self!assemble-request($method, $parsed-url, %options);
-        my $response-promise = $pipeline.send-request($request-object);
 
         my constant $redirect-codes = set(301, 302, 303, 307, 308);
         sub construct-url($path) {
@@ -208,90 +282,165 @@ class Cro::HTTP::Client {
         }
 
         Promise(supply {
-            whenever $response-promise {
-                # Consider adding the connection back into the cache to use it
-                # again.
-                if self && $!persistent {
-                    unless .http-version eq '1.0' || (.header('connection') // '').lc eq 'close' {
-                        $!connection-cache.add-pipeline($pipeline);
+            whenever self!get-pipeline($parsed-url, $http) -> $pipeline {
+                whenever $pipeline.send-request($request-object) {
+                    # Consider adding the connection back into the cache to use it
+                    # again.
+                    if self && $!persistent {
+                        unless .http-version eq '1.0' || (.header('connection') // '').lc eq 'close' {
+                            $!connection-cache.add-pipeline($pipeline);
+                        }
                     }
-                }
 
-                if 200 <= .status < 400 || .status == 101 {
-                    my $follow;
-                    if self {
-                        $follow = %options<follow> // $!follow // 5;
-                    } else {
-                        $follow = %options<follow> // 5;
-                    }
-                    if .status ⊂ $redirect-codes && ($follow !=== False) {
-                        my $remain = $follow === True ?? 4 !! $follow.Int - 1;
-                        die X::Cro::HTTP::Client::TooManyRedirects.new if $remain < 0;
-                        my $new-method = .status == 302|303 ?? 'GET' !! $method;
-                        my %new-opts = %options;
-                        %new-opts<follow> = $remain;
-                        if .status == 302|303 {
-                            %new-opts<body>:delete;
-                            %new-opts<content-type>:delete;
-                            %new-opts<content-length>:delete;
+                    if 200 <= .status < 400 || .status == 101 {
+                        my $follow;
+                        if self {
+                            $follow = %options<follow> // $!follow // 5;
+                        } else {
+                            $follow = %options<follow> // 5;
                         }
-                        my $new-url;
-                        $new-url = .header('location').starts-with('/')
-                                   ?? construct-url($_.header('location'))
-                                   !! .header('location');
-                        my $req = self.request($new-method, $new-url, %new-opts);
-                        whenever $req { .emit };
-                    } else {
-                        if self && $.cookie-jar.defined {
-                            $.cookie-jar.add-from-response($_, $parsed-url);
+                        if .status ⊂ $redirect-codes && ($follow !=== False) {
+                            my $remain = $follow === True ?? 4 !! $follow.Int - 1;
+                            die X::Cro::HTTP::Client::TooManyRedirects.new if $remain < 0;
+                            my $new-method = .status == 302|303 ?? 'GET' !! $method;
+                            my %new-opts = %options;
+                            %new-opts<follow> = $remain;
+                            if .status == 302|303 {
+                                %new-opts<body>:delete;
+                                %new-opts<content-type>:delete;
+                                %new-opts<content-length>:delete;
+                            }
+                            my $new-url;
+                            $new-url = .header('location').starts-with('/')
+                                       ?? construct-url($_.header('location'))
+                                       !! .header('location');
+                            my $req = self.request($new-method, $new-url, %new-opts);
+                            whenever $req { .emit };
+                        } else {
+                            if self && $.cookie-jar.defined {
+                                $.cookie-jar.add-from-response($_, $parsed-url);
+                            }
+                            .emit
                         }
-                        .emit
+                    } elsif 400 <= .status < 500 {
+                        my $auth;
+                        if self {
+                            $auth = %options<auth> // %!auth;
+                        } else {
+                            $auth = %options<auth> // {};
+                        }
+                        if .status == 401 && (%options<auth><if-asked>:exists) {
+                            my %opts = %options;
+                            %opts<auth><if-asked>:delete;
+                            whenever self.request($method, $parsed-url, %options) { .emit };
+                        } else {
+                            die X::Cro::HTTP::Error::Client.new(response => $_);
+                        }
+                    } elsif .status >= 500 {
+                        die X::Cro::HTTP::Error::Server.new(response => $_);
                     }
-                } elsif 400 <= .status < 500 {
-                    my $auth;
-                    if self {
-                        $auth = %options<auth> // %!auth;
-                    } else {
-                        $auth = %options<auth> // {};
-                    }
-                    if .status == 401 && (%options<auth><if-asked>:exists) {
-                        my %opts = %options;
-                        %opts<auth><if-asked>:delete;
-                        whenever self.request($method, $parsed-url, %options) { .emit };
-                    } else {
-                        die X::Cro::HTTP::Error::Client.new(response => $_);
-                    }
-                } elsif .status >= 500 {
-                    die X::Cro::HTTP::Error::Server.new(response => $_);
                 }
             }
         })
     }
 
-    method !get-pipeline(Cro::Uri $url) {
+    method !get-pipeline(Cro::Uri $url, $http) {
         my $secure = $url.scheme.lc eq 'https';
         my $host = $url.host;
         my $port = $url.port // ($secure ?? 443 !! 80);
-        if self && $!connection-cache.pipeline-for($secure, $host, $port) -> $pipeline {
-            return $pipeline;
+        if self && $!connection-cache.pipeline-for($secure, $host, $port, $http) -> $pipeline {
+            my $p = Promise.new;
+            $p.keep($pipeline);
+            $p
         }
-        self!build-pipeline($secure, $host, $port)
+        else {
+            self!build-pipeline($secure, $host, $port, $http)
+        }
     }
 
-    method !build-pipeline($secure, $host, $port) {
-        my @parts =
-            (RequestSerializerExtension.new(add-body-serializers => $.add-body-serializers,
-                                            body-serializers => $.body-serializers) if self),
-            Cro::HTTP::RequestSerializer.new,
-            $secure ?? Cro::SSL::Connector !! Cro::TCP::Connector,
-            Cro::HTTP::ResponseParser.new,
-            (ResponseParserExtension.new(add-body-parsers => $.add-body-parsers,
-                                         body-parsers => $.body-parsers) if self);
+    my class VersionDecisionNotifier does Cro::Transform {
+        has $.promise;
+        has $.result;
 
+        method consumes() { Cro::HTTP::Request }
+        method produces() { Cro::HTTP::Request }
+        method transformer($pipeline) {
+            $!promise.keep($!result);
+            return $pipeline;
+        }
+    }
+
+    method !build-pipeline($secure, $host, $port, $http) {
+        my @parts;
+        my $version-decision = Promise.new;
+        if self {
+            push @parts, RequestSerializerExtension.new:
+                add-body-serializers => $.add-body-serializers,
+                body-serializers => $.body-serializers;
+        }
+        if $http eq '2' {
+            push @parts, Cro::HTTP2::RequestSerializer.new;
+            push @parts, Cro::HTTP2::FrameSerializer.new(:client);
+            $version-decision.keep('2');
+        }
+        elsif $http eq '1.1' || !$secure {
+            push @parts, Cro::HTTP::RequestSerializer.new;
+            $version-decision.keep('1.1');
+        }
+        else {
+            push @parts, Cro::ConnectionConditional.new(
+                { (.apln-result // '') eq 'h2' } => [
+                    VersionDecisionNotifier.new(:promise($version-decision), :result('2')),
+                    Cro::HTTP2::RequestSerializer.new,
+                    Cro::HTTP2::FrameSerializer.new(:client)
+                ],
+                [
+                    VersionDecisionNotifier.new(:promise($version-decision), :result('1.1')),
+                    Cro::HTTP::RequestSerializer.new
+                ]
+            );
+        }
+        push @parts, $secure ?? Cro::SSL::Connector !! Cro::TCP::Connector;
+        if $http eq '2' {
+            push @parts, Cro::HTTP2::FrameParser.new(:client);
+            push @parts, Cro::HTTP2::ResponseParser.new;
+        }
+        elsif $http eq '1.1' || !$secure {
+            push @parts, Cro::HTTP::ResponseParser.new;
+        }
+        else {
+            push @parts, Cro::ConnectionConditional.new(
+                { (.apln-result // '') eq 'h2' } => [
+                    Cro::HTTP2::FrameParser.new(:client),
+                    Cro::HTTP2::ResponseParser.new
+                ],
+                Cro::HTTP::ResponseParser.new
+            );
+        }
+        if self {
+            push @parts, ResponseParserExtension.new:
+                add-body-parsers => $.add-body-parsers,
+                body-parsers => $.body-parsers;
+        }
         my $connector = Cro.compose(|@parts);
+
+        my %ssl-config = $secure && $http ne '1.1'
+            ?? alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
+            !! ();
         my $in = Supplier::Preserving.new;
-        my $out = $connector.establish($in.Supply, :$host, :$port);
-        return Pipeline.new(:$secure, :$host, :$port, :$in, :$out)
+        my $out = $version-decision
+            ?? $connector.establish($in.Supply, :$host, :$port, |%ssl-config)
+            !! supply {
+                whenever $connector.establish($in.Supply, :$host, :$port) {
+                    .emit;
+                    QUIT { try $version-decision.break($_) }
+                }
+            };
+        $version-decision.then: -> $version {
+            $version.result eq '2'
+                ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out)
+                !! Pipeline.new(:$secure, :$host, :$port, :$in, :$out)
+        }
     }
 
     method !assemble-request(Str $method, Cro::Uri $url, %options --> Cro::HTTP::Request) {
