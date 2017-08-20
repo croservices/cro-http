@@ -2,6 +2,10 @@ use Cro;
 use Cro::HTTP::Internal;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::ResponseSerializer;
+use Cro::HTTP2::FrameParser;
+use Cro::HTTP2::FrameSerializer;
+use Cro::HTTP2::RequestParser;
+use Cro::HTTP2::ResponseSerializer;
 use Cro::SSL;
 use Cro::TCP;
 
@@ -43,7 +47,17 @@ class Cro::HTTP::Server does Cro::Service {
                     service-type => self.WHAT,
                     :$label,
                     $listener,
-                    Cro::HTTP2::ConnectionManager(|%args)
+                    |$before-parse,
+                    Cro::HTTP2::FrameParser,
+                    Cro::HTTP2::RequestParser.new,
+                    RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
+                    |$before,
+                    $application,
+                    ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
+                    |$after,
+                    Cro::HTTP2::ResponseSerializer.new,
+                    Cro::HTTP2::FrameSerializer,
+                    |$after-serialize
                 )
             } else {
                 return Cro.compose(

@@ -30,7 +30,22 @@ class Cro::HTTP::VersionSelector does Cro::Sink {
                     :$add-body-serializers, :$body-serializers
                    ) {
         $!http2-supplier = Supplier.new;
-        $!http2 = Cro::HTTP2::ConnectionManager.new(:$application).sinker($!http2-supplier.Supply);
+        $!http2 = Cro::ConnectionManager.new(
+            connection-type => Cro::SSL::ServerConnection,
+            components => (
+                |$before-parse,
+                Cro::HTTP2::FrameParser,
+                Cro::HTTP2::RequestParser.new,
+                RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
+                |$before,
+                $application,
+                ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
+                |$after,
+                Cro::HTTP2::ResponseSerializer.new,
+                Cro::HTTP2::FrameSerializer,
+                |$after-serialize
+            )
+        ).sinker($!http2-supplier.Supply);
         $!http1-supplier = Supplier.new;
         $!http1 = Cro::ConnectionManager.new(
             connection-type => Cro::SSL::ServerConnection,

@@ -1,6 +1,5 @@
 use Cro;
-use Cro::SSL;
-use Cro::HTTP2::ConnectionManager;
+use Cro::HTTP::Server;
 
 class HTTPHello does Cro::Transform {
     method consumes() { Cro::HTTP::Request }
@@ -20,15 +19,14 @@ class HTTPHello does Cro::Transform {
 }
 
 constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
-constant %key-cert := {
-    alpn => 'h2',
+constant %ssl := {
     private-key-file => 't/certs-and-keys/server-key.pem',
     certificate-file => 't/certs-and-keys/server-crt.pem'
 };
 
-my Cro::Service $http2-service = Cro.compose(
-    Cro::SSL::Listener.new(port => 8000, |%key-cert),
-    Cro::HTTP2::ConnectionManager.new(application => HTTPHello)
+my Cro::Service $http2-service = Cro::HTTP::Server.new(
+    :http<2>, :host<localhost>, :port(8000), :%ssl,
+    :application(HTTPHello)
 );
 
 $http2-service.start;
