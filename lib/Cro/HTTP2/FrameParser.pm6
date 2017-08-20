@@ -13,6 +13,8 @@ class X::Cro::HTTP2::IncorrectPreface is Exception {
 }
 
 class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
+    has $.client = False;
+
     method consumes() { Cro::TCP::Message }
     method produces() { Cro::HTTP2::Frame }
 
@@ -23,19 +25,19 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
             my $buffer = Buf.new;
             my $length;
             my ($type, $flags, $sid);
-            my $preface = False;
+            my $missing-preface = not $!client;
             my Expecting $expecting = Header;
 
             whenever $in -> Cro::TCP::Message $packet {
                 my $data = $buffer ~ $packet.data;
                 $buffer = Buf.new;
 
-                unless $preface {
+                if $missing-preface {
                     if $data.subbuf(0,24) eq utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
                                                       46,48,13,10,13,10,83,77,13,10,13,10) {
                         $connection-state.settings.emit(True);
                         $data .= subbuf(24);
-                        $preface = True;
+                        $missing-preface = False;
                     } else {
                         die X::Cro::HTTP2::IncorrectPreface.new;
                     }

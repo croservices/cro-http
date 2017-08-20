@@ -14,7 +14,7 @@ ok Cro::HTTP2::FrameParser.produces === Cro::HTTP2::Frame,
 
 sub test-dying($data, $exception, $code, $desc) {
     my $connection-state = Cro::HTTP2::ConnectionState.new;
-    my $parser = Cro::HTTP2::FrameParser;
+    my $parser = Cro::HTTP2::FrameParser.new;
     my $fake-in = Supplier.new;
     my $complete = Promise.new;
     $parser.transformer($fake-in.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $frame {},
@@ -44,7 +44,7 @@ sub test-dying($data, $exception, $code, $desc) {
 
 sub test-example($buffer, $result, $desc) {
     my $connection-state = Cro::HTTP2::ConnectionState.new;
-    my $parser = Cro::HTTP2::FrameParser;
+    my $parser = Cro::HTTP2::FrameParser.new;
     my $serializer = Cro::HTTP2::FrameSerializer.new;
     my $fake-in-p = Supplier.new;
     my $fake-in-s = Supplier.new;

@@ -13,8 +13,8 @@ ok Cro::HTTP2::FrameSerializer.produces === Cro::TCP::Message,
     'HTTP2 frame serializer produces TCP messages';
 
 sub test-example($frame, $result, $desc) {
-    my $serializer = Cro::HTTP2::FrameSerializer;
-    my $parser = Cro::HTTP2::FrameParser;
+    my $serializer = Cro::HTTP2::FrameSerializer.new;
+    my $parser = Cro::HTTP2::FrameParser.new;
     my $fake-in-s = Supplier.new;
     my $fake-in-p = Supplier.new;
     my $complete = Promise.new;
@@ -49,7 +49,7 @@ sub test-example($frame, $result, $desc) {
 
 sub test-multi($frame, @result, $size, $max-frame-size, $desc) {
     my $fake-in = Supplier.new;
-    my $serializer = Cro::HTTP2::FrameSerializer;
+    my $serializer = Cro::HTTP2::FrameSerializer.new;
     my $connection-state = Cro::HTTP2::ConnectionState.new;
     my $complete = Promise.new;
     my $count = 0;

@@ -48,7 +48,7 @@ class Cro::HTTP::Server does Cro::Service {
                     :$label,
                     $listener,
                     |$before-parse,
-                    Cro::HTTP2::FrameParser,
+                    Cro::HTTP2::FrameParser.new,
                     Cro::HTTP2::RequestParser.new,
                     RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
                     |$before,
@@ -56,7 +56,7 @@ class Cro::HTTP::Server does Cro::Service {
                     ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
                     |$after,
                     Cro::HTTP2::ResponseSerializer.new,
-                    Cro::HTTP2::FrameSerializer,
+                    Cro::HTTP2::FrameSerializer.new,
                     |$after-serialize
                 )
             } else {

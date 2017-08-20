@@ -5,11 +5,27 @@ use Cro::Transform;
 use Cro;
 
 class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
+    has $.client = False;
+
     method consumes() { Cro::HTTP2::Frame }
     method produces() { Cro::TCP::Message }
 
     method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
         supply {
+            # If it's a client, always start out by sending connection preface
+            # and an empty settings frame.
+            if $!client {
+                emit Cro::TCP::Message.new(data => blob8.new(
+                    80,82,73,32,42,32,72,84,84,80,47,50,
+                    46,48,13,10,13,10,83,77,13,10,13,10));
+                send-message Cro::HTTP2::Frame::Settings.new(
+                    flags => 0, stream-identifier => 0,
+                    settings => (1 => 4096, 2 => 0,
+                                 3 => 100, 4 => 65535,
+                                 5 => 16384, 6 => 1000)
+                );
+            }
+
             my $MAX-FRAME-SIZE = 2 ** 14;
             sub send-message($frame) {
                 my $result = self!form-header($frame);
