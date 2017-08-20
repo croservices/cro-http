@@ -1,4 +1,5 @@
 use Cro::TCP;
+use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::FrameSerializer;
 use Cro::HTTP2::FrameParser;
 use Cro::HTTP2::Frame;
@@ -12,10 +13,11 @@ ok Cro::HTTP2::FrameParser.produces === Cro::HTTP2::Frame,
     'HTTP2 frame parser produces HTTP2 frames';
 
 sub test-dying($data, $exception, $code, $desc) {
-    my $parser = Cro::HTTP2::FrameParser.new(settings => Supplier.new);
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
+    my $parser = Cro::HTTP2::FrameParser;
     my $fake-in = Supplier.new;
     my $complete = Promise.new;
-    $parser.transformer($fake-in.Supply).schedule-on($*SCHEDULER).tap: -> $frame {},
+    $parser.transformer($fake-in.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $frame {},
     quit => {
         when $exception {
             if .code == $code {
@@ -41,22 +43,22 @@ sub test-dying($data, $exception, $code, $desc) {
 }
 
 sub test-example($buffer, $result, $desc) {
-    my $settings = Supplier::Preserving.new;
-    my $parser = Cro::HTTP2::FrameParser.new(settings => $settings);
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
+    my $parser = Cro::HTTP2::FrameParser;
     my $serializer = Cro::HTTP2::FrameSerializer.new;
     my $fake-in-p = Supplier.new;
     my $fake-in-s = Supplier.new;
     my $complete = Promise.new;
-    $settings.Supply.tap: -> $settings {
+    $connection-state.settings.Supply.tap: -> $settings {
         if $settings ~~ Bool {
         } else {
             is-deeply $settings, $result, $desc;
             $complete.keep;
         }
     }
-    $parser.transformer($fake-in-p.Supply).schedule-on($*SCHEDULER).tap: -> $frame {
+    $parser.transformer($fake-in-p.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $frame {
         is-deeply $frame, $result, $desc;
-        $serializer.transformer($fake-in-s.Supply).schedule-on($*SCHEDULER).tap: -> $message {
+        $serializer.transformer($fake-in-s.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $message {
             is-deeply $buffer, $message.data, $desc ~ ' is serialized back';
             $complete.keep;
         }

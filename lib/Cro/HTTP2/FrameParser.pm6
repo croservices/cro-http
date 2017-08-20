@@ -1,6 +1,8 @@
 use Cro::TCP;
+use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::Frame;
 use Cro::Transform;
+use Cro;
 
 class X::Cro::HTTP2::Disconnect is Exception {
     method message() { "Connection unexpectedly closed in the middle of frame" }
@@ -10,14 +12,11 @@ class X::Cro::HTTP2::IncorrectPreface is Exception {
     method message() { "Client's HTTP/2 preface value is incorrect" }
 }
 
-class Cro::HTTP2::FrameParser does Cro::Transform {
-    has $.settings;
-    has $.ping;
-
+class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
     method consumes() { Cro::TCP::Message }
     method produces() { Cro::HTTP2::Frame }
 
-    method transformer(Supply:D $in) {
+    method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
         supply {
             my enum Expecting <Header Payload>;
 
@@ -34,7 +33,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                 unless $preface {
                     if $data.subbuf(0,24) eq utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
                                                       46,48,13,10,13,10,83,77,13,10,13,10) {
-                        $!settings.emit(True);
+                        $connection-state.settings.emit(True);
                         $data .= subbuf(24);
                         $preface = True;
                     } else {
@@ -62,9 +61,9 @@ class Cro::HTTP2::FrameParser does Cro::Transform {
                         if $data.elems >= $length {
                             my $result = payload($type, $data, $length, :$flags, stream-identifier => $sid);
                             if $result ~~ Cro::HTTP2::Frame::Settings {
-                                $!settings.emit($result) unless $flags +& 1;
+                                $connection-state.settings.emit($result) unless $flags +& 1;
                             } elsif $result ~~ Cro::HTTP2::Frame::Ping {
-                                $!ping.emit($result);
+                                $connection-state.ping.emit($result);
                             } else {
                                 emit $result;
                             }

@@ -1,4 +1,5 @@
 use Cro::TCP;
+use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::FrameSerializer;
 use Cro::HTTP2::FrameParser;
 use Cro::HTTP2::Frame;
@@ -12,14 +13,16 @@ ok Cro::HTTP2::FrameSerializer.produces === Cro::TCP::Message,
     'HTTP2 frame serializer produces TCP messages';
 
 sub test-example($frame, $result, $desc) {
-    my $serializer = Cro::HTTP2::FrameSerializer.new;
-    my $parser = Cro::HTTP2::FrameParser.new(settings => Supplier.new);
+    my $serializer = Cro::HTTP2::FrameSerializer;
+    my $parser = Cro::HTTP2::FrameParser;
     my $fake-in-s = Supplier.new;
     my $fake-in-p = Supplier.new;
     my $complete = Promise.new;
-    $serializer.transformer($fake-in-s.Supply).schedule-on($*SCHEDULER).tap: -> $message {
+    my $connection-state = Cro::HTTP2::ConnectionState.new(settings => Nil, ping => Nil);
+    $serializer.transformer($fake-in-s.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $message {
         ok $message.data eq $result, $desc;
-        $parser.transformer($fake-in-p.Supply).schedule-on($*SCHEDULER).tap: -> $newframe {
+        my $connection-state = Cro::HTTP2::ConnectionState.new;
+        $parser.transformer($fake-in-p.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $newframe {
             is-deeply $newframe, $frame, $desc ~ ' is parsed back';
             $complete.keep;
         }
@@ -45,12 +48,12 @@ sub test-example($frame, $result, $desc) {
 }
 
 sub test-multi($frame, @result, $size, $max-frame-size, $desc) {
-    my $settings = Supplier.new;
     my $fake-in = Supplier.new;
-    my $serializer = Cro::HTTP2::FrameSerializer.new(settings => $settings.Supply);
+    my $serializer = Cro::HTTP2::FrameSerializer;
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
     my $complete = Promise.new;
     my $count = 0;
-    $serializer.transformer($fake-in.Supply).tap: -> $message {
+    $serializer.transformer($fake-in.Supply, :$connection-state).tap: -> $message {
         ok $message.data eq @result[$count];
         $count++;
         $complete.keep if $size == $count;
@@ -60,7 +63,7 @@ sub test-multi($frame, @result, $size, $max-frame-size, $desc) {
         $complete.break;
     }
     start {
-        $settings.emit(Cro::HTTP2::Frame::Settings.new(settings => [5 => $max-frame-size]));
+        $connection-state.settings.emit(Cro::HTTP2::Frame::Settings.new(settings => [5 => $max-frame-size]));
         $fake-in.emit($frame);
         $fake-in.done;
     }

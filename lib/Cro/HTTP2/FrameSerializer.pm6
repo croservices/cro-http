@@ -1,16 +1,16 @@
 use Cro::TCP;
+use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::Frame;
 use Cro::Transform;
+use Cro;
 
-class Cro::HTTP2::FrameSerializer does Cro::Transform {
-    has Supply $.settings;
-    has $!MAX-FRAME-SIZE = 2 ** 14;
-
+class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
     method consumes() { Cro::HTTP2::Frame }
     method produces() { Cro::TCP::Message }
 
-    method transformer(Supply:D $in) {
+    method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
         supply {
+            my $MAX-FRAME-SIZE = 2 ** 14;
             sub send-message($frame) {
                 my $result = self!form-header($frame);
                 self!serializer($result, $frame);
@@ -22,21 +22,21 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
                 my $payload = $is-header ?? $frame.headers !! $frame.data;
                 my $flag = $frame.flags == 4 ?? 0 !! 1 if $is-header;
                 # Send first piece
-                my $first-part = $payload.subbuf(0, $!MAX-FRAME-SIZE-9);
-                $payload .= subbuf($!MAX-FRAME-SIZE-9);
+                my $first-part = $payload.subbuf(0, $MAX-FRAME-SIZE-9);
+                $payload .= subbuf($MAX-FRAME-SIZE-9);
                 my %arg = $is-header ?? headers => $first-part !! data => $first-part;
                 send-message($frame.clone(
                                     flags => $is-header ?? $flag !! 0,
                                     |%arg));
 
                 while $payload.elems > 0 {
-                    my $sent = $payload.elems < $!MAX-FRAME-SIZE-9
+                    my $sent = $payload.elems < $MAX-FRAME-SIZE-9
                              ?? $payload.elems
-                             !! $!MAX-FRAME-SIZE-9;
+                             !! $MAX-FRAME-SIZE-9;
                     my $message;
                     %arg = $is-header ?? headers => $payload.subbuf(0, $sent) !! data => $payload.subbuf(0, $sent);
                     %arg<stream-identifier> = $frame.stream-identifier;
-                    %arg<flags> = $payload.elems < $!MAX-FRAME-SIZE-9 ?? 1 !! 0;
+                    %arg<flags> = $payload.elems < $MAX-FRAME-SIZE-9 ?? 1 !! 0;
                     if $is-header {
                         $message = Cro::HTTP2::Frame::Continuation.new(|%arg)
                     } else {
@@ -51,8 +51,8 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
             my $buffer;
             my $expecting = Header;
 
-            with $.settings {
-                whenever $.settings {
+            with $connection-state.settings {
+                whenever $connection-state.settings {
                     when Bool { # Preface case
                         # Emit server negotiated settings
                         my $set = Cro::HTTP2::Frame::Settings.new(
@@ -66,7 +66,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
                     default {
                         for .settings -> $pair {
                             if $pair.key == SETTINGS_MAX_FRAME_SIZE {
-                                $!MAX-FRAME-SIZE = $pair.value;
+                                $MAX-FRAME-SIZE = $pair.value;
                             }
                         }
                         my $ack = Cro::HTTP2::Frame::Settings.new(
@@ -79,13 +79,13 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform {
 
             whenever $in -> Cro::HTTP2::Frame $frame {
                 if $frame ~~ Cro::HTTP2::Frame::Headers {
-                    if $frame.headers.elems + 9 > $!MAX-FRAME-SIZE {
+                    if $frame.headers.elems + 9 > $MAX-FRAME-SIZE {
                         send-splitted($frame);
                     } else {
                         send-message($frame);
                     }
                 } elsif $frame ~~ Cro::HTTP2::Frame::Data {
-                    if $frame.data.elems + 9 > $!MAX-FRAME-SIZE {
+                    if $frame.data.elems + 9 > $MAX-FRAME-SIZE {
                         send-splitted($frame);
                     } else {
                         send-message($frame);
