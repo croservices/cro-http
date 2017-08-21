@@ -220,6 +220,7 @@ class Cro::HTTP::Client {
     has $.persistent;
     has $!connection-cache = ConnectionCache.new;
     has $.http;
+    has $.ca;
 
     method persistent() {
         self ?? $!persistent !! False
@@ -228,7 +229,7 @@ class Cro::HTTP::Client {
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
-                    :$!follow, :%!auth, :$!http, :$!persistent = True) {
+                    :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -304,7 +305,7 @@ class Cro::HTTP::Client {
         }
 
         Promise(supply {
-            whenever self!get-pipeline($parsed-url, $http) -> $pipeline {
+            whenever self!get-pipeline($parsed-url, $http, ca => %options<ca>) -> $pipeline {
                 if $pipeline !~~ Pipeline2 {
                     unless self.persistent || $request-object.has-header('connection') {
                         $request-object.append-header('Connection', 'close');
@@ -374,7 +375,7 @@ class Cro::HTTP::Client {
         })
     }
 
-    method !get-pipeline(Cro::Uri $url, $http) {
+    method !get-pipeline(Cro::Uri $url, $http, :$ca) {
         my $secure = $url.scheme.lc eq 'https';
         my $host = $url.host;
         my $port = $url.port // ($secure ?? 443 !! 80);
@@ -384,7 +385,7 @@ class Cro::HTTP::Client {
             $p
         }
         else {
-            self!build-pipeline($secure, $host, $port, $http)
+            self!build-pipeline($secure, $host, $port, $http, :$ca)
         }
     }
 
@@ -400,7 +401,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !build-pipeline($secure, $host, $port, $http) {
+    method !build-pipeline($secure, $host, $port, $http, :$ca) {
         my @parts;
         my $version-decision = Promise.new;
         if self {
@@ -458,8 +459,9 @@ class Cro::HTTP::Client {
             ?? alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
             !! ();
         my $in = Supplier::Preserving.new;
+        my %ca = self ?? (self.ca // $ca // {}) !! $ca // {};
         my $out = $version-decision
-            ?? $connector.establish($in.Supply, :$host, :$port, |%ssl-config)
+            ?? $connector.establish($in.Supply, :$host, :$port, |{%ssl-config, %ca})
             !! supply {
                 whenever $connector.establish($in.Supply, :$host, :$port) {
                     .emit;
