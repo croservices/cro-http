@@ -106,6 +106,8 @@ class Cro::HTTP::Client {
             $!in.emit($request);
             return $next-response-promise;
         }
+
+        method close() { $!in.done }
     }
 
     my monitor Pipeline2 {
@@ -158,6 +160,8 @@ class Cro::HTTP::Client {
             }
             %!outstanding-stream-responses = ();
         }
+
+        method close() { $!in.done }
     }
 
     my monitor ConnectionCache {
@@ -308,6 +312,9 @@ class Cro::HTTP::Client {
                         unless .http-version eq '1.0' || (.header('connection') // '').lc eq 'close' {
                             $!connection-cache.add-pipeline($pipeline);
                         }
+                    }
+                    else {
+                        $pipeline.close;
                     }
 
                     if 200 <= .status < 400 || .status == 101 {
