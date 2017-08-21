@@ -11,10 +11,9 @@ my $resp = await $client.get('https://http2.akamai.com/demo');
 is (await $resp.body-text).chars, 6031, 'Single HTTP/2 request works';
 await do for ^8 {
     start {
-        say "New";
         my $resp = await $client.get('https://http2.akamai.com/demo');
-        if (await $resp.body-text).chars == 6031 {
-            say 'Bang!';
+        my $body = await $resp.body-text;
+        if ($body ~~ /'<html>' .*? '</html>'/) {
             $lock.protect({$count--});
         }
     }
