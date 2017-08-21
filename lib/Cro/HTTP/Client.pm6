@@ -161,10 +161,23 @@ class Cro::HTTP::Client {
     }
 
     my monitor ConnectionCache {
-        has %!cached;
+        has %!cached-http1;
+        has %!cached-http2;
 
         method pipeline-for($secure, $host, $port, $http) {
-            if %!cached{self!key($secure, $host, $port)} -> @available {
+            my $key = self!key($secure, $host, $port);
+            if $http eq '2' || !$http && $secure {
+                if %!cached-http2{$key} -> $pipeline {
+                    if $pipeline.dead {
+                        %!cached-http2{$key}:delete;
+                        return Nil;
+                    }
+                    else {
+                        return $pipeline;
+                    }
+                }
+            }
+            if $http ne '1.1' && %!cached-http1{$key} -> @available {
                 while @available {
                     my $pipeline = @available.shift;
                     return $pipeline unless $pipeline.dead;
@@ -176,7 +189,12 @@ class Cro::HTTP::Client {
         method add-pipeline($pipeline --> Nil) {
             with $pipeline {
                 unless .dead {
-                    push %!cached{self!key(.secure, .host, .port)}, $pipeline;
+                    when Pipeline2 {
+                        %!cached-http2{self!key(.secure, .host, .port)} = $pipeline;
+                    }
+                    default {
+                        push %!cached-http1{self!key(.secure, .host, .port)}, $pipeline;
+                    }
                 }
             }
         }
