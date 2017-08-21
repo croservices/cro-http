@@ -42,30 +42,39 @@ class Cro::HTTP::Server does Cro::Service {
 
         sub pack2(:$http2-only) {
             my $listener = Cro::SSL::Listener.new(|(:$host with $host), |(:$port with $port), |%ssl);
+            my @pipe2 = $listener,
+                |$before-parse,
+                Cro::HTTP2::FrameParser.new,
+                Cro::HTTP2::RequestParser.new,
+                RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
+                |$before,
+                $application,
+                ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
+                |$after,
+                Cro::HTTP2::ResponseSerializer.new,
+                Cro::HTTP2::FrameSerializer.new,
+                |$after-serialize;
             if $http2-only {
                 return Cro.compose(
                     service-type => self.WHAT,
                     :$label,
-                    $listener,
+                    |@pipe2
+                )
+            } else {
+                my @pipe1 = $listener,
                     |$before-parse,
-                    Cro::HTTP2::FrameParser.new,
-                    Cro::HTTP2::RequestParser.new,
+                    Cro::HTTP::RequestParser.new,
                     RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
                     |$before,
                     $application,
                     ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
                     |$after,
-                    Cro::HTTP2::ResponseSerializer.new,
-                    Cro::HTTP2::FrameSerializer.new,
-                    |$after-serialize
-                )
-            } else {
-                return Cro.compose(
-                    service-type => self.WHAT,
-                    :$label,
-                    $listener,
-                    Cro::HTTP2::VersionSelector(|%args)
-                )
+                    Cro::HTTP::ResponseSerializer.new,
+                    |$after-serialize;
+                Cro::ConnectionConditional.new(
+                    {.cond} => [|@pipe2],
+                    [|@pipe1]
+                );
             }
         }
 

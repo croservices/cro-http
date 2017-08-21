@@ -34,7 +34,6 @@
                 "Cro::HTTP::ResponseSerializer": "lib/Cro/HTTP/ResponseSerializer.pm6",
                 "Cro::HTTP::Router": "lib/Cro/HTTP/Router.pm6",
                 "Cro::HTTP::Server": "lib/Cro/HTTP/Server.pm6",
-                "Cro::HTTP::VersionSelector": "lib/Cro/HTTP/VersionSelector.pm6",
                 "Cro::HTTP2::ConnectionState": "lib/Cro/HTTP2/ConnectionState.pm6",
                 "Cro::HTTP2::FrameSerializer": "lib/Cro/HTTP2/FrameSerializer.pm6",
                 "Cro::HTTP2::FrameParser": "lib/Cro/HTTP2/FrameParser.pm6",
