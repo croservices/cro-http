@@ -38,7 +38,7 @@ class Cro::HTTP::Server does Cro::Service {
                    :$add-body-serializers, :$body-serializers,
                    :$before-parse, :$before,
                    :$after, :$after-serialize;
-        my $http-val = $http ?? $http !! ();
+        my $http-val = $http // ();
 
         sub pack2(:$http2-only) {
             my $listener = Cro::SSL::Listener.new(|(:$host with $host), |(:$port with $port), |%ssl);
