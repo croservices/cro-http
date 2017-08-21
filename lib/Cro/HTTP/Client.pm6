@@ -305,6 +305,11 @@ class Cro::HTTP::Client {
 
         Promise(supply {
             whenever self!get-pipeline($parsed-url, $http) -> $pipeline {
+                if $pipeline !~~ Pipeline2 {
+                    unless self.persistent || $request-object.has-header('connection') {
+                        $request-object.append-header('Connection', 'close');
+                    }
+                }
                 whenever $pipeline.send-request($request-object) {
                     # Consider adding the connection back into the cache to use it
                     # again.
@@ -507,9 +512,6 @@ class Cro::HTTP::Client {
             when 'auth' {
                 self!form-authentication: $request, %$value, %$value<if-asked>:exists;
             }
-        }
-        unless self.persistent || $request.has-header('connection') {
-            $request.append-header('Connection', 'close');
         }
         return $request;
     }
