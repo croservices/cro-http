@@ -22,11 +22,11 @@ role Cro::HTTP2::GeneralParser {
     has $!pseudo-headers;
 
     method transformer(Supply:D $in) {
-        my $curr-sid = 0;
-        my %streams;
-        my ($breakable, $break) = (True, $curr-sid);
-
         supply {
+            my $curr-sid = 0;
+            my %streams;
+            my ($breakable, $break) = (True, $curr-sid);
+
             my $decoder = HTTP::HPACK::Decoder.new;
             whenever $in {
                 when Any {
