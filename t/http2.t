@@ -41,4 +41,19 @@ given $client.get("https://localhost:8000", :%ca) -> $resp {
     is (await $res.body), 'Response', 'HTTP/2 response is get';
 }
 
+my $lock = Lock.new;
+my $p = Promise.new;
+my $counter = 0;
+for ^3 {
+    start {
+        my $resp = await $client.get("https://localhost:8000", :%ca);
+        my $body = await $resp.body-text;
+        $lock.protect({ $counter++; $p.keep if $counter == 3; });
+    }
+}
+
+await Promise.anyof($p, Promise.in(2));
+
+is $counter, 3, 'Concurrent responses are handled';
+
 done-testing;
