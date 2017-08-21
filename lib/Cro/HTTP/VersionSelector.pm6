@@ -1,4 +1,3 @@
-use Cro::HTTP2::ConnectionManager;
 use Cro::HTTP::Internal;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::ResponseSerializer;
