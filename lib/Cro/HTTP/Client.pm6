@@ -217,7 +217,7 @@ class Cro::HTTP::Client {
     has $.content-type;
     has $.follow;
     has %.auth;
-    has $.persistent = True;
+    has $.persistent;
     has $!connection-cache = ConnectionCache.new;
     has $.http;
 
@@ -228,7 +228,7 @@ class Cro::HTTP::Client {
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
-                    :$!follow, :%!auth, :$!http) {
+                    :$!follow, :%!auth, :$!http, :$!persistent = True) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
