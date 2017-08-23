@@ -405,4 +405,21 @@ constant %key-cert := {
     }
 }
 
+{
+    my $base = "http://localhost:{HTTP_TEST_PORT}";
+    my $client = Cro::HTTP::Client.new;
+    my $lock = Lock.new;
+    my $p = Promise.new;
+    my $counter = 0;
+    for ^5 {
+        start {
+            my $resp = await $client.get("$base/");
+            my $body = await $resp.body-text;
+            $lock.protect({ $counter++ if $body eq 'Home'; $p.keep if $counter == 5; });
+        }
+    }
+    await Promise.anyof($p, Promise.in(2));
+    is $counter, 5, 'Concurrent client works';
+}
+
 done-testing;
