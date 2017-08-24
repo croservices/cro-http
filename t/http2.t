@@ -31,7 +31,6 @@ my Cro::Service $http2-service = Cro::HTTP::Server.new(
 );
 
 $http2-service.start;
-note "Started at 8000";
 END { $http2-service.stop; }
 
 my $client = Cro::HTTP::Client.new(:http<2>);
