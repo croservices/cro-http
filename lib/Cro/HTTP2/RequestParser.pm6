@@ -11,8 +11,10 @@ class Cro::HTTP2::RequestParser does Cro::Transform does Cro::HTTP2::GeneralPars
         $!pseudo-headers = <:method :scheme :authority :path :status>;
     }
 
-    method !get-message($http2-stream-id) {
-        Cro::HTTP::Request.new(:$http2-stream-id, http-version => 'http/2')
+    method !get-message($http2-stream-id, $connection) {
+        Cro::HTTP::Request.new(:$http2-stream-id,
+                               :$connection,
+                               http-version => 'http/2')
     }
 
     method !message-full($req--> Bool) { so $req.method && so $req.target }

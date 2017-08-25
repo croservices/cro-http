@@ -61,7 +61,9 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                     }
                     when Payload {
                         if $data.elems >= $length {
-                            my $result = payload($type, $data, $length, :$flags, stream-identifier => $sid);
+                            my $result = payload($type, $data, $length, :$flags,
+                                                 stream-identifier => $sid,
+                                                 conn => $packet.connection);
                             if $result ~~ Cro::HTTP2::Frame::Settings {
                                 $connection-state.settings.emit($result) unless $flags +& 1;
                             } elsif $result ~~ Cro::HTTP2::Frame::Ping {
@@ -121,6 +123,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
         Cro::HTTP2::Frame::Headers.new(padding-length => $padding-length // UInt,
                                        dependency => $dependency // UInt,
                                        weight => $weight // UInt,
+                                       connection => %header<conn>,
                                        :$exclusive, :$headers, |%header);
     }
     my multi sub payload(2, Buf $data is rw, $length, *%header) {

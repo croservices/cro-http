@@ -10,7 +10,7 @@ class Cro::HTTP2::ResponseParser does Cro::Transform does Cro::HTTP2::GeneralPar
         $!pseudo-headers = <:status>;
     }
 
-    method !get-message($sid) {
+    method !get-message($sid, $connection) {
         Cro::HTTP::Response.new(http-version => '2', http2-stream-id => $sid)
     }
     method !message-full($resp--> Bool) { so $resp.status }

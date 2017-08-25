@@ -44,6 +44,7 @@ class Cro::HTTP2::Frame::Headers does Cro::HTTP2::Frame {
     has UInt $.dependency;
     has UInt $.weight;
     has Blob $.headers;
+    has $.connection;
 
     method end-stream(--> Bool) { $!flags +& 0x1 != 0 }
     method end-headers(--> Bool) { $!flags +& 0x4 != 0 }

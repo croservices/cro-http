@@ -15,7 +15,6 @@ class Stream {
     has Buf $.headers is rw;
 }
 
-
 role Cro::HTTP2::GeneralParser {
     has $.ping;
     has $.settings;
@@ -55,7 +54,7 @@ role Cro::HTTP2::GeneralParser {
                         %streams{$curr-sid} = Stream.new(
                             sid => $curr-sid,
                             state => header-init,
-                            message => self!get-message(.stream-identifier),
+                            message => self!get-message(.stream-identifier, .connection),
                             stream-end => .end-stream,
                             :$body,
                             headers => Buf.new);
