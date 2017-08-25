@@ -2,6 +2,7 @@ use Cro;
 use Cro::HTTP::Internal;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::ResponseSerializer;
+use Cro::HTTP::VersionSelector;
 use Cro::HTTP2::FrameParser;
 use Cro::HTTP2::FrameSerializer;
 use Cro::HTTP2::RequestParser;
@@ -64,7 +65,7 @@ class Cro::HTTP::Server does Cro::Service {
                     service-type => self.WHAT,
                     :$label,
                     $listener,
-                    Cro::HTTP2::VersionSelector(|%args)
+                    Cro::HTTP::VersionSelector.new(|%args)
                 )
             }
         }
@@ -88,15 +89,14 @@ class Cro::HTTP::Server does Cro::Service {
 
         if %ssl {
             if $http-val == <2> {
-                die 'HTTP?2 is requested, but ALPN is not supported' unless supports-alpn;
+                die 'HTTP/2 is requested, but ALPN is not supported' unless supports-alpn;
                 %ssl<alpn> = <h2>;
                 return pack2(:http2-only);
-            } elsif $http-val == <1.1 2> {
-                die 'HTTP?2 is requested, but ALPN is not supported' unless supports-alpn;
+            } elsif !$http-val || $http-val eqv <1.1 2> {
+                die 'HTTP/2 is requested, but ALPN is not supported' unless supports-alpn;
                 %ssl<alpn> = <h2 http/1.1>;
                 return pack2(:!http2-only);
-            } elsif so $http-val == <1.1>|() {
-                %ssl<alpn> = supports-alpn() ?? <h2 http/1.1> !! <http/1.1>;
+            } elsif so $http-val == <1.1> {
                 my $listener = Cro::SSL::Listener.new(
                     |(:$host with $host),
                     |(:$port with $port),

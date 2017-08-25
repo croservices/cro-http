@@ -1,6 +1,10 @@
 use Cro::HTTP::Internal;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::ResponseSerializer;
+use Cro::HTTP2::FrameParser;
+use Cro::HTTP2::FrameSerializer;
+use Cro::HTTP2::RequestParser;
+use Cro::HTTP2::ResponseSerializer;
 use Cro::SSL;
 use Cro;
 
