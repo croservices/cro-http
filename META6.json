@@ -47,5 +47,5 @@
                 "Cro::Uri::HTTP": "lib/Cro/Uri/HTTP.pm6"
     },
     "resources": [],
-    "source-url"    : "https://github.com/jnthn/cro-http.git"
+    "source-url"    : "https://github.com/croservices/cro-http.git"
 }
