@@ -232,7 +232,7 @@ class TestHttpApp does Cro::Transform {
                 if $text eq 'give-me-text' {
                     content 'text/plain', 'Hands That Lift the Oceans';
                 } else {
-                    content 'application/json', :42answer;
+                    content 'application/json', {:42answer};
                 }
             }
         }
