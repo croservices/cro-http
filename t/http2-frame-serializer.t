@@ -18,18 +18,34 @@ sub test-example($frame, $result, $desc) {
     my $fake-in-s = Supplier.new;
     my $fake-in-p = Supplier.new;
     my $complete = Promise.new;
-    my $connection-state = Cro::HTTP2::ConnectionState.new(settings => Nil, ping => Nil);
+
+    # Settings/Ping part
+    my $settings = Supplier.new;
+    my $ping = Supplier.new;
+    my $once = 0;
+
+    my $connection-state = Cro::HTTP2::ConnectionState.new(:$settings, :$ping);
     $serializer.transformer($fake-in-s.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $message {
-        ok $message.data eq $result, $desc;
-        my $connection-state = Cro::HTTP2::ConnectionState.new;
-        $parser.transformer($fake-in-p.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $newframe {
-            is-deeply $newframe, $frame, $desc ~ ' is parsed back';
-            $complete.keep;
-        }
-        # Preface
-        if $frame ~~ Cro::HTTP2::Frame::Settings|Cro::HTTP2::Frame::Ping {
-            $complete.keep
-        } else {
+        if $once < 1 {
+            $once++;
+            ok $message.data eq $result, $desc;
+            $parser.transformer($fake-in-p.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $newframe {
+                is-deeply $newframe, $frame, $desc ~ ' is parsed back';
+                $complete.keep;
+            }
+            # Preface
+            if $frame ~~ Cro::HTTP2::Frame::Settings|Cro::HTTP2::Frame::Ping {
+                $settings.Supply.tap: -> $_ {
+                    if $_ ~~ Cro::HTTP2::Frame {
+                        is-deeply $_, $frame, 'Settings frame is successful';
+                        $complete.keep
+                    }
+                };
+                $ping.Supply.tap: -> $_ {
+                    is-deeply $_, $frame, 'Ping frame is successful';
+                    $complete.keep
+                };
+            }
             $fake-in-p.emit: Cro::TCP::Message.new(
                 data => utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
                                  46,48,13,10,13,10,83,77,13,10,13,10));
