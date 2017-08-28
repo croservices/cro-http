@@ -70,7 +70,9 @@ class Cro::HTTP::VersionSelector does Cro::Sink {
 
     method sinker(Supply:D $incoming) {
         $incoming.do: -> $_ {
-            ($_.alpn-result eq 'h2' ?? $!http2-supplier !! $!http1-supplier).emit($_)
+            (($_.alpn-result // '') eq 'h2'
+             ?? $!http2-supplier
+             !! $!http1-supplier).emit($_)
         }
     }
 }
