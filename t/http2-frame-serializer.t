@@ -22,12 +22,12 @@ sub test-example($frame, $result, $desc) {
     # Settings/Ping part
     my $settings = Supplier.new;
     my $ping = Supplier.new;
-    my $once = 0;
+    my $once = True;
 
     my $connection-state = Cro::HTTP2::ConnectionState.new(:$settings, :$ping);
     $serializer.transformer($fake-in-s.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $message {
-        if $once < 1 {
-            $once++;
+        if $once {
+            $once = False;
             ok $message.data eq $result, $desc;
             $parser.transformer($fake-in-p.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $newframe {
                 is-deeply $newframe, $frame, $desc ~ ' is parsed back';
