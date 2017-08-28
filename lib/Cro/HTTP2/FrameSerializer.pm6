@@ -68,7 +68,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             my $expecting = Header;
 
             with $connection-state.ping {
-                whenever $connection-state.ping {
+                whenever $connection-state.ping.Supply {
                     my $ack = Cro::HTTP2::Frame::Ping.new(
                         :1flags, :0stream-identifier, payload => .payload
                     );
@@ -76,7 +76,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                 }
             }
             with $connection-state.settings {
-                whenever $connection-state.settings {
+                whenever $connection-state.settings.Supply {
                     when Bool { # Preface case
                         # Emit server negotiated settings
                         my $set = Cro::HTTP2::Frame::Settings.new(
