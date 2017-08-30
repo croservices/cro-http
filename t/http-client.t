@@ -69,7 +69,9 @@ constant %key-cert := {
             content 'text/plain', "When you are $User-agent, it is fine to request";
         }
         get -> 'error' {
-            die 'Sudden error';
+            given response {
+                $_.status = 500;
+            }
         }
 
         # Cookie section

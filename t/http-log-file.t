@@ -17,7 +17,9 @@ my $app = route {
         content 'text/plain', 'My response';
     }
     get -> 'error' {
-        die 'No more'
+        given response {
+            $_.status = 500;
+        }
     }
 }
 
