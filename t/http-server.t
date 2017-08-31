@@ -276,8 +276,8 @@ class TestHttpApp does Cro::Transform {
 
     my Cro::Service $test = Cro::HTTP::Server.new(
         :host('localhost'), :port(TEST_PORT), application => $app,
-        body-serializers => [Cro::HTTP::BodySerializer::StrFallback.new],
-        add-body-serializers => [Cro::HTTP::BodySerializer::JSON.new]);
+        body-serializers => [Cro::HTTP::BodySerializer::StrFallback],
+        add-body-serializers => [Cro::HTTP::BodySerializer::JSON]);
 
     $test.start();
     LEAVE $test.stop();
