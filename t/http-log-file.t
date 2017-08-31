@@ -55,8 +55,14 @@ my $app = route {
 
     $out.close; $err.close;
 
-    is (slurp 'out'), "[OK] 200 / - 127.0.0.1\n[OK] 200 /route - 127.0.0.1\n[OK] 200 /route - 127.0.0.1\n", 'Correct responses logged';
-    is (slurp 'err'), "[ERROR] 500 /error - 127.0.0.1\n", 'Error responses logged';
+    like (slurp 'out'),
+        /'[OK] 200 / - '      '127.0.0.1' || '::1' \n
+         '[OK] 200 /route - ' '127.0.0.1' || '::1' \n
+         '[OK] 200 /route - ' '127.0.0.1' || '::1' \n/,
+        'Correct responses logged';
+    like (slurp 'err'),
+        /'[ERROR] 500 /error - ' '127.0.0.1' || '::1' \n/,
+        'Error responses logged';
 
     unlink 'out'.IO;
     unlink 'err'.IO;
