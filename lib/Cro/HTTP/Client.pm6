@@ -75,7 +75,6 @@ class Cro::HTTP::Client {
         has Str $.host;
         has Int $.port;
         has Supplier $!in;
-        has Supply $!out;
         has Tap $!tap;
         has $!next-response-vow;
         has Bool $.dead = False;
@@ -115,7 +114,6 @@ class Cro::HTTP::Client {
         has Str $.host;
         has Int $.port;
         has Supplier $!in;
-        has Supply $!out;
         has Tap $!tap;
         has Bool $.dead = False;
         has $!next-stream-id = 1;
