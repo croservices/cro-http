@@ -80,9 +80,9 @@ class Cro::HTTP::Client {
         has $!next-response-vow;
         has Bool $.dead = False;
 
-        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$!out!) {
             $!tap = supply {
-                whenever $out {
+                whenever $!out {
                     my $vow = $!next-response-vow;
                     $!next-response-vow = Nil;
                     $vow.keep($_);
@@ -121,9 +121,9 @@ class Cro::HTTP::Client {
         has $!next-stream-id = 1;
         has %!outstanding-stream-responses{Int};
 
-        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$!out!) {
             $!tap = supply {
-                whenever $out -> $response {
+                whenever $!out -> $response {
                     self.response($response);
                     LAST {
                         $!dead = True;
