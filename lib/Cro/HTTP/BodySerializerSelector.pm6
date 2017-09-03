@@ -13,8 +13,8 @@ role Cro::HTTP::BodySerializerSelector {
 
 class Cro::HTTP::BodySerializerSelector::RequestDefault does Cro::HTTP::BodySerializerSelector {
     my constant @defaults = [
-        Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded,
-        Cro::HTTP::BodySeiralizer::MultiPartFormData,
+        Cro::HTTP::BodySerializer::WWWFormUrlEncoded,
+        Cro::HTTP::BodySerializer::MultiPartFormData,
         Cro::HTTP::BodySerializer::JSON,
         Cro::HTTP::BodySerializer::StrFallback,
         Cro::HTTP::BodySerializer::BlobFallback

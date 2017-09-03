@@ -86,7 +86,7 @@ class Cro::HTTP::BodySerializer::JSON does Cro::HTTP::BodySerializer {
     }
 }
 
-class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerializer {
+class Cro::HTTP::BodySerializer::WWWFormUrlEncoded does Cro::HTTP::BodySerializer {
     method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
         if $body ~~ Cro::HTTP::Body::WWWFormUrlEncoded {
             True
@@ -136,7 +136,7 @@ class Cro::HTTP::BodySeiralizer::WWWFormUrlEncoded does Cro::HTTP::BodySerialize
     }
 }
 
-class Cro::HTTP::BodySeiralizer::MultiPartFormData does Cro::HTTP::BodySerializer {
+class Cro::HTTP::BodySerializer::MultiPartFormData does Cro::HTTP::BodySerializer {
     method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
         if $body ~~ Cro::HTTP::Body::MultiPartFormData {
             True
