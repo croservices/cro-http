@@ -475,6 +475,7 @@ class Cro::HTTP::Client {
 
     method !assemble-request(Str $method, Cro::Uri $url, %options --> Cro::HTTP::Request) {
         my $target = $url.path || '/';
+        $target ~= "?{$url.query}" if $url.query;
         my $request = Cro::HTTP::Request.new(:$method, :$target);
         $request.append-header('Host', $url.host);
         if self {

@@ -29,6 +29,9 @@ constant %key-cert := {
         delete -> {
             content 'text/plain', 'Gone';
         }
+        get -> 'query', :$value {
+            content 'text/plain', $value ?? $value.uc !! "No Query";
+        }
         get -> 'json' {
             request-body -> %json {
                 content 'text/plain', "%json<reason>";
@@ -172,6 +175,20 @@ constant %key-cert := {
     given await Cro::HTTP::Client.get("$base/") -> $resp {
         is await($resp.body-blob).list, 'Home'.encode('ascii').list,
             'Can also get body back as a blob';
+    }
+
+    given await Cro::HTTP::Client.get("$base/query?value=test") -> $resp {
+	ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /query?value=test';
+        is $resp.status, 200, 'Status is 200';
+        like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'TEST', 'Body text is correct';
+    }
+
+    given await Cro::HTTP::Client.get("$base/query") -> $resp {
+	ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /query';
+        is $resp.status, 200, 'Status is 200';
+        like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'No Query', 'Body text is correct';
     }
 
     my %body = reason => 'works';
