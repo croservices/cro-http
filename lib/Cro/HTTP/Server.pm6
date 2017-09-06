@@ -92,16 +92,16 @@ class Cro::HTTP::Server does Cro::Service {
                 die 'HTTP/2 is requested, but ALPN is not supported' unless supports-alpn;
                 %ssl<alpn> = <h2>;
                 return pack2(:http2-only);
-            } elsif !$http-val || $http-val eqv <1.1 2> {
+            } elsif $http-val eqv <1.1 2>|<2 1.1> {
                 die 'HTTP/2 is requested, but ALPN is not supported' unless supports-alpn;
                 %ssl<alpn> = <h2 http/1.1>;
                 return pack2(:!http2-only);
-            } elsif so $http-val == <1.1> {
+            } elsif $http-val eqv <1.1>|() {
                 my $listener = Cro::SSL::Listener.new(
                     |(:$host with $host),
                     |(:$port with $port),
                     |%ssl);
-                return pack1($listener);
+                return supports-alpn() && !$http-val ?? pack2(:!http2-only) !! pack1($listener);
             } else {
                 die "Incorrect :$http parameter was passed to the server: $http-val"
             }
