@@ -1,6 +1,9 @@
-use Cro::HTTP::Server;
 use Cro::HTTP::Client;
+use Cro::HTTP::Server;
+use Cro::SSL;
 use Test;
+
+skip-rest "ALPN is not supported" unless supports-alpn;
 
 class MyServer does Cro::Transform {
     method consumes() { Cro::HTTP::Request }
