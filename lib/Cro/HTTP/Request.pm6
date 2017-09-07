@@ -46,7 +46,7 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     }
 
     method trace-output(--> Str) {
-        "HTTP Request\n" ~ self.Str.indent(2)
+        "HTTP Request\n" ~ self.Str.trim.subst("\r\n", "\n", :g).indent(2)
     }
 
     method path() {

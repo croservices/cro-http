@@ -65,7 +65,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     }
 
     method trace-output(--> Str) {
-        "HTTP Response\n" ~ self.Str.indent(2)
+        "HTTP Response\n" ~ self.Str.trim.subst("\r\n", "\n", :g).indent(2)
     }
 
     method set-cookie($name, $value, *%options) {
