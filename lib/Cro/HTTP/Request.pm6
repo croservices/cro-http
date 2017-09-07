@@ -45,6 +45,10 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
         "$.method $.target HTTP/$version\r\n$headers\r\n"
     }
 
+    method trace-output(--> Str) {
+        "HTTP Request\n" ~ self.Str.indent(2)
+    }
+
     method path() {
         self!ensure-cached-uri();
         $!cached-uri.path
