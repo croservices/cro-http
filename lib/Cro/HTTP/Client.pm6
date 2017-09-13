@@ -461,7 +461,7 @@ class Cro::HTTP::Client {
         my $out = $version-decision
             ?? $connector.establish($in.Supply, :$host, :$port, |{%ssl-config, %ca})
             !! Promise(supply {
-                whenever $connector.establish($in.Supply, :$host, :$port) {
+                whenever $connector.establish($in.Supply, :$host, :$port, |{%ssl-config, %ca}) {
                     .emit;
                     QUIT { try $version-decision.break($_) }
                 }
