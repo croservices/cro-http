@@ -6,7 +6,7 @@
     "authors"       : [ "Jonathan Worthington <jnthn@jnthn.net>" ],
     "license"       : "Artistic-2.0",
     "depends"       : [ "IO::Socket::Async::SSL", "OO::Monitors", "IO::Path::ChildSecure",
-                        "Base64", "HTTP::HPACK", "Cro::Core", "Cro::SSL" ],
+                        "Base64", "HTTP::HPACK", "Cro::Core", "Cro::SSL", "JSON::Fast" ],
     "provides"      : {
                 "Cro::HTTP::Body": "lib/Cro/HTTP/Body.pm6",
                 "Cro::HTTP::BodyParser": "lib/Cro/HTTP/BodyParser.pm6",
