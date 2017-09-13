@@ -418,7 +418,7 @@ class Cro::HTTP::Client {
         }
         else {
             push @parts, Cro::ConnectionConditional.new(
-                { (.apln-result // '') eq 'h2' } => [
+                { (.alpn-result // '') eq 'h2' } => [
                     VersionDecisionNotifier.new(:promise($version-decision), :result('2')),
                     Cro::HTTP2::RequestSerializer.new,
                     Cro::HTTP2::FrameSerializer.new(:client)
@@ -439,7 +439,7 @@ class Cro::HTTP::Client {
         }
         else {
             push @parts, Cro::ConnectionConditional.new(
-                { (.apln-result // '') eq 'h2' } => [
+                { (.alpn-result // '') eq 'h2' } => [
                     Cro::HTTP2::FrameParser.new(:client),
                     Cro::HTTP2::ResponseParser.new
                 ],
@@ -460,12 +460,12 @@ class Cro::HTTP::Client {
         my %ca = self ?? (self.ca // $ca // {}) !! $ca // {};
         my $out = $version-decision
             ?? $connector.establish($in.Supply, :$host, :$port, |{%ssl-config, %ca})
-            !! supply {
+            !! Promise(supply {
                 whenever $connector.establish($in.Supply, :$host, :$port) {
                     .emit;
                     QUIT { try $version-decision.break($_) }
                 }
-            };
+            });
         $version-decision.then: -> $version {
             $version.result eq '2'
                 ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out)
