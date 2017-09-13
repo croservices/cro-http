@@ -1,4 +1,5 @@
 use Base64;
+use Cro::HTTP::Client;
 use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Response;
 use Test;
@@ -135,7 +136,6 @@ constant %key-cert := {
 }
 
 {
-    use Cro::HTTP::Client;
     my $base = "http://localhost:{HTTP_TEST_PORT}";
 
     throws-like { await Cro::HTTP::Client.get("$base/random-page"); }, X::Cro::HTTP::Error::Client,
@@ -442,7 +442,6 @@ constant %key-cert := {
 }
 
 {
-    use Cro::HTTP::Client;
     my $base = "https://localhost:{HTTPS_TEST_PORT}";
 
     given await Cro::HTTP::Client.get("$base/", :%ca) -> $resp {
