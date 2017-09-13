@@ -144,6 +144,11 @@ constant %key-cert := {
     throws-like { await Cro::HTTP::Client.get("$base/error"); }, X::Cro::HTTP::Error::Server,
         'It throws exception for 500';
 
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT}");
+    given await $c.get('/') -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'base-uri argument works';
+    }
+
     given await Cro::HTTP::Client.get("$base/") -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /';
         is $resp.status, 200, 'Status is 200';

@@ -219,12 +219,13 @@ class Cro::HTTP::Client {
     has $!connection-cache = ConnectionCache.new;
     has $.http;
     has $.ca;
+    has $.base-uri;
 
     method persistent() {
         self ?? $!persistent !! False
     }
 
-    submethod BUILD(:$cookie-jar, :@!headers, :$!content-type,
+    submethod BUILD(:$cookie-jar, :@!headers, :$!content-type, :$!base-uri = '',
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
                     :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca) {
@@ -284,7 +285,9 @@ class Cro::HTTP::Client {
         self.request($method, $url, %options)
     }
     multi method request(Str $method, $url, %options --> Promise) {
-        my $parsed-url = $url ~~ Cro::Uri ?? $url !! Cro::Uri.parse(~$url);
+        my $parsed-url = $url ~~ Cro::Uri
+                       ?? $url
+                       !! Cro::Uri.parse(self ?? $!base-uri ~ $url !! $url);
         my $http = self ?? $!http // %options<http> !! %options<http>;
         with $http {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
