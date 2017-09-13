@@ -441,4 +441,13 @@ constant %key-cert := {
     is $counter, 5, 'Concurrent client works';
 }
 
+{
+    use Cro::HTTP::Client;
+    my $base = "https://localhost:{HTTPS_TEST_PORT}";
+
+    given await Cro::HTTP::Client.get("$base/", :%ca) -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET / with HTTPS';
+    }
+}
+
 done-testing;
