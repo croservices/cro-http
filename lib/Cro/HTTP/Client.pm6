@@ -11,7 +11,7 @@ use Cro::HTTP2::FrameSerializer;
 use Cro::HTTP2::RequestSerializer;
 use Cro::HTTP2::ResponseParser;
 use Cro::TCP;
-use Cro::SSL;
+use Cro::TLS;
 use Cro::Uri;
 use Cro;
 
@@ -432,7 +432,7 @@ class Cro::HTTP::Client {
                 ]
             );
         }
-        push @parts, $secure ?? Cro::SSL::Connector !! Cro::TCP::Connector;
+        push @parts, $secure ?? Cro::TLS::Connector !! Cro::TCP::Connector;
         if $http eq '2' {
             push @parts, Cro::HTTP2::FrameParser.new(:client);
             push @parts, Cro::HTTP2::ResponseParser.new;
@@ -456,15 +456,15 @@ class Cro::HTTP::Client {
         }
         my $connector = Cro.compose(|@parts);
 
-        my %ssl-config = $secure && $http ne '1.1'
+        my %tls-config = $secure && $http ne '1.1'
             ?? alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
             !! ();
         my $in = Supplier::Preserving.new;
         my %ca = self ?? (self.ca // $ca // {}) !! $ca // {};
         my $out = $version-decision
-            ?? $connector.establish($in.Supply, :$host, :$port, |{%ssl-config, %ca})
+            ?? $connector.establish($in.Supply, :$host, :$port, |{%tls-config, %ca})
             !! Promise(supply {
-                whenever $connector.establish($in.Supply, :$host, :$port, |{%ssl-config, %ca}) {
+                whenever $connector.establish($in.Supply, :$host, :$port, |{%tls-config, %ca}) {
                     .emit;
                     QUIT { try $version-decision.break($_) }
                 }

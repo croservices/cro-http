@@ -5,7 +5,7 @@ use Cro::HTTP2::FrameParser;
 use Cro::HTTP2::FrameSerializer;
 use Cro::HTTP2::RequestParser;
 use Cro::HTTP2::ResponseSerializer;
-use Cro::SSL;
+use Cro::TLS;
 use Cro;
 
 my class RequestParserExtension is ParserExtension {
@@ -24,7 +24,7 @@ class Cro::HTTP::VersionSelector does Cro::Sink {
     has $!http2;
     has $!http2-supplier;
 
-    method consumes() { Cro::SSL::ServerConnection }
+    method consumes() { Cro::TLS::ServerConnection }
 
     submethod BUILD(:$application,
                     :$before-parse = (), :$before = (),
@@ -34,7 +34,7 @@ class Cro::HTTP::VersionSelector does Cro::Sink {
                    ) {
         $!http2-supplier = Supplier.new;
         $!http2 = Cro::ConnectionManager.new(
-            connection-type => Cro::SSL::ServerConnection,
+            connection-type => Cro::TLS::ServerConnection,
             components => (
                 |$before-parse,
                 Cro::HTTP2::FrameParser.new,
@@ -51,7 +51,7 @@ class Cro::HTTP::VersionSelector does Cro::Sink {
         ).sinker($!http2-supplier.Supply);
         $!http1-supplier = Supplier.new;
         $!http1 = Cro::ConnectionManager.new(
-            connection-type => Cro::SSL::ServerConnection,
+            connection-type => Cro::TLS::ServerConnection,
             components => (
                 |$before-parse,
                 Cro::HTTP::RequestParser.new,

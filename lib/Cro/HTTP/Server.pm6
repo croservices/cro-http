@@ -7,7 +7,7 @@ use Cro::HTTP2::FrameParser;
 use Cro::HTTP2::FrameSerializer;
 use Cro::HTTP2::RequestParser;
 use Cro::HTTP2::ResponseSerializer;
-use Cro::SSL;
+use Cro::TLS;
 use Cro::TCP;
 
 my class RequestParserExtension is ParserExtension {
@@ -26,7 +26,7 @@ class Cro::HTTP::Server does Cro::Service {
     }
 
     only method new(Cro::Transform :$application!,
-                    :$host, :$port, :%ssl,
+                    :$host, :$port, :ssl(:%tls),
                     :$before-parse = (), :$before = (),
                     :$after = (), :$after-serialize = (),
                     :$add-body-parsers, :$body-parsers,
@@ -42,7 +42,7 @@ class Cro::HTTP::Server does Cro::Service {
         my $http-val = $http // ();
 
         sub pack2(:$http2-only) {
-            my $listener = Cro::SSL::Listener.new(|(:$host with $host), |(:$port with $port), |%ssl);
+            my $listener = Cro::TLS::Listener.new(|(:$host with $host), |(:$port with $port), |%tls);
             if $http2-only {
                 return Cro.compose(
                     service-type => self.WHAT,
@@ -87,20 +87,20 @@ class Cro::HTTP::Server does Cro::Service {
             )
         }
 
-        if %ssl {
+        if %tls {
             if $http-val == <2> {
                 die 'HTTP/2 is requested, but ALPN is not supported' unless supports-alpn;
-                %ssl<alpn> = <h2>;
+                %tls<alpn> = <h2>;
                 return pack2(:http2-only);
             } elsif $http-val eqv <1.1 2>|<2 1.1> {
                 die 'HTTP/2 is requested, but ALPN is not supported' unless supports-alpn;
-                %ssl<alpn> = <h2 http/1.1>;
+                %tls<alpn> = <h2 http/1.1>;
                 return pack2(:!http2-only);
             } elsif $http-val eqv <1.1>|() {
-                my $listener = Cro::SSL::Listener.new(
+                my $listener = Cro::TLS::Listener.new(
                     |(:$host with $host),
                     |(:$port with $port),
-                    |%ssl);
+                    |%tls);
                 return supports-alpn() && !$http-val ?? pack2(:!http2-only) !! pack1($listener);
             } else {
                 die "Incorrect :$http parameter was passed to the server: $http-val"

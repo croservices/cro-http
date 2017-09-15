@@ -129,7 +129,7 @@ constant %key-cert := {
     my $https-server = Cro::HTTP::Server.new(
         port => HTTPS_TEST_PORT,
         application => $app,
-        ssl => %key-cert
+        tls => %key-cert
     );
     $https-server.start();
     END $https-server.stop();
