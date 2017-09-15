@@ -1,6 +1,6 @@
 use Cro::HTTP::Client;
 use Cro::HTTP::Server;
-use Cro::SSL;
+use Cro::TLS;
 use Test;
 
 plan 2;
@@ -25,13 +25,13 @@ class MyServer does Cro::Transform {
 }
 
 constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
-constant %ssl := {
+constant %tls := {
     private-key-file => 't/certs-and-keys/server-key.pem',
     certificate-file => 't/certs-and-keys/server-crt.pem'
 };
 
 my Cro::Service $http2-service = Cro::HTTP::Server.new(
-    :http<2>, :host<localhost>, :port(8000), :%ssl,
+    :http<2>, :host<localhost>, :port(8000), :%tls,
     :application(MyServer)
 );
 

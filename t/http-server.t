@@ -75,7 +75,7 @@ class TestHttpApp does Cro::Transform {
 
     my $service = Cro::HTTP::Server.new(
         port => TEST_PORT,
-        ssl => %key-cert,
+        tls => %key-cert,
         application => TestHttpApp
     );
     ok $service ~~ Cro::Service, 'Service does Cro::Service (HTTPS)';
