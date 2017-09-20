@@ -5,7 +5,10 @@ use Test;
 
 plan 2;
 
-skip-rest "ALPN is not supported" unless supports-alpn;
+unless supports-alpn() {
+    skip-rest "ALPN is not supported";
+    exit 0;
+}
 
 class MyServer does Cro::Transform {
     method consumes() { Cro::HTTP::Request }
@@ -36,7 +39,6 @@ my Cro::Service $http2-service = Cro::HTTP::Server.new(
 );
 
 $http2-service.start;
-END { $http2-service.stop; }
 
 my $client = Cro::HTTP::Client.new(:http<2>);
 
@@ -57,6 +59,8 @@ for ^3 {
         }
     }
 }
+
+$http2-service.stop;
 
 await Promise.anyof($p, Promise.in(2));
 
