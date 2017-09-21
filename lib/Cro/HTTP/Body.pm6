@@ -54,14 +54,21 @@ class WWWFormUrlEncoded does Associative {
         }
         $!hashed
     }
+
+    method Capture() {
+        Capture.new(hash => self!hashed)
+    }
 }
 
-class MultiPartFormData {
-    class Part {
+class MultiPartFormData does Associative {
+    class Part does Stringy {
         has Cro::HTTP::Header @.headers;
         has Str $.name;
         has Str $.filename;
         has Blob $.body-blob;
+
+        multi method Stringy(::?CLASS:D:) { self.Str }
+        multi method Str(::?CLASS:D:) { self.body-text }
 
         method body-text() {
             (try $!body-blob.decode('utf-8')) // $!body-blob.decode('latin-1')
@@ -84,4 +91,40 @@ class MultiPartFormData {
     }
 
     has Part @.parts;
+    has $!hashed;
+
+    method hash() { self!hashed }
+
+    method AT-KEY(Str() $key) {
+        self!hashed.AT-KEY($key)
+    }
+
+    method EXISTS-KEY(Str() $key) {
+        self!hashed.EXISTS-KEY($key);
+    }
+
+    method !hashed() {
+        without $!hashed {
+            my %hashed-pairs;
+            for @!parts -> $p {
+                with %hashed-pairs{$p.name} -> $existing {
+                    %hashed-pairs{$p.name} = Cro::HTTP::MultiValue.new(
+                        $existing ~~ Cro::HTTP::MultiValue
+                            ?? $existing.Slip
+                            !! $existing,
+                        $p
+                    )
+                }
+                else {
+                    %hashed-pairs{$p.name} = $p;
+                }
+            }
+            $!hashed = %hashed-pairs;
+        }
+        $!hashed
+    }
+
+    method Capture() {
+        Capture.new(hash => self!hashed)
+    }
 }

@@ -1485,4 +1485,45 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    use Cro::HTTP::Client;
+    use Cro::HTTP::Server;
+
+    my $app = route {
+        post -> 'destructure' {
+            request-body -> (:$name!, :$surname!) {
+                content 'text/plain', "Hello, $name $surname!";
+            }
+        }
+    }
+
+    my $http-server = Cro::HTTP::Server.new(
+        port => 31316,
+        application => $app
+    );
+    $http-server.start();
+    LEAVE $http-server.stop();
+
+    my $base = "http://localhost:31316";
+    given await Cro::HTTP::Client.post("$base/destructure",
+                                       content-type => 'multipart/form-data',
+                                       body => [name => 'John', surname => 'Doe']) -> $resp {
+        is await($resp.body-text), 'Hello, John Doe!',
+            'multipart/form-data is handled with destructuring';
+    }
+    given await Cro::HTTP::Client.post("$base/destructure",
+                                       content-type => 'application/x-www-form-urlencoded',
+                                       body => [name => 'John', surname => 'Doe']) -> $resp {
+        is await($resp.body-text), 'Hello, John Doe!',
+            'urlencoded is handled with destructuring';
+    }
+    my %body = name => 'John', surname => 'Doe';
+    given await Cro::HTTP::Client.post("$base/destructure",
+                                       content-type => 'application/json',
+                                       body => %body) -> $resp {
+        is await($resp.body-text), 'Hello, John Doe!',
+        'json is handled with destructuring';
+    }
+}
+
 done-testing;
