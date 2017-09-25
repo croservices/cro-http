@@ -79,6 +79,9 @@ module Cro::HTTP::Router {
                         whenever start ($req.path eq '/' ??
                                         implementation() !!
                                         implementation(|$arg-capture)) {
+                            unless $response.status {
+                                die "Route for path {$req.path} does not serve a Response.";
+                            }
                             emit $response;
 
                             QUIT {
