@@ -8,12 +8,13 @@ my $lock = Lock.new;
 
 my $client = Cro::HTTP::Client.new(:http<2>);
 my $resp = await $client.get('https://http2.akamai.com/demo');
-is (await $resp.body-text).chars, 6031, 'Single HTTP/2 request works';
+like (await $resp.body-text), /'<html>' .* '</html>'/,
+    'Single HTTP/2 request works';
 await do for ^8 {
     start {
         my $resp = await $client.get('https://http2.akamai.com/demo');
         my $body = await $resp.body-text;
-        if ($body ~~ /'<html>' .*? '</html>'/) {
+        if ($body ~~ /'<html>' .* '</html>'/) {
             $lock.protect({$count--});
         }
     }
