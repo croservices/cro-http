@@ -48,17 +48,17 @@ role Cro::HTTP2::GeneralParser {
                     }
                 }
                 when Cro::HTTP2::Frame::Headers {
-                    if .stream-identifier > $curr-sid {
+                    unless %streams{.stream-identifier}:exists {
                         $curr-sid = .stream-identifier;
                         my $body = Supplier::Preserving.new;
                         %streams{$curr-sid} = Stream.new(
                             sid => $curr-sid,
                             state => header-init,
-                            message => self!get-message(.stream-identifier, .connection),
+                            message => self!get-message($curr-sid, .connection),
                             stream-end => .end-stream,
                             :$body,
                             headers => Buf.new);
-                        %streams{.stream-identifier}.message.set-body-byte-stream($body.Supply);
+                        %streams{$curr-sid}.message.set-body-byte-stream($body.Supply);
                     }
                     my $message = %streams{.stream-identifier}.message;
 
