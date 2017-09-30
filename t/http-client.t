@@ -2,6 +2,7 @@ use Base64;
 use Cro::HTTP::Client;
 use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Response;
+use Cro::TLS;
 use Test;
 
 constant HTTP_TEST_PORT = 31316;
@@ -446,12 +447,15 @@ constant %key-cert := {
     is $counter, 5, 'Concurrent client works';
 }
 
-{
+if supports-alpn() {
     my $base = "https://localhost:{HTTPS_TEST_PORT}";
 
     given await Cro::HTTP::Client.get("$base/", :%ca) -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET / with HTTPS';
     }
+} else {
+    use Cro::TLS;
+    skip 1, 'No ALPN support';
 }
 
 done-testing;
