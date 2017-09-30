@@ -455,7 +455,7 @@ if supports-alpn() {
     }
 } else {
     use Cro::TLS;
-    skip 1, 'No ALPN support';
+    skip 'No ALPN support', 1;
 }
 
 done-testing;
