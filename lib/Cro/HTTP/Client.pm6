@@ -109,7 +109,8 @@ class Cro::HTTP::Client {
         method close() { $!in.done }
     }
 
-    my monitor Pipeline2 {
+    my class Pipeline2 {
+        has Lock $!lock = Lock.new;
         has Bool $.secure;
         has Str $.host;
         has Int $.port;
@@ -138,25 +139,31 @@ class Cro::HTTP::Client {
         }
 
         method send-request($request --> Promise) {
-            my $stream-id = $!next-stream-id;
-            $!next-stream-id += 2;
-            $request.http2-stream-id = $stream-id;
             my $p = Promise.new;
-            %!outstanding-stream-responses{$stream-id} = $p.vow;
+            $!lock.protect: {
+                my $stream-id = $!next-stream-id;
+                $!next-stream-id += 2;
+                $request.http2-stream-id = $stream-id;
+                %!outstanding-stream-responses{$stream-id} = $p.vow;
+            }
             $!in.emit($request);
             $p
         }
 
         method response($response) {
-            my $vow = %!outstanding-stream-responses{$response.http2-stream-id}:delete;
+            my $vow = $!lock.protect: {
+                %!outstanding-stream-responses{$response.http2-stream-id}:delete
+            }
             $vow.keep($response);
         }
 
         method break-all-responses($error) {
-            for %!outstanding-stream-responses.values -> $vow {
-                $vow.break($error);
+            $!lock.protect: {
+                for %!outstanding-stream-responses.values -> $vow {
+                    $vow.break($error);
+                }
+                %!outstanding-stream-responses = ();
             }
-            %!outstanding-stream-responses = ();
         }
 
         method close() { $!in.done }

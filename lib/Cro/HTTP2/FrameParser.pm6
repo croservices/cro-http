@@ -35,7 +35,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                 if $missing-preface {
                     if $data.subbuf(0,24) eq utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
                                                       46,48,13,10,13,10,83,77,13,10,13,10) {
-                        $connection-state.settings.emit(True);
+                        start $connection-state.settings.emit(True);
                         $data .= subbuf(24);
                         $missing-preface = False;
                     } else {
@@ -65,9 +65,9 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                                                  stream-identifier => $sid,
                                                  conn => $packet.connection);
                             if $result ~~ Cro::HTTP2::Frame::Settings {
-                                $connection-state.settings.emit($result) unless $flags +& 1;
+                                (start $connection-state.settings.emit($result)) unless $flags +& 1;
                             } elsif $result ~~ Cro::HTTP2::Frame::Ping {
-                                $connection-state.ping.emit($result);
+                                start $connection-state.ping.emit($result);
                             } else {
                                 emit $result;
                             }
