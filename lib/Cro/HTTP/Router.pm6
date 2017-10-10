@@ -140,6 +140,14 @@ module Cro::HTTP::Router {
             @!body-serializers.push($serializer);
         }
 
+        method include(RouteSet $includee) {
+            for $includee!handlers() -> $handler {
+                @!handlers.push($handler);
+            }
+        }
+
+        method !handlers() { @!handlers }
+
         method definition-complete(--> Nil) {
             my @route-matchers;
 
@@ -387,6 +395,10 @@ module Cro::HTTP::Router {
 
     sub body-serializer(Cro::HTTP::BodySerializer $serializer --> Nil) is export {
         $*CRO-ROUTE-SET.add-body-serializer($serializer);
+    }
+
+    sub include(RouteSet $includee) is export {
+        $*CRO-ROUTE-SET.include($includee);
     }
 
     sub term:<request>() is export {

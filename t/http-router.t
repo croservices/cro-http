@@ -1526,4 +1526,37 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $nested = route {
+        get -> {
+            content 'text/plain', 'empty route (include)';
+        }
+        get -> 'some', 'parts' {
+            content 'text/plain', 'some parts (include)';
+        }
+    }
+    my $app = route {
+        get -> 'before' {
+            content 'text/plain', 'before (outer)';
+        }
+        include $nested;
+        get -> 'after' {
+            content 'text/plain', 'after (outer)';
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my %expected =
+        '/' => 'empty route (include)',
+        '/some/parts', 'some parts (include)',
+        '/before' => 'before (outer)',
+        '/after' => 'after (outer)';
+    for %expected.kv -> $target, $expected {
+        $source.emit(Cro::HTTP::Request.new(method => 'GET', :$target));
+        given $responses.receive -> $r {
+            is body-text($r), $expected, "Basic include: $expected";
+        }
+    }
+}
+
 done-testing;
