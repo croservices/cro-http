@@ -1559,4 +1559,78 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my class TestBody {
+        has $.variant;
+        has $.content;
+    }
+
+    my class TestBodyParser1 does Cro::HTTP::BodyParser {
+        method is-applicable(Cro::HTTP::Message $message --> Bool) {
+            with $message.content-type {
+                .type eq 'text' && .subtype eq 'x-test-1'
+            }
+            else {
+                False
+            }
+        }
+        method parse(Cro::HTTP::Message $message --> Promise) {
+            $message.body-text.then({ TestBody.new(:1variant, :content(.result)) })
+        }
+    }
+
+    my class TestBodyParser2 does Cro::HTTP::BodyParser {
+        method is-applicable(Cro::HTTP::Message $message --> Bool) {
+            with $message.content-type {
+                .type eq 'text' && .subtype eq 'x-test-2'
+            }
+            else {
+                False
+            }
+        }
+        method parse(Cro::HTTP::Message $message --> Promise) {
+            $message.body-text.then({ TestBody.new(:2variant, :content(.result)) })
+        }
+    }
+
+    my $nested = route {
+        body-parser TestBodyParser2;
+        get -> 'inner' {
+            request-body -> $body {
+                content 'text/plain', $body ~~ TestBody
+                    ?? "$body.variant(), $body.content()"
+                    !! "no match";
+            }
+        }
+    }
+    my $app = route {
+        body-parser TestBodyParser1;
+        include $nested;
+        get -> 'outer' {
+            request-body -> $body {
+                content 'text/plain', $body ~~ TestBody
+                    ?? "$body.variant(), $body.content()"
+                    !! "no match";
+            }
+        }
+    }
+
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my %expected{Array} =
+        ['/outer', 1] => ['1, blah', 'outer has outer body parser'],
+        ['/outer', 2] => ['no match', 'body parser in include does not leak out'],
+        ['/inner', 1] => ['1, blah', 'outer body parser visible in include'],
+        ['/inner', 2] => ['2, blah', 'body parser in include works in include'];
+    for %expected.kv -> [$target, $variant], [$expected, $desc] {
+        my $req = Cro::HTTP::Request.new(method => 'GET', :$target);
+        $req.append-header('Content-type', "text/x-test-$variant");
+        $req.set-body('blah');
+        $source.emit($req);
+        given $responses.receive -> $r {
+            is body-text($r), $expected, "include and body-parser: $desc";
+        }
+    }
+}
+
 done-testing;

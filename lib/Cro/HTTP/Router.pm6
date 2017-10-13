@@ -40,12 +40,40 @@ module Cro::HTTP::Router {
         my class Handler {
             has Str $.method;
             has &.implementation;
+            has @.body-parsers;
+            has @.body-serializers;
+
+            method copy-adding(:@body-parsers!, :@body-serializers!) {
+                self.bless:
+                    :$!method, :&!implementation,
+                    :body-parsers[flat @!body-parsers, @body-parsers],
+                    :body-serializers[flat @!body-serializers, @body-serializers]
+            }
+
+            method invoke(Cro::HTTP::Request $req, Cro::HTTP::Response $res, Capture $args) {
+                if @!body-parsers {
+                    $req.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(
+                        parsers => @!body-parsers,
+                        next => $req.body-parser-selector
+                    );
+                }
+                if @!body-serializers {
+                    $res.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(
+                        serializers => @!body-serializers,
+                        next => $res.body-serializer-selector
+                    );
+                }
+                $req.path eq '/'
+                    ?? &!implementation()
+                    !! &!implementation(|$args)
+            }
         }
 
         has Handler @!handlers;
         has $!path-matcher;
         has Cro::HTTP::BodyParser @!body-parsers;
         has Cro::HTTP::BodySerializer @!body-serializers;
+        has RouteSet @!includes;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -58,44 +86,28 @@ module Cro::HTTP::Router {
                     my $*MISSING-UNPACK = False;
                     my @*BIND-FAILS;
                     with $req.path ~~ $!path-matcher {
-                        if @!body-parsers {
-                            $req.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(
-                                parsers => @!body-parsers,
-                                next => $req.body-parser-selector
-                            );
-                        }
                         my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(request => $req);
-                        if @!body-serializers {
-                            $*CRO-ROUTER-RESPONSE.body-serializer-selector =
-                                Cro::HTTP::BodySerializerSelector::Prepend.new(
-                                    serializers => @!body-serializers,
-                                    next => $req.body-serializer-selector
-                                );
-                        }
-                        my ($handler-idx, $arg-capture) = .ast;
+                        my ($handler-idx, $args) = .ast;
                         my $handler := @!handlers[$handler-idx];
-                        my &implementation := $handler.implementation;
-                        my $response = $*CRO-ROUTER-RESPONSE;
-                        whenever start ($req.path eq '/' ??
-                                        implementation() !!
-                                        implementation(|$arg-capture)) {
+                        my $res = $*CRO-ROUTER-RESPONSE;
+                        whenever start $handler.invoke($req, $res, $args) {
                             # No Content is default
-                            $response.status //= 204;
-                            emit $response;
+                            $res.status //= 204;
+                            emit $res;
 
                             QUIT {
                                 when X::Cro::HTTP::Router::NoRequestBodyMatch {
-                                    $response.status = 400;
-                                    emit $response;
+                                    $res.status = 400;
+                                    emit $res;
                                 }
                                 when X::Cro::HTTP::BodyParserSelector::NoneApplicable {
-                                    $response.status = 400;
-                                    emit $response;
+                                    $res.status = 400;
+                                    emit $res;
                                 }
                                 default {
                                     .note;
-                                    $response.status = 500;
-                                    emit $response;
+                                    $res.status = 500;
+                                    emit $res;
                                 }
                             }
                         }
@@ -141,14 +153,25 @@ module Cro::HTTP::Router {
         }
 
         method include(RouteSet $includee) {
-            for $includee!handlers() -> $handler {
-                @!handlers.push($handler);
-            }
+            @!includes.push($includee);
         }
 
         method !handlers() { @!handlers }
 
         method definition-complete(--> Nil) {
+            for @!handlers {
+                .body-parsers = @!body-parsers;
+                .body-serializers = @!body-serializers;
+            }
+            for @!includes -> $inc {
+                for $inc!handlers() {
+                    @!handlers.push(.copy-adding(:@!body-parsers, :@!body-serializers));
+                }
+            }
+            self!generate-route-matcher();
+        }
+
+        method !generate-route-matcher(--> Nil) {
             my @route-matchers;
 
             my @handlers = @!handlers; # This is closed over in the EVAL'd regex
