@@ -1687,4 +1687,39 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my class TestTransform does Cro::Transform {
+        has $.label is required;
+        method consumes() { Cro::HTTP::Request }
+        method produces() { Cro::HTTP::Response }
+        method transformer(Supply $in --> Supply) {
+            supply whenever $in -> $request {
+                my $resp = Cro::HTTP::Response.new(:$request, :200status);
+                $resp.append-header('Content-type', 'text/plain');
+                $resp.set-body("delegated transform $!label");
+                emit $resp;
+            }
+        }
+    }
+    my $app = route {
+        delegate simple => TestTransform.new(:label<simple>);
+        delegate <multi part> => TestTransform.new(:label<multi part>);
+        delegate first => TestTransform.new(:label<first>),
+                 <and second> => TestTransform.new(:label<and second>);
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my %expected =
+        '/simple' => 'delegated transform simple',
+        '/multi/part' => 'delegated transform multi part',
+        '/first' => 'delegated transform first',
+        '/and/second' => 'delegated transform and second';
+    for %expected.kv -> $target, $expected {
+        $source.emit(Cro::HTTP::Request.new(method => 'GET', :$target));
+        given $responses.receive -> $r {
+            is body-text($r), $expected, "Basic delegation: $expected";
+        }
+    }
+}
+
 done-testing;

@@ -109,6 +109,32 @@ module Cro::HTTP::Router {
             }
         }
 
+        my class DelegateHandler does Handler {
+            has Cro::Transform $.transform;
+
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!) {
+                self.bless:
+                    :$!transform,
+                    :prefix[flat @prefix, @!prefix],
+                    :body-parsers[flat @!body-parsers, @body-parsers],
+                    :body-serializers[flat @!body-serializers, @body-serializers]
+            }
+
+            method signature() {
+                (-> {}).signature
+            }
+
+            method invoke(Cro::HTTP::Request $request, Capture $args) {
+                self!add-body-parsers($request);
+                supply {
+                    whenever $!transform.transformer(supply emit $request) -> $response {
+                        self!add-body-serializers($response);
+                        emit $response;
+                    }
+                }
+            }
+        }
+
         has Handler @!handlers;
         has $!path-matcher;
         has Cro::HTTP::BodyParser @!body-parsers;
@@ -183,6 +209,10 @@ module Cro::HTTP::Router {
         }
 
         method !handlers() { @!handlers }
+
+        method delegate(@prefix, Cro::Transform $transform) {
+            @!handlers.push(DelegateHandler.new(:@prefix, :$transform));
+        }
 
         method definition-complete(--> Nil) {
             for @!handlers {
@@ -385,8 +415,10 @@ module Cro::HTTP::Router {
                     $need-sig-bind = True if extract-constraints($param);
                 }
 
-                my $method-check = '<?{ $req.method eq "' ~ $handler.method ~
-                    '" || !($*WRONG-METHOD = True) }>';
+                my $method-check = $handler.can('method')
+                    ?? '<?{ $req.method eq "' ~ $handler.method ~
+                        '" || !($*WRONG-METHOD = True) }>'
+                    !! '';
                 my $checks = @checks
                     ?? '<?{ ' ~ @checks.join(' and ') ~ ' }>'
                     !! '';
@@ -488,6 +520,39 @@ module Cro::HTTP::Router {
             }
             else {
                 die "Can only use 'include' with `route` block, not a $routes.^name()";
+            }
+        }
+    }
+
+    sub delegate(*@delegates, *%delegates --> Nil) is export {
+        for flat @delegates, %delegates.pairs {
+            when Pair {
+                my ($prefix, $transform) = .kv;
+                unless $transform ~~ Cro::Transform {
+                    die "Pairs passed to 'delegate' must have a Cro::Transform value";
+                }
+                unless $transform.consumes ~~ Cro::HTTP::Request {
+                    die "Transform used with delegate must consume Cro::HTTP::Request, but " ~
+                        $transform.^name ~ " consumes " ~ $transform.consumes.^name;
+                }
+                unless $transform.produces ~~ Cro::HTTP::Response {
+                    die "Transform used with delegate must produce Cro::HTTP::Response, but " ~
+                        $transform.^name ~ " produces " ~ $transform.produces.^name;
+                }
+                given $prefix {
+                    when Iterable {
+                        $*CRO-ROUTE-SET.delegate($prefix, $transform);
+                    }
+                    when Str {
+                        $*CRO-ROUTE-SET.delegate([$prefix], $transform);
+                    }
+                    default {
+                        die "Paris passed to 'delegate' must have a Str or Iterable key, not " ~ .^name;
+                    }
+                }
+            }
+            default {
+                die "Must pass one or more Pairs to 'delegate', not a " ~ .^name;
             }
         }
     }
