@@ -486,7 +486,7 @@ module Cro::HTTP::Router {
         $*CRO-ROUTE-SET.add-body-serializer($serializer);
     }
 
-    sub include(*@includees, *%includees) is export {
+    sub include(*@includees, *%includees --> Nil) is export {
         for @includees {
             when RouteSet  {
                 $*CRO-ROUTE-SET.include([], $_);
