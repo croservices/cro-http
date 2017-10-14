@@ -43,6 +43,7 @@ module Cro::HTTP::Router {
             has @.body-serializers;
 
             method copy-adding() { ... }
+            method signature() { ... }
             method invoke(Cro::HTTP::Request $request, Capture $args) { ... }
 
             method !add-body-parsers(Cro::HTTP::Request $request --> Nil) {
@@ -74,6 +75,10 @@ module Cro::HTTP::Router {
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers]
+            }
+
+            method signature() {
+                &!implementation.signature
             }
 
             method invoke(Cro::HTTP::Request $request, Capture $args --> Promise) {
@@ -213,7 +218,7 @@ module Cro::HTTP::Router {
 
                 # Positionals are URL segments, nameds are unpacks of other
                 # request data.
-                my $signature = $handler.implementation.signature;
+                my $signature = $handler.signature;
                 my (:@positional, :@named) := $signature.params.classify:
                     { .named ?? 'named' !! 'positional' };
 
@@ -390,9 +395,9 @@ module Cro::HTTP::Router {
                     ($prefix-elems ?? "[$prefix-elems..*]" !! "") ~
                     '), :hash(%unpacks)); }';
                 my $bind-check = $need-sig-bind
-                    ?? '<?{ my $imp = @handlers[' ~ $index ~ '].implementation; ' ~
-                            '$imp.signature.ACCEPTS($cap) || ' ~
-                            '!(@*BIND-FAILS.push($imp, $cap)) }>'
+                    ?? '<?{ my $han = @handlers[' ~ $index ~ ']; ' ~
+                            '$han.signature.ACCEPTS($cap) || ' ~
+                            '!(@*BIND-FAILS.push($han.implementation, $cap)) }>'
                     !! '';
                 my $make = '{ make (' ~ $index ~ ', $cap) }';
                 push @route-matchers, join " ",
