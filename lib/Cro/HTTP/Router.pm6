@@ -37,12 +37,36 @@ module Cro::HTTP::Router {
     }
 
     class RouteSet does Cro::Transform {
-        my class Handler {
+        my role Handler {
             has @.prefix;
-            has Str $.method;
-            has &.implementation;
             has @.body-parsers;
             has @.body-serializers;
+
+            method copy-adding() { ... }
+            method invoke(Cro::HTTP::Request $request, Capture $args) { ... }
+
+            method !add-body-parsers(Cro::HTTP::Request $request --> Nil) {
+                if @!body-parsers {
+                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(
+                        parsers => @!body-parsers,
+                        next => $request.body-parser-selector
+                    );
+                }
+            }
+
+            method !add-body-serializers(Cro::HTTP::Response $response --> Nil) {
+                if @!body-serializers {
+                    $response.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(
+                        serializers => @!body-serializers,
+                        next => $response.body-serializer-selector
+                    );
+                }
+            }
+        }
+
+        my class RouteHandler does Handler {
+            has Str $.method;
+            has &.implementation;
 
             method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!) {
                 self.bless:
@@ -52,22 +76,31 @@ module Cro::HTTP::Router {
                     :body-serializers[flat @!body-serializers, @body-serializers]
             }
 
-            method invoke(Cro::HTTP::Request $req, Cro::HTTP::Response $res, Capture $args) {
-                if @!body-parsers {
-                    $req.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(
-                        parsers => @!body-parsers,
-                        next => $req.body-parser-selector
-                    );
+            method invoke(Cro::HTTP::Request $request, Capture $args --> Promise) {
+                my $response = my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(:$request);
+                self!add-body-parsers($request);
+                self!add-body-serializers($response);
+                start {
+                    {
+                        $request.path eq '/'
+                            ?? &!implementation()
+                            !! &!implementation(|$args);
+                        CATCH {
+                            when X::Cro::HTTP::Router::NoRequestBodyMatch {
+                                $response.status = 400;
+                            }
+                            when X::Cro::HTTP::BodyParserSelector::NoneApplicable {
+                                $response.status = 400;
+                            }
+                            default {
+                                .note;
+                                $response.status = 500;
+                            }
+                        }
+                    }
+                    $response.status //= 204;
+                    $response
                 }
-                if @!body-serializers {
-                    $res.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(
-                        serializers => @!body-serializers,
-                        next => $res.body-serializer-selector
-                    );
-                }
-                $req.path eq '/'
-                    ?? &!implementation()
-                    !! &!implementation(|$args)
             }
         }
 
@@ -82,34 +115,20 @@ module Cro::HTTP::Router {
 
         method transformer(Supply:D $requests) {
             supply {
-                whenever $requests -> $req {
-                    my $*CRO-ROUTER-REQUEST = $req;
+                whenever $requests -> $request {
+                    my $*CRO-ROUTER-REQUEST = $request;
                     my $*WRONG-METHOD = False;
                     my $*MISSING-UNPACK = False;
                     my @*BIND-FAILS;
-                    with $req.path ~~ $!path-matcher {
-                        my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(request => $req);
+                    with $request.path ~~ $!path-matcher {
                         my ($handler-idx, $args) = .ast;
                         my $handler := @!handlers[$handler-idx];
-                        my $res = $*CRO-ROUTER-RESPONSE;
-                        whenever start $handler.invoke($req, $res, $args) {
-                            # No Content is default
-                            $res.status //= 204;
-                            emit $res;
-
+                        whenever $handler.invoke($request, $args) -> $response {
+                            emit $response;
                             QUIT {
-                                when X::Cro::HTTP::Router::NoRequestBodyMatch {
-                                    $res.status = 400;
-                                    emit $res;
-                                }
-                                when X::Cro::HTTP::BodyParserSelector::NoneApplicable {
-                                    $res.status = 400;
-                                    emit $res;
-                                }
                                 default {
                                     .note;
-                                    $res.status = 500;
-                                    emit $res;
+                                    emit Cro::HTTP::Response.new(:500status, :$request);
                                 }
                             }
                         }
@@ -136,14 +155,14 @@ module Cro::HTTP::Router {
                                 }
                             }
                         }
-                        emit Cro::HTTP::Response.new(:$status, request => $*CRO-ROUTER-REQUEST);
+                        emit Cro::HTTP::Response.new(:$status, :$request);
                     }
                 }
             }
         }
 
         method add-handler(Str $method, &implementation --> Nil) {
-            @!handlers.push(Handler.new(:$method, :&implementation));
+            @!handlers.push(RouteHandler.new(:$method, :&implementation));
         }
 
         method add-body-parser(Cro::HTTP::BodyParser $parser --> Nil) {
