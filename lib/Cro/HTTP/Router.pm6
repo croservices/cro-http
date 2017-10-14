@@ -38,14 +38,16 @@ module Cro::HTTP::Router {
 
     class RouteSet does Cro::Transform {
         my class Handler {
+            has @.prefix;
             has Str $.method;
             has &.implementation;
             has @.body-parsers;
             has @.body-serializers;
 
-            method copy-adding(:@body-parsers!, :@body-serializers!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!) {
                 self.bless:
                     :$!method, :&!implementation,
+                    :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers]
             }
@@ -73,7 +75,7 @@ module Cro::HTTP::Router {
         has $!path-matcher;
         has Cro::HTTP::BodyParser @!body-parsers;
         has Cro::HTTP::BodySerializer @!body-serializers;
-        has RouteSet @!includes;
+        has @!includes;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -152,8 +154,8 @@ module Cro::HTTP::Router {
             @!body-serializers.push($serializer);
         }
 
-        method include(RouteSet $includee) {
-            @!includes.push($includee);
+        method include(@prefix, RouteSet $includee) {
+            @!includes.push({ :@prefix, :$includee });
         }
 
         method !handlers() { @!handlers }
@@ -163,9 +165,9 @@ module Cro::HTTP::Router {
                 .body-parsers = @!body-parsers;
                 .body-serializers = @!body-serializers;
             }
-            for @!includes -> $inc {
-                for $inc!handlers() {
-                    @!handlers.push(.copy-adding(:@!body-parsers, :@!body-serializers));
+            for @!includes -> (:@prefix, :$includee) {
+                for $includee!handlers() {
+                    @!handlers.push(.copy-adding(:@prefix, :@!body-parsers, :@!body-serializers));
                 }
             }
             self!generate-route-matcher();
@@ -173,7 +175,6 @@ module Cro::HTTP::Router {
 
         method !generate-route-matcher(--> Nil) {
             my @route-matchers;
-
             my @handlers = @!handlers; # This is closed over in the EVAL'd regex
             for @handlers.kv -> $index, $handler {
                 # Things we need to do to prepare segments for binding and unpack
@@ -184,6 +185,12 @@ module Cro::HTTP::Router {
 
                 # If we need a signature bind test (due to subset/where).
                 my $need-sig-bind = False;
+
+                # The prefix is a set of segments that are part of the route
+                # that we match, but excluded from the invocation capture that
+                # we produce. These are used in include/delegate.
+                my @prefix = $handler.prefix.map({ "'$_'" });
+                my $prefix-elems = @prefix.elems;
 
                 # Positionals are URL segments, nameds are unpacks of other
                 # request data.
@@ -236,11 +243,11 @@ module Cro::HTTP::Router {
                     } else {
                         my Str $range = $signed ?? -$bound ~ ' <= $_ <= ' ~ $bound - 1 !! '0 <= $_ <= ' ~ 2 ** $bits - 1;
                         my Str $check = '<?{('
-                                      ~ Q:c/with @segs[{$seg-index}]/
+                                      ~ Q:c/with @segs[{$prefix-elems + $seg-index}]/
                                       ~ ' {( '~ $range
                                       ~ ' )} else { True }) }>';
                         @matcher-target.push: Q['-'?\d+:] ~ $check;
-                        @make-tasks.push: Q:c/.=Int with @segs[{$seg-index}]/;
+                        @make-tasks.push: Q:c/.=Int with @segs[{$prefix-elems + $seg-index}]/;
                         $need-sig-bind = True if @constraints;
                     }
                 }
@@ -269,7 +276,8 @@ module Cro::HTTP::Router {
                         elsif $type =:= Int || $type =:= UInt {
                             @matcher-target.push(Q['-'?\d+:]);
                             my Str $coerce-prefix = $type =:= Int ?? '.=Int' !! '.=UInt';
-                            @make-tasks.push: $coerce-prefix ~ Q:c/ with @segs[{$seg-index}]/;
+                            @make-tasks.push: $coerce-prefix ~
+                                Q:c/ with @segs[{$prefix-elems + $seg-index}]/;
                             $need-sig-bind = True if @constraints;
                         }
                         else {
@@ -280,7 +288,7 @@ module Cro::HTTP::Router {
                     }
                 }
                 my $segment-matcher = " '/' " ~
-                    @segments-required.join(" '/' ") ~
+                    (flat @prefix, @segments-required).join(" '/' ") ~
                     @segments-optional.map({ "[ '/' $_ " }).join ~ (' ]? ' x @segments-optional) ~
                     $segments-terminal;
 
@@ -359,7 +367,9 @@ module Cro::HTTP::Router {
                     ?? '<?{ ' ~ @checks.join(' and ') ~ ' }>'
                     !! '';
                 my $form-cap = '{ my %unpacks; ' ~ @make-tasks.join(';') ~
-                    '; $cap = Capture.new(:list(@segs), :hash(%unpacks)); }';
+                    '; $cap = Capture.new(:list(@segs' ~
+                    ($prefix-elems ?? "[$prefix-elems..*]" !! "") ~
+                    '), :hash(%unpacks)); }';
                 my $bind-check = $need-sig-bind
                     ?? '<?{ my $imp = @handlers[' ~ $index ~ '].implementation; ' ~
                             '$imp.signature.ACCEPTS($cap) || ' ~
@@ -420,8 +430,42 @@ module Cro::HTTP::Router {
         $*CRO-ROUTE-SET.add-body-serializer($serializer);
     }
 
-    sub include(RouteSet $includee) is export {
-        $*CRO-ROUTE-SET.include($includee);
+    sub include(*@includees, *%includees) is export {
+        for @includees {
+            when RouteSet  {
+                $*CRO-ROUTE-SET.include([], $_);
+            }
+            when Pair {
+                my ($prefix, $routes) = .kv;
+                if $routes ~~ RouteSet {
+                    given $prefix {
+                        when Str {
+                            $*CRO-ROUTE-SET.include([$prefix], $routes);
+                        }
+                        when Iterable {
+                            $*CRO-ROUTE-SET.include($prefix, $routes);
+                        }
+                        default {
+                            die "An 'include' prefix may be a Str or Iterable, but not " ~ .^name;
+                        }
+                    }
+                }
+                else {
+                    die "Can only use 'include' with 'route' block, not a $routes.^name()";
+                }
+            }
+            default {
+                die "Can only use 'include' with `route` block, not a " ~ .^name;
+            }
+        }
+        for %includees.kv -> $prefix, $routes {
+            if $routes ~~ RouteSet {
+                $*CRO-ROUTE-SET.include([$prefix], $routes);
+            }
+            else {
+                die "Can only use 'include' with `route` block, not a $routes.^name()";
+            }
+        }
     }
 
     sub term:<request>() is export {
