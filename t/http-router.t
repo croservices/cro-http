@@ -1722,4 +1722,26 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $app = route {
+        get -> 'encoded/slash' {
+            content 'text/plain', 'encoded slash';
+        }
+        get -> 'a+plus' {
+            content 'text/plain', 'a plus';
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my %expected =
+        '/encoded%2Fslash' => 'encoded slash',
+        '/a%2Bplus' => 'a plus';
+    for %expected.kv -> $target, $expected {
+        $source.emit(Cro::HTTP::Request.new(method => 'GET', :$target));
+        given $responses.receive -> $r {
+            is body-text($r), $expected, "Can match URL segments with encoded bits ($target)";
+        }
+    }
+}
+
 done-testing;

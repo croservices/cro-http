@@ -319,7 +319,7 @@ module Cro::HTTP::Router {
                         if $type =:= Mu || $type =:= Any || $type =:= Str {
                             if @constraints == 1 && @constraints[0] ~~ Str:D {
                                 # Literal string constraint; matches literally.
-                                @matcher-target.push("'@constraints[0]'");
+                                @matcher-target.push("'&encode(@constraints[0])'");
                             }
                             else {
                                 # Any match will do, but need bind check.
@@ -445,6 +445,16 @@ module Cro::HTTP::Router {
                 ':my $cap; ' ~
                 '[ '  ~ @route-matchers.join(' | ') ~ ' ] ' ~
                 '$ }';
+        }
+
+        sub encode($target) {
+            $target.subst: :g, /<-[A..Za..z0..9_~.-]>/, -> Str() $encodee {
+                $encodee eq ' '
+                    ?? '+'
+                    !! $encodee le "\x7F"
+                        ?? '%' ~ $encodee.ord.base(16)
+                        !! $encodee.encode('utf-8').list.map({ '%' ~ .base(16) }).join
+            }
         }
     }
 
