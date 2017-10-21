@@ -125,9 +125,10 @@ module Cro::HTTP::Router {
             }
 
             method invoke(Cro::HTTP::Request $request, Capture $args) {
-                self!add-body-parsers($request);
+                my $req = $request.without-first-path-segments(@!prefix.elems);
+                self!add-body-parsers($req);
                 supply {
-                    whenever $!transform.transformer(supply emit $request) -> $response {
+                    whenever $!transform.transformer(supply emit $req) -> $response {
                         self!add-body-serializers($response);
                         emit $response;
                     }

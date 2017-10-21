@@ -1723,6 +1723,34 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
 }
 
 {
+    my class TestTransform does Cro::Transform {
+        method consumes() { Cro::HTTP::Request }
+        method produces() { Cro::HTTP::Response }
+        method transformer(Supply $in --> Supply) {
+            supply whenever $in -> $request {
+                my $resp = Cro::HTTP::Response.new(:$request, :200status);
+                $resp.append-header('Content-type', 'text/plain');
+                $resp.set-body("{$request.target} and {$request.original-target()}");
+                emit $resp;
+            }
+        }
+    }
+    my $app = route {
+        delegate category => TestTransform.new;
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my %expected =
+        '/category' => '/ and /category';
+    for %expected.kv -> $target, $expected {
+        $source.emit(Cro::HTTP::Request.new(method => 'GET', :$target));
+        given $responses.receive -> $r {
+            is body-text($r), $expected, "Delegation: $expected";
+        }
+    }
+}
+
+{
     my $app = route {
         get -> 'encoded/slash' {
             content 'text/plain', 'encoded slash';

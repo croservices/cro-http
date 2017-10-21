@@ -194,11 +194,21 @@ use Test;
 }
 
 {
-    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/products/category/');
-    is $req.target(), '/products/category/', 'Target is correct';
-    is $req.original-target().Str, '/products/category/', 'original-target is correct';
-    is $req.original-path().path, '/products/category/', 'original-path is correct';
-    is $req.original-path-segments().join('/'), 'products/category/', 'original-path-segments is correct';
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/products/category/items/');
+    is $req.target(), '/products/category/items/', 'Target is set';
+    is $req.original-target().Str, '/products/category/items/', 'original-target equals target';
+    is $req.original-path().path, '/products/category/items/', 'original-path path equals target';
+    is $req.original-path-segments(), $req.path-segments(), 'original-path-segments are equal to target segments';
+    my $req2 = $req.without-first-path-segments(1);
+    is $req2.target(), '/category/items/', 'target on stripped request changes';
+    is $req2.original-target().Str, '/products/category/items/', 'original-target preserves';
+    is $req2.original-path().path, '/products/category/items/', 'original-path preserves';
+    is $req2.original-path-segments().join('/'), 'products/category/items/', 'original-path-segments are preserved';
+    my $req3 = $req2.without-first-path-segments(1);
+    is $req3.target(), '/items/', 'target on second stripped request changes';
+    is $req3.original-target().Str, '/products/category/items/', 'original-target preserves';
+    is $req3.original-path().path, '/products/category/items/', 'original-path preserves';
+    is $req3.original-path-segments().join('/'), 'products/category/items/', 'original-path-segments are preserved';
 }
 
 done-testing;
