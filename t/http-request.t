@@ -193,4 +193,12 @@ use Test;
     like $req.Str, /"GET / HTTP/1.0\r\nCookie: " ['Foo=Bar' || 'Heaven=Valhalla' || 'Lang=US'] ** 3 % '; '  "\r\n\r\n"/, 'Cookie header looks good';
 }
 
+{
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/products/category/');
+    is $req.target(), '/products/category/', 'Target is correct';
+    is $req.original-target().Str, '/products/category/', 'original-target is correct';
+    is $req.original-path().path, '/products/category/', 'original-path is correct';
+    is $req.original-path-segments().join('/'), 'products/category/', 'original-path-segments is correct';
+}
+
 done-testing;
