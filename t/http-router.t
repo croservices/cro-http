@@ -1735,13 +1735,35 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
             }
         }
     }
+    my $inner = route {
+        get -> 'home' {
+            content 'text/plain', 'Home';
+        }
+    }
+    my $nested = route {
+        get -> {
+            content 'text/plain', 'Slash';
+        }
+        get -> 'path' {
+            content 'text/plain', 'Path';
+        }
+        include $inner;
+    }
+
     my $app = route {
         delegate category => TestTransform.new;
+        delegate <proxy *> => TestTransform.new;
+        delegate <subsite *> => $nested;
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
     my %expected =
-        '/category' => '/ and /category';
+        '/category' => '/ and /category',
+        '/proxy/item' => '/item and /proxy/item',
+        '/proxy/item/1' => '/item/1 and /proxy/item/1',
+        '/subsite' => 'Slash',
+        '/subsite/path' => 'Path',
+        '/subsite/home' => 'Home';
     for %expected.kv -> $target, $expected {
         $source.emit(Cro::HTTP::Request.new(method => 'GET', :$target));
         given $responses.receive -> $r {

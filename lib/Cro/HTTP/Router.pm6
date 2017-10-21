@@ -111,6 +111,7 @@ module Cro::HTTP::Router {
 
         my class DelegateHandler does Handler {
             has Cro::Transform $.transform;
+            has Bool $.wildcard;
 
             method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!) {
                 self.bless:
@@ -121,7 +122,7 @@ module Cro::HTTP::Router {
             }
 
             method signature() {
-                (-> {}).signature
+                $!wildcard ?? (-> *@ { }).signature !! (-> {}).signature
             }
 
             method invoke(Cro::HTTP::Request $request, Capture $args) {
@@ -212,7 +213,12 @@ module Cro::HTTP::Router {
         method !handlers() { @!handlers }
 
         method delegate(@prefix, Cro::Transform $transform) {
-            @!handlers.push(DelegateHandler.new(:@prefix, :$transform));
+            my $wildcard = @prefix[*-1] eq '*';
+            my @new-prefix = @prefix;
+            @new-prefix.pop if $wildcard;
+            @!handlers.push(DelegateHandler.new(
+                                   prefix => @new-prefix,
+                                   :$transform, :$wildcard));
         }
 
         method definition-complete(--> Nil) {
