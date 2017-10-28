@@ -151,4 +151,121 @@ class UpperCase does Cro::Transform {
     LEAVE $service.stop();
 }
 
+class PreHeaderMiddleware does Cro::Transform {
+    has $.value;
+
+    method consumes() { Cro::HTTP::Request }
+    method produces() { Cro::HTTP::Request }
+
+    method transformer(Supply $pipeline --> Supply) {
+        supply {
+            whenever $pipeline {
+                .append-header('Custom-header', $!value);
+                .emit;
+            }
+        }
+    }
+}
+
+class PostHeaderMiddleware does Cro::Transform {
+    has $.value;
+
+    method consumes() { Cro::HTTP::Response }
+    method produces() { Cro::HTTP::Response }
+
+    method transformer(Supply $pipeline --> Supply) {
+        supply {
+            whenever $pipeline {
+                .append-header('Post-Custom', $!value);
+                .emit;
+            }
+        }
+    }
+}
+
+class TestDelegate does Cro::Transform {
+    method consumes() { Cro::HTTP::Request }
+    method produces() { Cro::HTTP::Response }
+
+    method transformer(Supply $in --> Supply) {
+        supply whenever $in -> $request {
+            my $resp = Cro::HTTP::Response.new(:$request, :200status);
+            if $request.has-header('Custom-header') {
+                $resp.set-body("Correct Answer");
+            } else {
+                $resp.set-body("Incorrect Answer")
+            }
+            emit $resp;
+        }
+    }
+}
+
+my $inner-redef = route {
+    before PreHeaderMiddleware.new(:value<Rock>);
+    after  PostHeaderMiddleware.new(:value<Roll>);
+
+    get -> 'home-redef' {
+        if request.header('Custom-header') eq 'foo,Rock' {
+            content 'text/html', "Correct Answer";
+        } else {
+            content 'text/html', "Incorrect Answer";
+        }
+    }
+}
+
+my $inner = route {
+    get -> 'home' {
+        if request.header('Custom-header') eq 'foo' {
+            content 'text/html', "Correct Answer";
+        } else {
+            content 'text/html', "Incorrect Answer";
+        }
+    }
+}
+
+# Application with built-in middleware
+my $app = route {
+    before PreHeaderMiddleware.new(:value<foo>);
+    after  PostHeaderMiddleware.new(:value<bar>);
+    get -> {
+        if request.header('Custom-header') eq 'foo' {
+            content 'text/html', "Correct Answer";
+        } else {
+            content 'text/html', "Incorrect Answer";
+        }
+    }
+    delegate d => TestDelegate.new;
+    include $inner;
+    include $inner-redef;
+};
+
+{
+    my Cro::Service $service = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app
+    );
+    $service.start;
+
+    given await Cro::HTTP::Client.get("$url/") -> $resp {
+        is $resp.header('Post-Custom'), 'bar', 'per-route after middleware for regular request works';
+        is await($resp.body-text), 'Correct Answer', 'per-route before middleware for regular request works';
+    }
+
+    given await Cro::HTTP::Client.get("$url/d") -> $resp {
+        is $resp.header('Post-Custom'), 'bar', 'per-route after middleware for delegated request works';
+        is await($resp.body-text), 'Correct Answer', 'per-route before middleware for delegated request works';
+    }
+
+    given await Cro::HTTP::Client.get("$url/home") -> $resp {
+        is $resp.header('Post-Custom'), 'bar', 'per-route after middleware for includee works';
+        is await($resp.body-text), 'Correct Answer', 'per-route before middleware for includee works';
+    }
+
+    given await Cro::HTTP::Client.get("$url/home-redef") -> $resp {
+        is $resp.header('Post-Custom'), 'Roll,bar', 'per-route after middleware for includee works';
+        is await($resp.body-text), 'Correct Answer', 'per-route before middleware for includee works';
+    }
+
+    LEAVE $service.stop();
+}
+
 done-testing;

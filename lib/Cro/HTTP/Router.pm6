@@ -41,6 +41,8 @@ module Cro::HTTP::Router {
             has @.prefix;
             has @.body-parsers;
             has @.body-serializers;
+            has @.before;
+            has @.after;
 
             method copy-adding() { ... }
             method signature() { ... }
@@ -69,19 +71,22 @@ module Cro::HTTP::Router {
             has Str $.method;
             has &.implementation;
 
-            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before!, :@after!) {
                 self.bless:
                     :$!method, :&!implementation,
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
-                    :body-serializers[flat @!body-serializers, @body-serializers]
+                    :body-serializers[flat @!body-serializers, @body-serializers],
+                    before => @before.append(@!before),
+                    after => @!after.append(@after)
             }
 
             method signature() {
                 &!implementation.signature
             }
 
-            method invoke(Cro::HTTP::Request $request, Capture $args --> Promise) {
+            method !invoke-internal(Cro::HTTP::Request $request, Capture $args --> Promise) {
+                my $*CRO-ROUTER-REQUEST = $request;
                 my $response = my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(:$request);
                 self!add-body-parsers($request);
                 self!add-body-serializers($response);
@@ -107,18 +112,38 @@ module Cro::HTTP::Router {
                     $response
                 }
             }
+
+            method invoke(Cro::HTTP::Request $request, Capture $args) {
+                if @!before || @!after {
+                    my $current = supply emit $request;
+                    { $current = $_.transformer($current) } for @!before;
+                    supply {
+                        whenever $current -> $req {
+                            whenever self!invoke-internal($req, $args) {
+                                my $response = supply emit $_;
+                                $response = $_.transformer($response) for @!after;
+                                whenever $response { .emit }
+                            }
+                        }
+                    }
+                } else {
+                    return self!invoke-internal($request, $args);
+                }
+            }
         }
 
         my class DelegateHandler does Handler {
             has Cro::Transform $.transform;
             has Bool $.wildcard;
 
-            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before!, :@after!) {
                 self.bless:
                     :$!transform,
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
-                    :body-serializers[flat @!body-serializers, @body-serializers]
+                    :body-serializers[flat @!body-serializers, @body-serializers],
+                    before => @before.append(@!before),
+                    after => @!after.append(@after)
             }
 
             method signature() {
@@ -128,10 +153,14 @@ module Cro::HTTP::Router {
             method invoke(Cro::HTTP::Request $request, Capture $args) {
                 my $req = $request.without-first-path-segments(@!prefix.elems);
                 self!add-body-parsers($req);
+                my $current = supply emit $req;
+                $current = $_.transformer($current) for @!before;
                 supply {
-                    whenever $!transform.transformer(supply emit $req) -> $response {
+                    whenever $!transform.transformer($current) -> $response {
                         self!add-body-serializers($response);
-                        emit $response;
+                        my $res = supply emit $response;
+                        $res = $_.transformer($res) for @!after;
+                        whenever $res { .emit }
                     }
                 }
             }
@@ -142,6 +171,8 @@ module Cro::HTTP::Router {
         has Cro::HTTP::BodyParser @!body-parsers;
         has Cro::HTTP::BodySerializer @!body-serializers;
         has @!includes;
+        has @!before;
+        has @!after;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -195,7 +226,7 @@ module Cro::HTTP::Router {
         }
 
         method add-handler(Str $method, &implementation --> Nil) {
-            @!handlers.push(RouteHandler.new(:$method, :&implementation));
+            @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before, :@!after));
         }
 
         method add-body-parser(Cro::HTTP::BodyParser $parser --> Nil) {
@@ -210,6 +241,13 @@ module Cro::HTTP::Router {
             @!includes.push({ :@prefix, :$includee });
         }
 
+        method before($middleware) {
+            @!before.push($middleware);
+        }
+        method after($middleware) {
+            @!after.push($middleware);
+        }
+
         method !handlers() { @!handlers }
 
         method delegate(@prefix, Cro::Transform $transform) {
@@ -218,7 +256,7 @@ module Cro::HTTP::Router {
             @new-prefix.pop if $wildcard;
             @!handlers.push(DelegateHandler.new(
                                    prefix => @new-prefix,
-                                   :$transform, :$wildcard));
+                                   :$transform, :$wildcard, before => @!before, after => @!after));
         }
 
         method definition-complete(--> Nil) {
@@ -228,7 +266,7 @@ module Cro::HTTP::Router {
             }
             for @!includes -> (:@prefix, :$includee) {
                 for $includee!handlers() {
-                    @!handlers.push(.copy-adding(:@prefix, :@!body-parsers, :@!body-serializers));
+                    @!handlers.push(.copy-adding(:@prefix, :@!body-parsers, :@!body-serializers, :@!before, :@!after));
                 }
             }
             self!generate-route-matcher();
@@ -725,6 +763,13 @@ module Cro::HTTP::Router {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
         $resp.status = $status;
+    }
+
+    sub before($middleware) is export {
+        $middleware ~~ Cro::Transform ?? $*CRO-ROUTE-SET.before($middleware) !! ();
+    }
+    sub after($middleware) is export {
+        $middleware ~~ Cro::Transform ?? $*CRO-ROUTE-SET.after($middleware) !! ();
     }
 
     sub cache-control(:$public, :$private, :$no-cache, :$no-store,
