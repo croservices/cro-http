@@ -65,16 +65,18 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                                                  stream-identifier => $sid,
                                                  conn => $packet.connection);
                             if $result ~~ Cro::HTTP2::Frame::Data {
-                                start {
-                                    my $bytes = $result.data.bytes;
-                                    $connection-state.window-size.emit:
-                                        Cro::HTTP2::Frame::WindowUpdate.new:
-                                            stream-identifier => 0,
-                                            flags => 0, increment => $bytes;
-                                    $connection-state.window-size.emit:
-                                        Cro::HTTP2::Frame::WindowUpdate.new:
-                                            stream-identifier => $result.stream-identifier,
-                                            flags => 0, increment => $bytes;
+                                unless $result.end-stream {
+                                    start {
+                                        my $bytes = $result.data.bytes;
+                                        $connection-state.window-size.emit:
+                                            Cro::HTTP2::Frame::WindowUpdate.new:
+                                                stream-identifier => 0,
+                                                flags => 0, increment => $bytes;
+                                        $connection-state.window-size.emit:
+                                            Cro::HTTP2::Frame::WindowUpdate.new:
+                                                stream-identifier => $result.stream-identifier,
+                                                flags => 0, increment => $bytes;
+                                    }
                                 }
                                 emit $result;
                             } elsif $result ~~ Cro::HTTP2::Frame::Settings {
