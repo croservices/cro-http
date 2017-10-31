@@ -64,7 +64,20 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                             my $result = payload($type, $data, $length, :$flags,
                                                  stream-identifier => $sid,
                                                  conn => $packet.connection);
-                            if $result ~~ Cro::HTTP2::Frame::Settings {
+                            if $result ~~ Cro::HTTP2::Frame::Data {
+                                start {
+                                    my $bytes = $result.data.bytes;
+                                    $connection-state.window-size.emit:
+                                        Cro::HTTP2::Frame::WindowUpdate.new:
+                                            stream-identifier => 0,
+                                            flags => 0, increment => $bytes;
+                                    $connection-state.window-size.emit:
+                                        Cro::HTTP2::Frame::WindowUpdate.new:
+                                            stream-identifier => $result.stream-identifier,
+                                            flags => 0, increment => $bytes;
+                                }
+                                emit $result;
+                            } elsif $result ~~ Cro::HTTP2::Frame::Settings {
                                 (start $connection-state.settings.emit($result)) unless $flags +& 1;
                             } elsif $result ~~ Cro::HTTP2::Frame::Ping {
                                 start $connection-state.ping.emit($result);

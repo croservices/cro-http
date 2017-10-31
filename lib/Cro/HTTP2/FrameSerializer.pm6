@@ -100,6 +100,11 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                     }
                 }
             }
+            with $connection-state.window-size {
+                whenever $connection-state.window-size.Supply {
+                    send-message($_);
+                }
+            }
 
             whenever $in -> Cro::HTTP2::Frame $frame {
                 if $frame ~~ Cro::HTTP2::Frame::Headers {
