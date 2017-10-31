@@ -6,7 +6,7 @@ use HTTP::HPACK;
 # HTTP/2 stream
 enum State <header-init header-c data>;
 
-class Stream {
+my class Stream {
     has Int $.sid;
     has State $.state is rw;
     has $.message;
