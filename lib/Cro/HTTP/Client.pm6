@@ -470,12 +470,17 @@ class Cro::HTTP::Client {
         my %ca = self ?? (self.ca // $ca // {}) !! $ca // {};
         my $out = $version-decision
             ?? $connector.establish($in.Supply, :$host, :$port, |{%tls-config, %ca})
-            !! Promise(supply {
-                whenever $connector.establish($in.Supply, :$host, :$port, |{%tls-config, %ca}) {
-                    .emit;
-                    QUIT { try $version-decision.break($_) }
-                }
-            });
+            !! do {
+                my $s = Supplier::Preserving.new;
+                $connector.establish($in.Supply, :$host, :$port, |{%tls-config, %ca}).tap:
+                    { $s.emit($_) },
+                    done => { $s.done },
+                    quit => {
+                        try $version-decision.break($_);
+                        $s.quit($_);
+                    };
+                $s.Supply
+            };
         $version-decision.then: -> $version {
             $version.result eq '2'
                 ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out)
