@@ -85,7 +85,14 @@ class Cro::HTTP::Client {
                     my $vow = $!next-response-vow;
                     $!next-response-vow = Nil;
                     $vow.keep($_);
-                    LAST $!dead = True;
+                    LAST {
+                        $!dead = True;
+                        if $!next-response-vow {
+                            $!next-response-vow.break:
+                                'Connection unexpectedly closed before response headers received';
+                            $!next-response-vow = Nil;
+                        }
+                    }
                     QUIT {
                         default {
                             $!dead = True;
