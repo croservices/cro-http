@@ -1498,13 +1498,13 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 
     my $http-server = Cro::HTTP::Server.new(
-        port => 31316,
+        port => 31318,
         application => $app
     );
     $http-server.start();
     LEAVE $http-server.stop();
 
-    my $base = "http://localhost:31316";
+    my $base = "http://localhost:31318";
     given await Cro::HTTP::Client.post("$base/destructure",
                                        content-type => 'multipart/form-data',
                                        body => [name => 'John', surname => 'Doe']) -> $resp {

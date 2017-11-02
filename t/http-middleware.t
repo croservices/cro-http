@@ -6,7 +6,7 @@ use Cro::Service;
 use Cro::Transform;
 use Test;
 
-constant TEST_PORT = 31314;
+constant TEST_PORT = 31315;
 my $url = "http://localhost:{TEST_PORT}";
 
 # Application
