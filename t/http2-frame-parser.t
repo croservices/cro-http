@@ -13,7 +13,8 @@ ok Cro::HTTP2::FrameParser.produces === Cro::HTTP2::Frame,
     'HTTP2 frame parser produces HTTP2 frames';
 
 sub test-dying($data, $exception, $code, $desc) {
-    my $connection-state = Cro::HTTP2::ConnectionState.new;
+    my $connection-state = Cro::HTTP2::ConnectionState.new:
+        window-size => class :: is Supplier { method emit(|) {} };
     my $parser = Cro::HTTP2::FrameParser.new;
     my $fake-in = Supplier.new;
     my $complete = Promise.new;

@@ -22,9 +22,10 @@ sub test-example($frame, $result, $desc) {
     # Settings/Ping part
     my $settings = Supplier.new;
     my $ping = Supplier.new;
+    my $window-size = class :: is Supplier { method emit(|) {} };
     my $once = True;
 
-    my $connection-state = Cro::HTTP2::ConnectionState.new(:$settings, :$ping);
+    my $connection-state = Cro::HTTP2::ConnectionState.new(:$settings, :$ping, :$window-size);
     $serializer.transformer($fake-in-s.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $message {
         if $once {
             $once = False;
