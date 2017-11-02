@@ -43,19 +43,21 @@ sub test-dying($data, $exception, $code, $desc) {
     }
 }
 
-sub test-example($buffer, $result, $desc) {
+sub test-example($buffer, $result, $desc, :$settings-test) {
     my $connection-state = Cro::HTTP2::ConnectionState.new:
         window-size => class :: is Supplier { method emit(|) {} };
     my $parser = Cro::HTTP2::FrameParser.new;
     my $serializer = Cro::HTTP2::FrameSerializer.new;
     my $fake-in-p = Supplier.new;
-    my $fake-in-s = Supplier.new;
+    my $fake-in-s = Supplier::Preserving.new;
     my $complete = Promise.new;
-    $connection-state.settings.Supply.tap: -> $settings {
-        if $settings ~~ Bool {
-        } else {
-            is-deeply $settings, $result, $desc;
-            $complete.keep;
+    if $settings-test {
+        $connection-state.settings.Supply.tap: -> $settings {
+            if $settings ~~ Bool {
+            } else {
+                is-deeply $settings, $result, $desc;
+                $complete.keep;
+            }
         }
     }
     $parser.transformer($fake-in-p.Supply, :$connection-state).schedule-on($*SCHEDULER).tap: -> $frame {
@@ -173,6 +175,7 @@ test-example Buf.new([0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00]),
               Cro::HTTP2::Frame::Settings.new(
                   flags => 0,
                   stream-identifier => 0),
+              :settings-test,
               'SETTINGS frame with zero content is emitted correctly';
 
 done-testing;
