@@ -77,8 +77,8 @@ module Cro::HTTP::Router {
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
-                    before => @before.append(@!before),
-                    after => @!after.append(@after)
+                    :before[flat @before, @!before],
+                    :after[flat @!after, @after]
             }
 
             method signature() {
