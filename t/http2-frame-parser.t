@@ -44,7 +44,8 @@ sub test-dying($data, $exception, $code, $desc) {
 }
 
 sub test-example($buffer, $result, $desc) {
-    my $connection-state = Cro::HTTP2::ConnectionState.new;
+    my $connection-state = Cro::HTTP2::ConnectionState.new:
+        window-size => class :: is Supplier { method emit(|) {} };
     my $parser = Cro::HTTP2::FrameParser.new;
     my $serializer = Cro::HTTP2::FrameSerializer.new;
     my $fake-in-p = Supplier.new;

@@ -67,7 +67,8 @@ sub test-example($frame, $result, $desc) {
 sub test-multi($frame, @result, $size, $max-frame-size, $desc) {
     my $fake-in = Supplier.new;
     my $serializer = Cro::HTTP2::FrameSerializer.new;
-    my $connection-state = Cro::HTTP2::ConnectionState.new;
+    my $connection-state = Cro::HTTP2::ConnectionState.new:
+        window-size => class :: is Supplier { method emit(|) {} };
     my $complete = Promise.new;
     my $count = 0;
     $serializer.transformer($fake-in.Supply, :$connection-state).tap: -> $message {
