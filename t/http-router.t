@@ -1794,4 +1794,42 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $app = route {
+        get -> :$value is query {
+            content 'text/plain', "got $value";
+        }
+    }
+
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my %expected =
+        '/?value=1' => 'got 1';
+    for %expected.kv -> $target, $expected {
+        $source.emit(Cro::HTTP::Request.new(method => 'GET', :$target));
+        given $responses.receive -> $r {
+            is body-text($r), $expected, "Can pass query argument without path components ($target)";
+        }
+    }
+}
+{
+    my $app = route {
+        get -> *@path, :$value is query {
+            content 'text/plain', "got <{@path}> and $value";
+        }
+    }
+
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my %expected =
+        '/?value=1' => 'got <> and 1',
+        '/x?value=1' => 'got <x> and 1';
+    for %expected.kv -> $target, $expected {
+        $source.emit(Cro::HTTP::Request.new(method => 'GET', :$target));
+        given $responses.receive -> $r {
+            is body-text($r), $expected, "Can pass query arguments with slurpy path signature ($target)";
+        }
+    }
+}
+
 done-testing;

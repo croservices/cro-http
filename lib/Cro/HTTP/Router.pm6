@@ -93,7 +93,7 @@ module Cro::HTTP::Router {
                 start {
                     {
                         $request.path eq '/'
-                            ?? &!implementation()
+                            ?? &!implementation(|%($args))
                             !! &!implementation(|$args);
                         CATCH {
                             when X::Cro::HTTP::Router::NoRequestBodyMatch {
