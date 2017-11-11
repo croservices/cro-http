@@ -80,7 +80,6 @@ monitor Cro::HTTP::Client::CookieJar {
             $path = $_.path // self!default-path($uri);
             $state.secure-only = $_.secure // False;
             $state.http-only = $_.http-only // False;
-            next if $state.http-only && not $uri.scheme eq 'http';
 
             # Uniqueness check
             sub checker($_, $cs) {
@@ -90,7 +89,6 @@ monitor Cro::HTTP::Client::CookieJar {
             };
             my @set = @!cookies.grep(-> $cs { checker($_, $cs) });
             if @set.elems != 0 {
-                next if @set[0].http-only && not $uri.scheme eq 'http';
                 $state.creation-time = @set[0].creation-time;
             }
             @!cookies = @!cookies.grep(-> $cs { !checker($_, $cs) });
@@ -106,8 +104,7 @@ monitor Cro::HTTP::Client::CookieJar {
             ( .host-only && $uri.host eq .cookie.domain ||
               !.host-only && self!domain-match(.cookie.domain, $uri.host) ) &&
             ( self!path-match($_.cookie.path, $uri.path)                  ) &&
-            ( .secure-only ?? $uri.scheme eq 'https' !! True              ) &&
-            ( .http-only   ?? $uri.scheme eq 'http'  !! True              )
+            ( .secure-only ?? $uri.scheme eq 'https' !! True              )
         };
         @!cookies.map({
             if $checker($_) {
