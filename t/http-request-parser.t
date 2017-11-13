@@ -190,15 +190,7 @@ refuses 'The TRACE method, as it is not implemented by default', q:to/REQUEST/,
     REQUEST
     *.status == 501;
 
-refuses 'The PATCH method, as it is not implemented by default', q:to/REQUEST/,
-    PATCH / HTTP/1.1
-
-    REQUEST
-    *.status == 501;
-
-parses 'The PATCH method if included in allowed-methods',
-    allowed-methods => <GET PUT POST DELETE PATCH>,
-    q:to/REQUEST/,
+parses 'Simple PATCH request with no headers', q:to/REQUEST/,
     PATCH / HTTP/1.1
 
     REQUEST
