@@ -295,6 +295,13 @@ class Cro::HTTP::Client {
         self.request('DELETE', $url, %options)
     }
 
+    multi method patch($url, %options --> Promise) {
+        self.request('PATCH', $url, %options)
+    }
+    multi method patch($url, *%options --> Promise) {
+        self.request('PATCH', $url, %options)
+    }
+
     multi method request(Str $method, $url, *%options --> Promise) {
         self.request($method, $url, %options)
     }

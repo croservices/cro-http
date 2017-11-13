@@ -9,7 +9,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
         Cro::HTTP::RawBodyParserSelector::Default;
 
     submethod TWEAK(
-        :@allowed-methods = <GET HEAD POST PUT DELETE CONNECT OPTIONS>
+        :@allowed-methods = <GET HEAD POST PUT DELETE PATCH CONNECT OPTIONS>
     ) {
         %!allowed-methods{@allowed-methods} = True xx *;
     }

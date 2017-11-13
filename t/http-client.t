@@ -31,6 +31,9 @@ constant %key-cert := {
         delete -> {
             content 'text/plain', 'Gone';
         }
+        patch -> {
+            content 'text/plain', 'Patched';
+        }
         get -> 'query', :$value {
             content 'text/plain', $value ?? $value.uc !! "No Query";
         }
@@ -176,6 +179,13 @@ constant %key-cert := {
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Gone', 'Body text is correct';
+    }
+
+    given await Cro::HTTP::Client.patch("$base/") -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from PATCH /';
+        is $resp.status, 200, 'Status is 200';
+        like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'Patched', 'Body text is correct';
     }
 
     given await Cro::HTTP::Client.get("$base/") -> $resp {

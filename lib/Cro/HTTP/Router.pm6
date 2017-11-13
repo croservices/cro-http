@@ -533,6 +533,10 @@ module Cro::HTTP::Router {
         $*CRO-ROUTE-SET.add-handler('DELETE', &handler);
     }
 
+    sub patch(&handler --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('PATCH', &handler);
+    }
+
     sub body-parser(Cro::HTTP::BodyParser $parser --> Nil) is export {
         $*CRO-ROUTE-SET.add-body-parser($parser);
     }
