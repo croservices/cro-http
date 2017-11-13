@@ -769,11 +769,55 @@ module Cro::HTTP::Router {
         $resp.status = $status;
     }
 
+    # XXX These two subs can be generalized,
+    # but without much improvements achieved both readability- or performance-wise.
     sub before($middleware) is export {
-        $middleware ~~ Cro::Transform ?? $*CRO-ROUTE-SET.before($middleware) !! ();
+        my class BeforeMiddleTransform does Cro::Transform {
+            has &.block;
+
+            method consumes() { Cro::HTTP::Request }
+            method produces() { Cro::HTTP::Request }
+
+            method transformer(Supply $pipeline --> Supply) {
+                supply {
+                    whenever $pipeline -> $request {
+                        my $*CRO-ROUTER-REQUEST := $request;
+                        &!block($request);
+                        emit $request;
+                    }
+                }
+            }
+        }
+        if $middleware ~~ Cro::Transform {
+            $*CRO-ROUTE-SET.before($middleware)
+        } else {
+            my $transformer = BeforeMiddleTransform.new(block => $middleware);
+            $*CRO-ROUTE-SET.before($transformer);
+        }
     }
     sub after($middleware) is export {
-        $middleware ~~ Cro::Transform ?? $*CRO-ROUTE-SET.after($middleware) !! ();
+        my class AfterMiddleTransform does Cro::Transform {
+            has &.block;
+
+            method consumes() { Cro::HTTP::Resposne }
+            method produces() { Cro::HTTP::Response }
+
+            method transformer(Supply $pipeline --> Supply) {
+                supply {
+                    whenever $pipeline -> $response {
+                        my $*CRO-ROUTER-RESPONSE := $response;
+                        &!block($response);
+                        emit $response;
+                    }
+                }
+            }
+        }
+        if $middleware ~~ Cro::Transform {
+            $*CRO-ROUTE-SET.after($middleware)
+        } else {
+            my $transformer = AfterMiddleTransform.new(block => $middleware);
+            $*CRO-ROUTE-SET.after($transformer);
+        }
     }
 
     sub cache-control(:$public, :$private, :$no-cache, :$no-store,

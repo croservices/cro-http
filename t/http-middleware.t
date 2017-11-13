@@ -268,4 +268,33 @@ my $app = route {
     LEAVE $service.stop();
 }
 
+my $block-app = route {
+    after {
+        header 'Strict-transport-security', 'max-age=31536000; includeSubDomains';
+    }
+    before {
+        .append-header('Custom-header', 'Foo');
+    }
+    get -> {
+        if request.header('Custom-header') eq 'Foo' {
+            content 'text/html', 'Correct Answer';
+        } else {
+            content 'text/html', 'Incorrect answer';
+        }
+    }
+}
+
+{
+    my Cro::Service $service = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $block-app
+    );
+    $service.start;
+
+    given await Cro::HTTP::Client.get("$url/") -> $resp {
+        is await($resp.body-text), 'Correct Answer', 'per-route block before middleware works';
+        is $resp.header('Strict-transport-security'), 'max-age=31536000; includeSubDomains', 'per-route block after middleware works';
+    }
+    LEAVE $service.stop();
+}
+
 done-testing;
