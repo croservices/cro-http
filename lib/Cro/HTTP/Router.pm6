@@ -769,55 +769,68 @@ module Cro::HTTP::Router {
         $resp.status = $status;
     }
 
-    # XXX These two subs can be generalized,
-    # but without much improvements achieved both readability- or performance-wise.
-    sub before($middleware) is export {
-        my class BeforeMiddleTransform does Cro::Transform {
-            has &.block;
+    my class BeforeMiddleTransform does Cro::Transform {
+        has &.block;
 
-            method consumes() { Cro::HTTP::Request }
-            method produces() { Cro::HTTP::Request }
+        method consumes() { Cro::HTTP::Request }
+        method produces() { Cro::HTTP::Request }
 
-            method transformer(Supply $pipeline --> Supply) {
-                supply {
-                    whenever $pipeline -> $request {
-                        my $*CRO-ROUTER-REQUEST := $request;
-                        &!block($request);
-                        emit $request;
-                    }
+        method transformer(Supply $pipeline --> Supply) {
+            supply {
+                whenever $pipeline -> $request {
+                    my $*CRO-ROUTER-REQUEST := $request;
+                    &!block($request);
+                    emit $request;
                 }
             }
-        }
-        if $middleware ~~ Cro::Transform {
-            $*CRO-ROUTE-SET.before($middleware)
-        } else {
-            my $transformer = BeforeMiddleTransform.new(block => $middleware);
-            $*CRO-ROUTE-SET.before($transformer);
         }
     }
-    sub after($middleware) is export {
-        my class AfterMiddleTransform does Cro::Transform {
-            has &.block;
 
-            method consumes() { Cro::HTTP::Resposne }
-            method produces() { Cro::HTTP::Response }
+    my class AfterMiddleTransform does Cro::Transform {
+        has &.block;
 
-            method transformer(Supply $pipeline --> Supply) {
-                supply {
-                    whenever $pipeline -> $response {
-                        my $*CRO-ROUTER-RESPONSE := $response;
-                        &!block($response);
-                        emit $response;
-                    }
+        method consumes() { Cro::HTTP::Response }
+        method produces() { Cro::HTTP::Response }
+
+        method transformer(Supply $pipeline --> Supply) {
+            supply {
+                whenever $pipeline -> $response {
+                    my $*CRO-ROUTER-RESPONSE := $response;
+                    &!block($response);
+                    emit $response;
                 }
             }
         }
-        if $middleware ~~ Cro::Transform {
-            $*CRO-ROUTE-SET.after($middleware)
+    }
+
+    # XXX These subs can be generalized,
+    # but without much improvements achieved both readability- or performance-wise.
+    multi sub before(Cro::Transform $middleware) is export {
+        $_ = $middleware;
+        if .consumes ~~ Cro::HTTP::Request
+        && .produces ~~ Cro::HTTP::Request {
+            $*CRO-ROUTE-SET.before($_)
         } else {
-            my $transformer = AfterMiddleTransform.new(block => $middleware);
-            $*CRO-ROUTE-SET.after($transformer);
+            die "before middleware must consume and produce Cro::HTTP::Request, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
+    }
+    multi sub before(&middleware) is export {
+        my $transformer = BeforeMiddleTransform.new(block => &middleware);
+        $*CRO-ROUTE-SET.before($transformer);
+    }
+
+    multi sub after(Cro::Transform $middleware) is export {
+        $_ = $middleware;
+        if .consumes ~~ Cro::HTTP::Response
+        && .produces ~~ Cro::HTTP::Response {
+            $*CRO-ROUTE-SET.after($_)
+        } else {
+            die "after middleware must consume and produce Cro::HTTP::Response, got ({.consumes.perl}) and ({.produces.perl}) instead";
+        }
+    }
+    multi sub after(&middleware) is export {
+        my $transformer = AfterMiddleTransform.new(block => &middleware);
+        $*CRO-ROUTE-SET.after($transformer);
     }
 
     sub cache-control(:$public, :$private, :$no-cache, :$no-store,

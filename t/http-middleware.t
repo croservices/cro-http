@@ -297,4 +297,15 @@ my $block-app = route {
     LEAVE $service.stop();
 }
 
+{
+    dies-ok {
+        my $block-app = route {
+            after PreHeaderMiddleware.new(:value<foo>);
+            get -> {
+                content 'text/html', 'Dies';
+            }
+        }
+    }, 'Cannot use wrong typed Transformer as a middleware';
+}
+
 done-testing;
