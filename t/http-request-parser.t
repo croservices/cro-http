@@ -198,6 +198,22 @@ parses 'Simple PATCH request with no headers', q:to/REQUEST/,
     *.target eq '/',
     *.http-version eq '1.1';
 
+refuses 'The TRACE method, as it is not implemented by default', q:to/REQUEST/,
+    TRACE / HTTP/1.1
+
+    REQUEST
+    *.status == 501;
+
+parses 'The TRACE method if included in allowed-methods',
+    allowed-methods => <GET PUT POST DELETE TRACE>,
+    q:to/REQUEST/,
+    TRACE / HTTP/1.1
+
+    REQUEST
+    *.method eq 'TRACE',
+    *.target eq '/',
+    *.http-version eq '1.1';
+
 refuses 'PUT when it is not included in the allowed methods',
     allowed-methods => <GET HEAD OPTIONS>,
     q:to/REQUEST/,
