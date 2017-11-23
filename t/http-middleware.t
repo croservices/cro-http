@@ -1,7 +1,8 @@
 use Cro::TCP;
+use Cro::HTTP::Client;
+use Cro::HTTP::Middleware;
 use Cro::HTTP::Router;
 use Cro::HTTP::Server;
-use Cro::HTTP::Client;
 use Cro::Service;
 use Cro::Transform;
 use Test;
@@ -109,6 +110,76 @@ subtest {
         LEAVE $service.stop();
     }
 }, 'Request and response middleware written using a transform';
+
+subtest {
+    # Request middleware written using Cro::HTTP::Middleware::Request
+    my class LowerCase does Cro::HTTP::Middleware::Request {
+        method process(Supply $requests --> Supply) {
+            supply whenever $requests -> $request {
+                $request.target = $request.target.lc;
+                emit $request;
+            }
+        }
+    }
+
+    # Response middleware written using Cro::HTTP::Middleware::Response
+    my class StrictTransportSecurity does Cro::HTTP::Middleware::Response {
+        has Duration:D $.max-age is required;
+
+        method process(Supply $responses --> Supply) {
+            supply whenever $responses -> $response {
+                $response.append-header:
+                    'Strict-Transport-Security',
+                    "max-age=$!max-age";
+                emit $response;
+            }
+        }
+    }
+
+    {
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $application,
+            after => StrictTransportSecurity.new(max-age => Duration.new(60))
+        );
+        $service.start;
+
+        given await Cro::HTTP::Client.get("$url") -> $resp {
+            is $resp.header('Strict-Transport-Security'), "max-age=60", 'Header was set';
+        }
+
+        LEAVE $service.stop();
+    }
+
+    {
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $application,
+            before => LowerCase
+        );
+        $service.start;
+
+        given await Cro::HTTP::Client.get("$url/index.SHTML") -> $resp {
+            is await($resp.body-text), 'Correct Answer', 'Target was processed';
+        }
+
+        LEAVE $service.stop();
+    }
+
+    {
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $application,
+            before => LowerCase,
+            after => StrictTransportSecurity.new(max-age => Duration.new(60))
+        );
+        $service.start;
+
+        given await Cro::HTTP::Client.get("$url/index.SHTML") -> $resp {
+            is $resp.header('Strict-Transport-Security'), "max-age=60", 'after works with before';
+            is await($resp.body-text), 'Correct Answer', 'before works with after';
+        }
+
+        LEAVE $service.stop();
+    }
+}, 'Request and response middleware written using a Cro::HTTP::Middleware roles';
 
 subtest {
     my class UpperCase does Cro::Transform {
