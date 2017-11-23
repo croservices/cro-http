@@ -1,5 +1,6 @@
 use Cro;
 use Cro::HTTP::Internal;
+use Cro::HTTP::Middleware;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::ResponseSerializer;
 use Cro::HTTP::VersionSelector;
@@ -34,11 +35,38 @@ class Cro::HTTP::Server does Cro::Service {
                     :$http,
                     :$label = "HTTP($port)") {
 
+        my @before;
+        my @after;
+        if $before ~~ Iterable {
+            for @$before {
+                when Cro::HTTP::Middleware::Pair {
+                    push @before, .request;
+                    unshift @after, .response;
+                }
+                default {
+                    push @before, $_;
+                }
+            }
+        }
+        elsif $before ~~ Cro::HTTP::Middleware::Pair {
+            push @before, $before.request;
+            unshift @after, $before.response;
+        }
+        else {
+            push @before, $before;
+        }
+        if $after ~~ Iterable {
+            append @after, @$after;
+        }
+        else {
+            push @after, $after;
+        }
+
         my %args = :$application,
                    :$add-body-parsers, :$body-parsers,
                    :$add-body-serializers, :$body-serializers,
-                   :$before-parse, :$before,
-                   :$after, :$after-serialize;
+                   :$before-parse, :@before,
+                   :@after, :$after-serialize;
         my $http-val = $http // ();
 
         sub pack2(:$http2-only) {
@@ -52,10 +80,10 @@ class Cro::HTTP::Server does Cro::Service {
                     Cro::HTTP2::FrameParser.new,
                     Cro::HTTP2::RequestParser.new,
                     RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
-                    |$before,
+                    |@before,
                     $application,
                     ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
-                    |$after,
+                    |@after,
                     Cro::HTTP2::ResponseSerializer.new,
                     Cro::HTTP2::FrameSerializer.new,
                     |$after-serialize
@@ -78,10 +106,10 @@ class Cro::HTTP::Server does Cro::Service {
                 |$before-parse,
                 Cro::HTTP::RequestParser.new,
                 RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
-                |$before,
+                |@before,
                 $application,
                 ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
-                |$after,
+                |@after,
                 Cro::HTTP::ResponseSerializer.new,
                 |$after-serialize
             )
