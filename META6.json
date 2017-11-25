@@ -22,6 +22,7 @@
                 "Cro::HTTP::Internal": "lib/Cro/HTTP/Internal.pm6",
                 "Cro::HTTP::Log::File": "lib/Cro/HTTP/Log/File.pm6",
                 "Cro::HTTP::Message": "lib/Cro/HTTP/Message.pm6",
+                "Cro::HTTP::Middleware": "lib/Cro/HTTP/Middleware.pm6",
                 "Cro::HTTP::MimeTypes": "lib/Cro/HTTP/MimeTypes.pm6",
                 "Cro::HTTP::MultiValue": "lib/Cro/HTTP/MultiValue.pm6",
                 "Cro::HTTP::RawBodyParser": "lib/Cro/HTTP/RawBodyParser.pm6",
