@@ -120,7 +120,7 @@ role Cro::HTTP::Message does Cro::Message {
                 }
             }
             without $encoding {
-                # Decoder drops the BOM by itself, it it exists, so just use
+                # Decoder drops the BOM by itself, if it exists, so just use
                 # it for identification here.
                 if $blob[0] == 0xEF && $blob[1] == 0xBB && $blob[2] == 0xBF {
                     $encoding = 'utf-8';
