@@ -29,6 +29,11 @@ my $application = route {
     get -> 'index.SHTML' {
         content 'text/html', "Incorrect Answer";
     }
+
+    my atomicint $i = 0;
+    get -> 'counter' {
+        content 'text/plain', (++⚛$i).Str;
+    }
 };
 
 subtest {
@@ -211,6 +216,57 @@ subtest {
         }
     }
 }, 'Conditional response middleware using Cro::HTTP::Middleware::Conditional';
+
+subtest {
+    my class OverlySimpleCache does Cro::HTTP::Middleware::RequestResponse {
+        has $!cached-blob;
+
+        method process-requests(Supply $requests) {
+            supply whenever $requests -> $request {
+                if $!cached-blob {
+                    given Cro::HTTP::Response.new(:$request, :200status) {
+                        .set-body-byte-stream: supply emit $!cached-blob;
+                        .emit;
+                    }
+                }
+                else {
+                    emit $request;
+                }
+            }
+        }
+
+        method process-responses(Supply $responses) {
+            supply whenever $responses -> $response {
+                whenever $response.body-blob -> $!cached-blob {
+                    $response.set-body-byte-stream: supply emit $!cached-blob;
+                    $response.append-header: 'X-Uncached', 'true';
+                    emit $response;
+                }
+            }
+        }
+    }
+
+    {
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $application,
+            before => OverlySimpleCache.new
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        given await Cro::HTTP::Client.get("$url/counter") -> $resp {
+            is $resp.status, 200, 'Got 200 response on first request';
+            ok $resp.has-header('X-Uncached'), 'Response part added header';
+            is await($resp.body-text), '1', 'Expected body';
+        }
+
+        given await Cro::HTTP::Client.get("$url/counter") -> $resp {
+            is $resp.status, 200, 'Got 200 response on second request';
+            nok $resp.has-header('X-Uncached'), 'Response part did not run on early response';
+            is await($resp.body-text), '1', 'Got cached body';
+        }
+    }
+}, 'Request/response middleware using Cro::HTTP::Middleware::RequestResponse';
 
 subtest {
     my class UpperCase does Cro::Transform {
