@@ -184,6 +184,27 @@ subtest {
 
         LEAVE $service.stop();
     }
+
+    {
+        my $mw-app = route {
+            before LowerCase;
+            after StrictTransportSecurity.new(max-age => Duration.new(60));
+            delegate <*> => $application;
+        }
+
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $mw-app
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        given await Cro::HTTP::Client.get("$url/index.SHTML") -> $resp {
+            is await($resp.body-text), 'Correct Answer',
+                'Request middleware works with before in route block';
+            is $resp.header('Strict-Transport-Security'), "max-age=60",
+                'Response middleware works with after in route block';
+        }
+    }
 }, 'Request and response middleware written using a Cro::HTTP::Middleware roles';
 
 subtest {
@@ -469,6 +490,6 @@ subtest {
             }
         }
     }, 'Cannot use wrong typed Transformer as a middleware';
-}, 'Interaction of middleware with HTTP router';
+}, 'Interaction of middleware written as Cro::Transform with HTTP router';
 
 done-testing;
