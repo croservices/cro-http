@@ -3,6 +3,7 @@ use Cro::HTTP::BodyParser;
 use Cro::HTTP::BodyParserSelector;
 use Cro::HTTP::BodySerializer;
 use Cro::HTTP::BodySerializerSelector;
+use Cro::HTTP::Middleware;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 use IO::Path::ChildSecure;
@@ -803,9 +804,7 @@ module Cro::HTTP::Router {
         }
     }
 
-    # XXX These subs can be generalized,
-    # but without much improvements achieved both readability- or performance-wise.
-    multi sub before(Cro::Transform $middleware) is export {
+    multi sub before(Cro::Transform $middleware --> Nil) is export {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Request
         && .produces ~~ Cro::HTTP::Request {
@@ -814,12 +813,16 @@ module Cro::HTTP::Router {
             die "before middleware must consume and produce Cro::HTTP::Request, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
-    multi sub before(&middleware) is export {
+    multi sub before(&middleware --> Nil) is export {
         my $transformer = BeforeMiddleTransform.new(block => &middleware);
         $*CRO-ROUTE-SET.before($transformer);
     }
+    multi sub before(Cro::HTTP::Middleware::Pair $pair --> Nil) {
+        before($pair.request);
+        after($pair.response);
+    }
 
-    multi sub after(Cro::Transform $middleware) is export {
+    multi sub after(Cro::Transform $middleware --> Nil) is export {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Response
         && .produces ~~ Cro::HTTP::Response {
@@ -828,7 +831,7 @@ module Cro::HTTP::Router {
             die "after middleware must consume and produce Cro::HTTP::Response, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
-    multi sub after(&middleware) is export {
+    multi sub after(&middleware --> Nil) is export {
         my $transformer = AfterMiddleTransform.new(block => &middleware);
         $*CRO-ROUTE-SET.after($transformer);
     }
