@@ -310,6 +310,31 @@ subtest {
             is await($resp.body-text), '1', 'Got cached body';
         }
     }
+
+    {
+        my $mw-app = route {
+            before OverlySimpleCache.new;
+            delegate <*> => $application;
+        }
+
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $mw-app
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        given await Cro::HTTP::Client.get("$url/counter") -> $resp {
+            is $resp.status, 200, 'Got 200 response on first request';
+            ok $resp.has-header('X-Uncached'), 'Response part added header';
+            is await($resp.body-text), '2', 'Expected body';
+        }
+
+        given await Cro::HTTP::Client.get("$url/counter") -> $resp {
+            is $resp.status, 200, 'Got 200 response on second request';
+            nok $resp.has-header('X-Uncached'), 'Response part did not run on early response';
+            is await($resp.body-text), '2', 'Got cached body';
+        }
+    }
 }, 'Request/response middleware using Cro::HTTP::Middleware::RequestResponse';
 
 subtest {
