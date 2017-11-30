@@ -794,18 +794,18 @@ module Cro::HTTP::Router {
         $resp.status = $status;
     }
 
-    my class BeforeMiddleTransform does Cro::Transform {
+    my class BeforeMiddleTransform does Cro::HTTP::Middleware::Conditional {
         has &.block;
 
-        method consumes() { Cro::HTTP::Request }
-        method produces() { Cro::HTTP::Request }
-
-        method transformer(Supply $pipeline --> Supply) {
+        method process(Supply $pipeline --> Supply) {
             supply {
                 whenever $pipeline -> $request {
                     my $*CRO-ROUTER-REQUEST := $request;
+                    my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(:$request);
                     &!block($request);
-                    emit $request;
+                    emit $*CRO-ROUTER-RESPONSE.status.defined
+                        ?? $*CRO-ROUTER-RESPONSE
+                        !! $request;
                 }
             }
         }
@@ -838,8 +838,9 @@ module Cro::HTTP::Router {
         }
     }
     multi sub before(&middleware --> Nil) is export {
-        my $transformer = BeforeMiddleTransform.new(block => &middleware);
-        $*CRO-ROUTE-SET.before($transformer);
+        my $conditional = BeforeMiddleTransform.new(block => &middleware);
+        $*CRO-ROUTE-SET.before($conditional.request);
+        $*CRO-ROUTE-SET.after($conditional.response);
     }
     multi sub before(Cro::HTTP::Middleware::Pair $pair --> Nil) {
         before($pair.request);

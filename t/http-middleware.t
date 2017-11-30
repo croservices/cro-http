@@ -595,4 +595,33 @@ subtest {
     }, 'Cannot use wrong typed Transformer as a middleware';
 }, 'Interaction of middleware written as Cro::Transform with HTTP router';
 
+subtest {
+    my $mw-app = route {
+        before {
+            forbidden unless .has-header('Authorization');
+        }
+
+        get -> {
+            content 'text/html', "<strong>Hello from Cro!</strong>";
+        }
+    }
+
+    my Cro::Service $service = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $mw-app
+    );
+    $service.start;
+    LEAVE $service.stop();
+
+    throws-like { await Cro::HTTP::Client.get("$url") },
+        X::Cro::HTTP::Error::Client,
+        response => { .status == 403 },
+        'Block form of before in router can produce an early response';
+
+    my %headers = Authorization => 'Bearer Polarer';
+    given await Cro::HTTP::Client.get("$url", :%headers) -> $resp {
+        is $resp.status, 200,
+            'Block form of before not producing a response also works';
+    }
+}, 'Conditional response in block form of before in router';
+
 done-testing;
