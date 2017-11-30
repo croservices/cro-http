@@ -324,15 +324,16 @@ subtest {
         LEAVE $service.stop();
 
         given await Cro::HTTP::Client.get("$url/counter") -> $resp {
-            is $resp.status, 200, 'Got 200 response on first request';
-            ok $resp.has-header('X-Uncached'), 'Response part added header';
-            is await($resp.body-text), '2', 'Expected body';
+            is $resp.status, 200, 'Got 200 response on first request (before in router)';
+            ok $resp.has-header('X-Uncached'), 'Response part added header (before in router)';
+            is await($resp.body-text), '2', 'Expected body (before in router)';
         }
 
         given await Cro::HTTP::Client.get("$url/counter") -> $resp {
-            is $resp.status, 200, 'Got 200 response on second request';
-            nok $resp.has-header('X-Uncached'), 'Response part did not run on early response';
-            is await($resp.body-text), '2', 'Got cached body';
+            is $resp.status, 200, 'Got 200 response on second request (before in router)';
+            nok $resp.has-header('X-Uncached'),
+                'Response part did not run on early response (before in router)';
+            is await($resp.body-text), '2', 'Got cached body (before in router)';
         }
     }
 }, 'Request/response middleware using Cro::HTTP::Middleware::RequestResponse';
