@@ -66,6 +66,34 @@ module Cro::HTTP::Router {
                     );
                 }
             }
+
+            method !append-body-serializers(Supply $pipeline --> Supply) {
+                supply whenever $pipeline {
+                    self!add-body-serializers($_);
+                    emit $_;
+                }
+            }
+
+            method !append-middleware(Supply $pipeline, @middleware, %connection-state --> Supply) {
+                my $current = $pipeline;
+                for @middleware -> $comp {
+                    if $comp ~~ Cro::ConnectionState {
+                        my $cs-type = $comp.connection-state-type;
+                        with %connection-state{$cs-type} {
+                            $current = $comp.transformer($current, :connection-state($_));
+                        }
+                        else {
+                            my $cs = $cs-type.new;
+                            %connection-state{$cs-type} = $cs;
+                            $current = $comp.transformer($current, :connection-state($cs));
+                        }
+                    }
+                    else {
+                        $current = $comp.transformer($current);
+                    }
+                }
+                $current
+            }
         }
 
         my class RouteHandler does Handler {
@@ -117,16 +145,15 @@ module Cro::HTTP::Router {
             method invoke(Cro::HTTP::Request $request, Capture $args) {
                 if @!before || @!after {
                     my $current = supply emit $request;
-                    { $current = $_.transformer($current) } for @!before;
-                    supply {
-                        whenever $current -> $req {
-                            whenever self!invoke-internal($req, $args) {
-                                my $response = supply emit $_;
-                                $response = $_.transformer($response) for @!after;
+                    my %connection-state{Mu};
+                    $current = self!append-middleware($current, @!before, %connection-state);
+                    my $response = supply whenever $current -> $req {
+                        whenever self!invoke-internal($req, $args) {
+                            emit $_;
                                 whenever $response { .emit }
-                            }
                         }
                     }
+                    return self!append-middleware($response, @!after, %connection-state);
                 } else {
                     return self!invoke-internal($request, $args);
                 }
@@ -155,15 +182,12 @@ module Cro::HTTP::Router {
                 my $req = $request.without-first-path-segments(@!prefix.elems);
                 self!add-body-parsers($req);
                 my $current = supply emit $req;
-                $current = $_.transformer($current) for @!before;
-                supply {
-                    whenever $!transform.transformer($current) -> $response {
-                        self!add-body-serializers($response);
-                        my $res = supply emit $response;
-                        $res = $_.transformer($res) for @!after;
-                        whenever $res { .emit }
-                    }
-                }
+                my %connection-state{Mu};
+                $current = self!append-middleware($current, @!before, %connection-state);
+                $current = $!transform.transformer($current);
+                $current = self!append-body-serializers($current);
+                $current = self!append-middleware($current, @!after, %connection-state);
+                $current
             }
         }
 

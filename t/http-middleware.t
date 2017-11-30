@@ -236,6 +236,29 @@ subtest {
             is $resp.status, 200, 'Got 200 normal response with an auth header';
         }
     }
+
+    {
+        my $mw-app = route {
+            before ForbiddenWithoutAuthHeader;
+            delegate <*> => $application;
+        }
+
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $mw-app
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        throws-like { await Cro::HTTP::Client.get("$url") },
+            X::Cro::HTTP::Error::Client,
+            response => { .status == 403 },
+            'Got 403 response from middleware when no auth header (before in router)';
+
+        my %headers = Authorization => 'Bearer Polarer';
+        given await Cro::HTTP::Client.get("$url", :%headers) -> $resp {
+            is $resp.status, 200, 'Got 200 normal response with an auth header (before in router)';
+        }
+    }
 }, 'Conditional response middleware using Cro::HTTP::Middleware::Conditional';
 
 subtest {
