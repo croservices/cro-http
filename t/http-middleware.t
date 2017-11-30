@@ -259,6 +259,30 @@ subtest {
             is $resp.status, 200, 'Got 200 normal response with an auth header (before in router)';
         }
     }
+
+    {
+        my $mw-app = route {
+            before ForbiddenWithoutAuthHeader;
+            include $application;
+        }
+
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $mw-app
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        throws-like { await Cro::HTTP::Client.get("$url") },
+            X::Cro::HTTP::Error::Client,
+            response => { .status == 403 },
+            'Got 403 response from middleware when no auth header (before + include in router)';
+
+        my %headers = Authorization => 'Bearer Polarer';
+        given await Cro::HTTP::Client.get("$url", :%headers) -> $resp {
+            is $resp.status, 200,
+                'Got 200 normal response with an auth header (before + include in router)';
+        }
+    }
 }, 'Conditional response middleware using Cro::HTTP::Middleware::Conditional';
 
 subtest {
@@ -334,6 +358,36 @@ subtest {
             nok $resp.has-header('X-Uncached'),
                 'Response part did not run on early response (before in router)';
             is await($resp.body-text), '2', 'Got cached body (before in router)';
+        }
+    }
+
+    {
+        my $mw-app = route {
+            before OverlySimpleCache.new;
+            include $application;
+        }
+
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $mw-app
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        given await Cro::HTTP::Client.get("$url/counter") -> $resp {
+            is $resp.status, 200,
+                'Got 200 response on first request (before + include in router)';
+            ok $resp.has-header('X-Uncached'),
+                'Response part added header (before + include in router)';
+            is await($resp.body-text), '3', 'Expected body (before + include in router)';
+        }
+
+        given await Cro::HTTP::Client.get("$url/counter") -> $resp {
+            is $resp.status, 200,
+                'Got 200 response on second request (before + include in router)';
+            nok $resp.has-header('X-Uncached'),
+                'Response part did not run on early response (before + include in router)';
+            is await($resp.body-text), '3',
+                'Got cached body (before + include in router)';
         }
     }
 }, 'Request/response middleware using Cro::HTTP::Middleware::RequestResponse';
