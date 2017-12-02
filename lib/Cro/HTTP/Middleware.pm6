@@ -81,13 +81,13 @@ role Cro::HTTP::Middleware::Conditional does Cro::HTTP::Middleware::Pair {
 
         method transformer(Supply $pipeline, :$connection-state! --> Supply) {
             supply {
-                whenever $pipeline -> $response {
-                    emit $response;
-                }
                 whenever $connection-state.early-responses -> $skipped {
                     if $skipped.middleware === $!middleware {
                         emit $skipped.response;
                     }
+                }
+                whenever $pipeline -> $response {
+                    emit $response;
                 }
             }
         }
@@ -131,13 +131,13 @@ role Cro::HTTP::Middleware::RequestResponse does Cro::HTTP::Middleware::Pair {
 
         method transformer(Supply $pipeline, :$connection-state! --> Supply) {
             supply {
-                whenever $!middleware.process-responses($pipeline) -> $response {
-                    emit $response;
-                }
                 whenever $connection-state.early-responses -> $skipped {
                     if $skipped.middleware === $!middleware {
                         emit $skipped.response;
                     }
+                }
+                whenever $!middleware.process-responses($pipeline) -> $response {
+                    emit $response;
                 }
             }
         }
