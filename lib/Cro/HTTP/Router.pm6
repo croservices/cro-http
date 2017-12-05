@@ -150,7 +150,6 @@ module Cro::HTTP::Router {
                     my $response = supply whenever $current -> $req {
                         whenever self!invoke-internal($req, $args) {
                             emit $_;
-                                whenever $response { .emit }
                         }
                     }
                     return self!append-middleware($response, @!after, %connection-state);
