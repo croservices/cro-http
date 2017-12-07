@@ -1,8 +1,9 @@
 {
     "perl"          : "6.*",
     "name"          : "Cro::HTTP",
-    "version"       : "0.7.1",
-    "description"   : "Libraries for building reactive services in Perl 6 - http part.",
+    "version"       : "0.7.2",
+    "description"   : "Asynchronous HTTP, both client and server side. Includes HTTP/2.0 support.",
+    "tags"          : [ "HTTP", "Client", "Server" ],
     "authors"       : [ "Jonathan Worthington <jnthn@jnthn.net>" ],
     "license"       : "Artistic-2.0",
     "depends"       : [ "IO::Socket::Async::SSL", "OO::Monitors", "IO::Path::ChildSecure",
