@@ -657,7 +657,7 @@ module Cro::HTTP::Router {
                         $*CRO-ROUTE-SET.delegate([$prefix], $transform);
                     }
                     default {
-                        die "Paris passed to 'delegate' must have a Str or Iterable key, not " ~ .^name;
+                        die "Pairs passed to 'delegate' must have a Str or Iterable key, not " ~ .^name;
                     }
                 }
             }
