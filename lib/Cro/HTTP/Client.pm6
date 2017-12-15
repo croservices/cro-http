@@ -234,6 +234,7 @@ class Cro::HTTP::Client {
     has $.http;
     has $.ca;
     has $.base-uri;
+    has $.push-promises = False;
 
     method persistent() {
         self ?? $!persistent !! False
@@ -242,7 +243,8 @@ class Cro::HTTP::Client {
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type, :$!base-uri = '',
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
-                    :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca) {
+                    :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca,
+                    :$!push-promises) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -326,8 +328,10 @@ class Cro::HTTP::Client {
             $parsed-url.Str.comb[0..$pos-1].join ~ $path;
         }
 
+        my $enable-push = self ?? $!push-promises // %options<push-promises> !! %options<push-promises>;
+
         Promise(supply {
-            whenever self!get-pipeline($parsed-url, $http, ca => %options<ca>) -> $pipeline {
+            whenever self!get-pipeline($parsed-url, $http, ca => %options<ca>, :$enable-push) -> $pipeline {
                 if $pipeline !~~ Pipeline2 {
                     unless self.persistent || $request-object.has-header('connection') {
                         $request-object.append-header('Connection', 'close');
@@ -397,7 +401,7 @@ class Cro::HTTP::Client {
         })
     }
 
-    method !get-pipeline(Cro::Uri $url, $http, :$ca) {
+    method !get-pipeline(Cro::Uri $url, $http, :$ca, :$enable-push) {
         my $secure = $url.scheme.lc eq 'https';
         my $host = $url.host;
         my $port = $url.port // ($secure ?? 443 !! 80);
@@ -407,7 +411,7 @@ class Cro::HTTP::Client {
             $p
         }
         else {
-            self!build-pipeline($secure, $host, $port, $http, :$ca)
+            self!build-pipeline($secure, $host, $port, $http, :$ca, :$enable-push)
         }
     }
 
@@ -423,7 +427,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !build-pipeline($secure, $host, $port, $http, :$ca) {
+    method !build-pipeline($secure, $host, $port, $http, :$ca, :$enable-push) {
         my @parts;
         my $version-decision = Promise.new;
         if self {
@@ -433,7 +437,7 @@ class Cro::HTTP::Client {
         }
         if $http eq '2' {
             push @parts, Cro::HTTP2::RequestSerializer.new;
-            push @parts, Cro::HTTP2::FrameSerializer.new(:client);
+            push @parts, Cro::HTTP2::FrameSerializer.new(:client, :$enable-push);
             $version-decision.keep('2');
         }
         elsif $http eq '1.1' || !$secure {
@@ -445,7 +449,7 @@ class Cro::HTTP::Client {
                 { (.alpn-result // '') eq 'h2' } => [
                     VersionDecisionNotifier.new(:promise($version-decision), :result('2')),
                     Cro::HTTP2::RequestSerializer.new,
-                    Cro::HTTP2::FrameSerializer.new(:client)
+                    Cro::HTTP2::FrameSerializer.new(:client, :$enable-push)
                 ],
                 [
                     VersionDecisionNotifier.new(:promise($version-decision), :result('1.1')),
