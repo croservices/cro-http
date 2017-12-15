@@ -5,10 +5,11 @@ use Cro::HTTP::BodyParserSelector;
 use Cro::HTTP::BodySerializer;
 use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Middleware;
+use Cro::HTTP::MimeTypes;
+use Cro::HTTP::PushPromise;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 use IO::Path::ChildSecure;
-use Cro::HTTP::MimeTypes;
 
 class X::Cro::HTTP::Router::OnlyInHandler is Exception {
     has $.what;
@@ -818,6 +819,20 @@ module Cro::HTTP::Router {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
         $resp.status = $status;
+    }
+
+    multi sub push-promise(Str $path, :%headers) {
+        push-promise($path, |%headers.List);
+    }
+    multi sub push-promise(Str $path, Pair :@headers) is export {
+        my $resp = $*CRO-ROUTER-RESPONSE //
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+        return unless $resp.http-version eq 'http/2';
+        # TODO: target resolution
+        my $pp = Cro::HTTP::PushPromise.new(:method<GET>,
+                                            target => $path);
+        $pp.append-header($_) for @headers;
+        $resp.add-push-promise($pp);
     }
 
     my class BeforeMiddleTransform does Cro::HTTP::Middleware::Conditional {
