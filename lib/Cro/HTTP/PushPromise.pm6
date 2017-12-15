@@ -5,7 +5,7 @@ class Cro::HTTP::PushPromise is Cro::HTTP::Request {
 
     method response(--> Promise) { $!response }
 
-    method set-response(Cro::HTTP::Response $resp) {
+    method set-response($resp) {
         $!response.keep($resp);
     }
 }
