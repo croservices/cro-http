@@ -14,7 +14,7 @@ class Cro::HTTP2::RequestParser does Cro::Transform does Cro::HTTP2::GeneralPars
     method !get-message($http2-stream-id, $connection) {
         Cro::HTTP::Request.new(:$http2-stream-id,
                                :$connection,
-                               http-version => 'http/2')
+                               http-version => '2.0')
     }
 
     method !message-full($req--> Bool) { so $req.method && so $req.target }

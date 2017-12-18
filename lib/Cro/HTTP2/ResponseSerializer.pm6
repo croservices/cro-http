@@ -47,7 +47,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                         headers => $encoder.encode-headers(.headers),
                         promised-sid => $push-promise-counter
                     );
-                    $_.http-version = 'http/2';
+                    $_.http-version = '2.0';
                     $_.http2-stream-id = $push-promise-counter;
                     $!push-promise-supplier.emit: $_;
                     $push-promise-counter += 2;

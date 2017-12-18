@@ -841,8 +841,8 @@ module Cro::HTTP::Router {
         # TODO: We don't set http-version anywhere really, so check a request instead.
         # To fix we need to introduce some rules to set appropriate http version
         # during $*CRO-ROUTER-RESPONSE creation.
-        return unless ($*CRO-ROUTER-REQUEST.http-version // '') eq 'http/2';
-        $resp.http-version = 'http/2';
+        return unless ($*CRO-ROUTER-REQUEST.http-version // '') eq '2.0';
+        $resp.http-version = '2.0';
         # TODO: target resolution
         my $pp = Cro::HTTP::PushPromise.new(:method<GET>,
                                             target => $path);

@@ -91,7 +91,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     }
 
     method push-promises(--> Supply) {
-        ($!http-version // '') eq 'http/2' ??
+        ($!http-version // '') eq '2.0' ??
         $!push-promises.Supply !!
         supply { done };
     }
