@@ -57,7 +57,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
         Cro::HTTP::BodyParserSelector::ResponseDefault;
     has Cro::HTTP::BodySerializerSelector $.body-serializer-selector is rw =
         Cro::HTTP::BodySerializerSelector::ResponseDefault;
-    has Supplier::Preserving $!push-promises;
+    has $!push-promises = Supplier::Preserving.new;
 
     multi method Str(Cro::HTTP::Response:D:) {
         my $status = $!status // (self.has-body ?? 200 !! 204);
@@ -91,7 +91,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     }
 
     method push-promises(--> Supply) {
-        $!http-version eq 'http/2' ??
+        ($!http-version // '') eq 'http/2' ??
         $!push-promises.Supply !!
         supply { done };
     }
