@@ -821,13 +821,28 @@ module Cro::HTTP::Router {
         $resp.status = $status;
     }
 
-    multi sub push-promise(Str $path, :%headers) {
-        push-promise($path, |%headers.List);
+    sub push-promise(Str $path, :$headers) is export {
+        with $headers {
+            if $headers ~~ Hash {
+                push-promise-internal($path, $headers.List)
+            } elsif $headers ~~ List {
+                push-promise-internal($path, $headers)
+            } else {
+                die "push-promise headers argument must be a Hash or a List, got {$headers.^name} instead";
+            }
+        }
+        else {
+            push-promise-internal($path, []);
+        }
     }
-    multi sub push-promise(Str $path, Pair :@headers) is export {
+    sub push-promise-internal(Str $path, @headers) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
-        return unless $resp.http-version eq 'http/2';
+        # TODO: We don't set http-version anywhere really, so check a request instead.
+        # To fix we need to introduce some rules to set appropriate http version
+        # during $*CRO-ROUTER-RESPONSE creation.
+        return unless ($*CRO-ROUTER-REQUEST.http-version // '') eq 'http/2';
+        $resp.http-version = 'http/2';
         # TODO: target resolution
         my $pp = Cro::HTTP::PushPromise.new(:method<GET>,
                                             target => $path);
