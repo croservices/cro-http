@@ -37,6 +37,8 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                 @headers.unshift: HTTP::HPACK::Header.new(
                     name => ':status',
                     value => $resp.status.Str);
+                # It is safe to set flags as there are always no continuations,
+                # since it will be properly splitted and re-set in FrameSerializer
                 emit Cro::HTTP2::Frame::Headers.new(
                     flags => $resp.has-body ?? 4 !! 5,
                     stream-identifier => $resp.request.http2-stream-id,
