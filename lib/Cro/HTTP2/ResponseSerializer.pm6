@@ -38,29 +38,24 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                     }
                 }
 
-                # Sends push promise frames
-                my $promises-done = Promise.new;
-                whenever $resp.push-promises() {
-                    emit Cro::HTTP2::Frame::PushPromise.new(
-                        flags => 4,
-                        stream-identifier => $resp.request.http2-stream-id,
-                        headers => $encoder.encode-headers(.headers),
-                        promised-sid => $push-promise-counter
-                    );
-                    $_.http-version = '2.0';
-                    $_.http2-stream-id = $push-promise-counter;
-                    $!push-promise-supplier.emit: $_;
-                    $push-promise-counter += 2;
-                    LAST { $promises-done.keep }
-                    QUIT { $promises-done.break($_) }
-                }
-
-                await $promises-done;
-                CATCH {
-                    default {
-                        die "Push promises were not sent: $_";
+                # Gather push promise frames
+                my @promises;
+                react {
+                    whenever $resp.push-promises() {
+                        @promises.push: Cro::HTTP2::Frame::PushPromise.new(
+                            flags => 4,
+                            stream-identifier => $resp.request.http2-stream-id,
+                            headers => $encoder.encode-headers(.headers),
+                            promised-sid => $push-promise-counter
+                        );
+                        $_.http-version = '2.0';
+                        $_.http2-stream-id = $push-promise-counter;
+                        $!push-promise-supplier.emit: $_;
+                        $push-promise-counter += 2;
                     }
                 }
+                # Emit push promise frames
+                .emit for @promises;
 
                 my @headers = $resp.headers.map({ HTTP::HPACK::Header.new(
                                                         name  => .name.lc,

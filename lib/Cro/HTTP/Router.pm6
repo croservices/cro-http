@@ -142,6 +142,8 @@ module Cro::HTTP::Router {
                         }
                     }
                     $response.status //= 204;
+                    # Close push promises as we don't get a new ones
+                    $response.close-push-promises();
                     $response
                 }
             }
