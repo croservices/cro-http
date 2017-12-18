@@ -4,6 +4,8 @@ use Cro::Transform;
 use HTTP::HPACK;
 
 class Cro::HTTP2::ResponseSerializer does Cro::Transform {
+    has Supplier::Preserving $.push-promise-supplier;
+
     method consumes() { Cro::HTTP::Response }
     method produces() { Cro::HTTP2::Frame   }
 
@@ -15,9 +17,13 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                 );
             }
 
+            # Even numbers started from request id + 1
+            my $push-promise-counter;
+
             whenever $in -> Cro::HTTP::Response $resp {
                 my $body-byte-stream;
                 my $encoder = HTTP::HPACK::Encoder.new;
+                $push-promise-counter = $resp.request.http2-stream-id + 1;
                 if $resp.has-body {
                     try {
                         CATCH {
@@ -31,6 +37,31 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                         $body-byte-stream = $resp.body-byte-stream;
                     }
                 }
+
+                # Sends push promise frames
+                my $promises-done = Promise.new;
+                whenever $resp.push-promises() {
+                    emit Cro::HTTP2::Frame::PushPromise.new(
+                        flags => 4,
+                        stream-identifier => $resp.request.http2-stream-id,
+                        headers => $encoder.encode-headers(.headers),
+                        promised-sid => $push-promise-counter
+                    );
+                    $_.http-version = 'http/2';
+                    $_.http2-stream-id = $push-promise-counter;
+                    $!push-promise-supplier.emit: $_;
+                    $push-promise-counter += 2;
+                    LAST { $promises-done.keep }
+                    QUIT { $promises-done.break($_) }
+                }
+
+                await $promises-done;
+                CATCH {
+                    default {
+                        die "Push promises were not sent: $_";
+                    }
+                }
+
                 my @headers = $resp.headers.map({ HTTP::HPACK::Header.new(
                                                         name  => .name.lc,
                                                         value => .value.Str.lc) });

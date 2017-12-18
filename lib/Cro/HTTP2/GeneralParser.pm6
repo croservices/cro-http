@@ -19,12 +19,17 @@ role Cro::HTTP2::GeneralParser {
     has $.ping;
     has $.settings;
     has $!pseudo-headers;
+    has $.push-promise-supply;
 
     method transformer(Supply:D $in) {
         supply {
             my $curr-sid = 0;
             my %streams;
             my ($breakable, $break) = (True, $curr-sid);
+
+            with $!push-promise-supply {
+                whenever $!push-promise-supply { emit $_ }
+            }
 
             my $decoder = HTTP::HPACK::Decoder.new;
             whenever $in {
@@ -89,6 +94,9 @@ role Cro::HTTP2::GeneralParser {
                 }
                 when Cro::HTTP2::Frame::Settings {
                     $!settings.emit: $_;
+                }
+                when Cro::HTTP2::Frame::PushPromise {
+                    # TODO
                 }
                 when Cro::HTTP2::Frame::Ping {
                     $!ping.emit: $_;
