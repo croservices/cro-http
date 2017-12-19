@@ -13,12 +13,10 @@ constant %tls := {
 
 my $application = route {
     get -> {
-        say "Promised";
         push-promise '/main.css';
         content 'text/html', "Main page";
     }
     get -> 'main.css' {
-        say "Promise is processed";
         content 'text/html', "CSS by server push!";
     }
 };
@@ -33,7 +31,14 @@ my $client = Cro::HTTP::Client.new(:http<2>);
 
 given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
     my $res = await $resp;
-    say $res;
+    react {
+        whenever $res.push-promises -> $prom {
+            whenever $prom.response -> $resp {
+                say "Push promise for $prom.target() had status $resp.status()";
+            }
+            LAST { done }
+        }
+    }
 }
 
 done-testing;
