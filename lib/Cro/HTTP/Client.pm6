@@ -162,7 +162,7 @@ class Cro::HTTP::Client {
         }
 
         method !resolve-promise($response) {
-            my $pp = %!promised-streams{$response.http2-stream-id};
+            my $pp = $!lock.protect: { %!promised-streams{$response.http2-stream-id} };
             die 'Got unexpected stream!' unless $pp;
             $pp.set-response($response);
             $!lock.protect: { %!promised-streams{$response.http2-stream-id}:delete };
