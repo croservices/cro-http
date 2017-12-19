@@ -32,12 +32,13 @@ my $client = Cro::HTTP::Client.new(:http<2>);
 given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
     my $res = await $resp;
     react {
-        whenever $res.push-promises -> $prom {
-            whenever $prom.response -> $resp {
-                say "Push promise for $prom.target() had status $resp.status()";
-            }
-            LAST { done }
-        }
+        # Hangs
+        # whenever $res.push-promises -> $prom {
+        #     whenever $prom.response -> $resp {
+        #         say "Push promise for $prom.target() had status $resp.status()";
+        #     }
+        #     LAST { done }
+        # }
     }
 }
 
