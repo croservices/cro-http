@@ -26,6 +26,7 @@ role Cro::HTTP2::GeneralParser {
             my $curr-sid = 0;
             my %streams;
             my ($breakable, $break) = (True, $curr-sid);
+            my %push-promises;
 
             with $!push-promise-supply {
                 whenever $!push-promise-supply { emit $_ }
@@ -67,6 +68,17 @@ role Cro::HTTP2::GeneralParser {
                     }
                     my $message = %streams{.stream-identifier}.message;
 
+                    # Process push promises
+                    my @promises = %push-promises{.stream-identifier}<>.grep({so $_});
+                    if @promises.elems > 0 {
+                        if $message ~~ Cro::HTTP::Response {
+                            $message.add-push-promise($_) for @promises;
+                            $message.close-push-promises;
+                        }
+                    } else {
+                        $message.close-push-promises if $message ~~ Cro::HTTP::Response;
+                    }
+
                     if .end-headers {
                         self!set-headers($decoder, $message, .headers);
                         if .end-stream {
@@ -96,7 +108,24 @@ role Cro::HTTP2::GeneralParser {
                     $!settings.emit: $_;
                 }
                 when Cro::HTTP2::Frame::PushPromise {
-                    # TODO
+                    my @headers = $decoder.decode-headers(Buf.new: .headers);
+                    my $pp = Cro::HTTP::PushPromise.new(
+                        http2-stream-id => .promised-sid,
+                        target => @headers.grep({.name eq ':path'})[0].value,
+                        http-version => '2.0',
+                        :method<GET>);
+                    my @real-headers = @headers.grep({ not .name eq any <:method :scheme :authority :path :status> });
+                    for @real-headers { $pp.append-header(.name => .value) }
+                    my $promises = %push-promises{.stream-identifier};
+                    if $promises ~~ Array {
+                        $promises.push: $pp;
+                        %push-promises{.stream-identifier} = $promises;
+                    } elsif $promises ~~ Cro::HTTP::PushPromise {
+                        my @promises = $promises, $pp;
+                        %push-promises{.stream-identifier} = @promises;
+                    } else {
+                        %push-promises{.stream-identifier} = $pp;
+                    }
                 }
                 when Cro::HTTP2::Frame::Ping {
                     $!ping.emit: $_;
