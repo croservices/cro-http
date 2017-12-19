@@ -42,10 +42,22 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                 my @promises;
                 react {
                     whenever $resp.push-promises() {
+                        my @headers = .headers.map({ HTTP::HPACK::Header.new(
+                                                           name  => .name.lc,
+                                                           value => .value.Str.lc) });
+                        @headers.unshift: HTTP::HPACK::Header.new(
+                            name => ':path',
+                            value => .target);
+                        @headers.unshift: HTTP::HPACK::Header.new(
+                            name => ':scheme',
+                            value => 'https');
+                        @headers.unshift: HTTP::HPACK::Header.new(
+                            name => ':method',
+                            value => .method);
                         @promises.push: Cro::HTTP2::Frame::PushPromise.new(
                             flags => 4,
                             stream-identifier => $resp.request.http2-stream-id,
-                            headers => $encoder.encode-headers(.headers),
+                            headers => $encoder.encode-headers(@headers),
                             promised-sid => $push-promise-counter
                         );
                         $_.http-version = '2.0';
