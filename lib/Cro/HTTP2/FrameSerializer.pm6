@@ -35,7 +35,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             }
 
             sub send-splitted($frame) {
-                my $is-header = $frame ~~ Cro::HTTP2::Frame::Headers;
+                my $is-header = $frame ~~ Cro::HTTP2::Frame::Headers|Cro::HTTP2::Frame::PushPromise;
                 my $payload = $is-header ?? $frame.headers !! $frame.data;
                 my $flag = $frame.flags == 4 ?? 0 !! 1 if $is-header;
                 # Send first piece
@@ -108,7 +108,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             }
 
             whenever $in -> Cro::HTTP2::Frame $frame {
-                if $frame ~~ Cro::HTTP2::Frame::Headers {
+                if $frame ~~ Cro::HTTP2::Frame::Headers|Cro::HTTP2::Frame::PushPromise {
                     if $frame.headers.elems + 9 > $MAX-FRAME-SIZE {
                         send-splitted($frame);
                     } else {
