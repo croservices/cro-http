@@ -11,7 +11,7 @@ class Cro::HTTP2::ResponseParser does Cro::Transform does Cro::HTTP2::GeneralPar
     }
 
     method !get-message($sid, $connection) {
-        Cro::HTTP::Response.new(http-version => '2', http2-stream-id => $sid)
+        Cro::HTTP::Response.new(http-version => '2.0', http2-stream-id => $sid)
     }
     method !message-full($resp--> Bool) { so $resp.status }
     method !check-data($stream, $sid, $csid) {
