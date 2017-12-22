@@ -8,20 +8,20 @@ my $encoder = HTTP::HPACK::Encoder.new;
 my ($buf, @headers);
 
 sub test(@frames, $count, $desc, @checks, :$fail, :$test-supplies) {
-    my ($ping, $settings);
     my $test-completed = Promise.new;
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
     with $test-supplies {
-        $ping = Supplier.new;
-        $settings = Supplier.new;
-        $ping.Supply.tap: -> $ping {
-            $test-completed.keep;
-            $test-supplies.keep;
-        };
+        my $ping = $connection-state.ping.Supply;
+        $ping.tap(
+            -> $_ {
+                $test-completed.keep;
+                $test-supplies.keep;
+            });
     }
-    my $parser = Cro::HTTP2::RequestParser.new(:$ping);
+    my $parser = Cro::HTTP2::RequestParser.new;
     my $fake-in = Supplier.new;
     my $counter = 0;
-    $parser.transformer($fake-in.Supply).tap:
+    $parser.transformer($fake-in.Supply, :$connection-state).tap:
     -> $request {
         for @checks[$counter].kv -> $i, $check {
             ok $check($request), "check {$i + 1}";

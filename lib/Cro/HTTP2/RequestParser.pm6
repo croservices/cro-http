@@ -7,7 +7,7 @@ class Cro::HTTP2::RequestParser does Cro::Transform does Cro::HTTP2::GeneralPars
     method consumes() { Cro::HTTP2::Frame  }
     method produces() { Cro::HTTP::Request }
 
-    submethod BUILD(:$!settings, :$!ping) {
+    submethod BUILD() {
         $!pseudo-headers = <:method :scheme :authority :path :status>;
     }
 

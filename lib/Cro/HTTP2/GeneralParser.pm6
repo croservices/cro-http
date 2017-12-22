@@ -18,8 +18,6 @@ my class Stream {
 }
 
 role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
-    has $.ping;
-    has $.settings;
     has $!pseudo-headers;
 
     method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
@@ -104,7 +102,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                 when Cro::HTTP2::Frame::RstStream {
                 }
                 when Cro::HTTP2::Frame::Settings {
-                    $!settings.emit: $_;
+                    $connection-state.settings.emit: $_;
                 }
                 when Cro::HTTP2::Frame::PushPromise {
                     my @headers = $decoder.decode-headers(Buf.new: .headers);
@@ -127,7 +125,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     }
                 }
                 when Cro::HTTP2::Frame::Ping {
-                    $!ping.emit: $_;
+                    $connection-state.ping.emit: $_;
                 }
                 when Cro::HTTP2::Frame::GoAway {
                 }
