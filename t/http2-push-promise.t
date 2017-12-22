@@ -1,7 +1,7 @@
-use Cro;
+use Cro::HTTP::Client;
 use Cro::HTTP::Router;
 use Cro::HTTP::Server;
-use Cro::HTTP::Client;
+use Cro;
 use Test;
 
 constant $TEST_PORT = 8883;

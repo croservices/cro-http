@@ -1,15 +1,15 @@
+use Cro;
+use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::Frame;
 use Cro::HTTP::Response;
 use Cro::Transform;
 use HTTP::HPACK;
 
-class Cro::HTTP2::ResponseSerializer does Cro::Transform {
-    has Supplier::Preserving $.push-promise-supplier;
-
+class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
     method consumes() { Cro::HTTP::Response }
     method produces() { Cro::HTTP2::Frame   }
 
-    method transformer(Supply:D $in) {
+    method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
         supply {
             sub emit-data($flags, $stream-identifier, $data) {
                 emit Cro::HTTP2::Frame::Data.new(
@@ -62,7 +62,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform {
                         );
                         $_.http-version = '2.0';
                         $_.http2-stream-id = $push-promise-counter;
-                        $!push-promise-supplier.emit: $_;
+                        $connection-state.push-promise.emit: $_;
                         $push-promise-counter += 2;
                     }
                 }

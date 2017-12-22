@@ -1,6 +1,8 @@
+use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::Frame;
-use Cro::HTTP::Response;
 use Cro::HTTP::Request;
+use Cro::HTTP::Response;
+use Cro;
 use HTTP::HPACK;
 
 # HTTP/2 stream
@@ -15,22 +17,19 @@ my class Stream {
     has Buf $.headers is rw;
 }
 
-role Cro::HTTP2::GeneralParser {
+role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
     has $.ping;
     has $.settings;
     has $!pseudo-headers;
-    has $.push-promise-supply;
 
-    method transformer(Supply:D $in) {
+    method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
         supply {
             my $curr-sid = 0;
             my %streams;
             my ($breakable, $break) = (True, $curr-sid);
             my %push-promises;
 
-            with $!push-promise-supply {
-                whenever $!push-promise-supply { emit $_ }
-            }
+            whenever $connection-state.push-promise.Supply { emit $_ }
 
             my $decoder = HTTP::HPACK::Decoder.new;
             whenever $in {

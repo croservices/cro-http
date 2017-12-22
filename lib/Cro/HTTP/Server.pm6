@@ -72,20 +72,19 @@ class Cro::HTTP::Server does Cro::Service {
         sub pack2(:$http2-only) {
             my $listener = Cro::TLS::Listener.new(|(:$host with $host), |(:$port with $port), |%tls);
             if $http2-only {
-                my $push-promise-supplier = Supplier::Preserving.new;
                 return Cro.compose(
                     service-type => self.WHAT,
                     :$label,
                     $listener,
                     |$before-parse,
                     Cro::HTTP2::FrameParser.new,
-                    Cro::HTTP2::RequestParser.new(push-promise-supply => $push-promise-supplier.Supply),
+                    Cro::HTTP2::RequestParser.new,
                     RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
                     |@before,
                     $application,
                     ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
                     |@after,
-                    Cro::HTTP2::ResponseSerializer.new(:$push-promise-supplier),
+                    Cro::HTTP2::ResponseSerializer.new,
                     Cro::HTTP2::FrameSerializer.new,
                     |$after-serialize
                 )
