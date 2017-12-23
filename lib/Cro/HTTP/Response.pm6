@@ -85,7 +85,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
         "Server responded with $!status {%reason-phrases{$!status} // 'Unknown'}";
     }
 
-    method add-push-promise(Cro::HTTP::PushPromise $pp) {
+    method add-push-promise(Cro::HTTP::PushPromise $pp --> Nil) {
         $!push-promises.emit: $pp;
     }
 
