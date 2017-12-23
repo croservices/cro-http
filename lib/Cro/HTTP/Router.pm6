@@ -839,7 +839,7 @@ module Cro::HTTP::Router {
     }
     sub push-promise-internal(Str $path, @headers) {
         my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<push-promise>);
         # TODO: We don't set http-version anywhere really, so check a request instead.
         # To fix we need to introduce some rules to set appropriate http version
         # during $*CRO-ROUTER-RESPONSE creation.
