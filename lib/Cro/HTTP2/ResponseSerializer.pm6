@@ -17,13 +17,13 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionSta
                 );
             }
 
-            # Even numbers started from request id + 1
+            # Even numbers started from first request id + 1
             my $push-promise-counter;
 
             whenever $in -> Cro::HTTP::Response $resp {
                 my $body-byte-stream;
                 my $encoder = HTTP::HPACK::Encoder.new;
-                $push-promise-counter = $resp.request.http2-stream-id + 1;
+                $push-promise-counter = $push-promise-counter // $resp.request.http2-stream-id + 1;
                 if $resp.has-body {
                     try {
                         CATCH {
