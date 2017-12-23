@@ -130,8 +130,15 @@ class Cro::HTTP::Client {
 
         submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
             $!tap = supply {
+                sub handle-promises($response) {
+                    whenever $response.push-promises {
+                        $!lock.protect: { %!promised-streams{.http2-stream-id} = $_ };
+                        $response.add-push-promise($_);
+                    }
+                }
+
                 whenever $out -> $response {
-                    self!handle-promises($response);
+                    handle-promises($response);
                     if (%!outstanding-stream-responses{$response.http2-stream-id}) {
                         self.response($response);
                     } else {
@@ -149,16 +156,6 @@ class Cro::HTTP::Client {
                     }
                 }
             }.tap
-        }
-
-        method !handle-promises($response) {
-            react {
-                whenever $response.push-promises {
-                    $!lock.protect: { %!promised-streams{.http2-stream-id} = $_ };
-                    $response.add-push-promise($_);
-                    LAST { done }
-                }
-            }
         }
 
         method !resolve-promise($response) {
