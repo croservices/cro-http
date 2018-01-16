@@ -121,9 +121,7 @@ module Cro::HTTP::Router {
                 self!add-body-serializers($response);
                 start {
                     {
-                        $request.path eq '/'
-                            ?? &!implementation(|%($args))
-                            !! &!implementation(|$args);
+                        &!implementation(|$args);
                         CATCH {
                             when X::Cro::HTTP::Router::NoRequestBodyMatch {
                                 $response.status = 400;
@@ -505,8 +503,10 @@ module Cro::HTTP::Router {
                 ?? '<?{ ' ~ @checks.join(' and ') ~ ' }>'
                 !! '';
             my $form-cap = '{ my %unpacks; ' ~ @make-tasks.join(';') ~
-                '; $cap = Capture.new(:list(@segs' ~
-                ($prefix-elems ?? "[$prefix-elems..*]" !! "") ~
+                '; $cap = Capture.new(:list(' ~
+                (@positional == 0
+                    ?? ''
+                    !! '@segs' ~ ($prefix-elems ?? "[$prefix-elems..*]" !! "")) ~
                 '), :hash(%unpacks)); }';
             my $bind-check = $need-sig-bind
                 ?? '<?{ my $han = @handlers[' ~ $index ~ ']; ' ~
