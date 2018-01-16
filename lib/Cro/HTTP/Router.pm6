@@ -37,6 +37,10 @@ module Cro::HTTP::Router {
     multi trait_mod:<is>(Parameter:D $param, :$cookie! --> Nil) is export {
         $param does Cookie;
     }
+    role Auth {}
+    multi trait_mod:<is>(Parameter:D $param, :$auth! --> Nil) is export {
+        $param does Auth;
+    }
 
     class RouteSet does Cro::Transform {
         my role Handler {
@@ -238,7 +242,7 @@ module Cro::HTTP::Router {
                                             $status = 400;
                                             last;
                                         }
-                                        elsif $param.type ~~ Cro::HTTP::Auth {
+                                        elsif $param ~~ Auth || $param.type ~~ Cro::HTTP::Auth {
                                             $status = 401;
                                             last;
                                         }
@@ -341,7 +345,7 @@ module Cro::HTTP::Router {
             # and it and compile the check.
             my $have-auth-param = False;
             with @positional[0] -> $param {
-                if $param.type ~~ Cro::HTTP::Auth {
+                if $param ~~ Auth || $param.type ~~ Cro::HTTP::Auth {
                     @positional.shift;
                     $have-auth-param = True;
                     $need-sig-bind = True;
