@@ -21,7 +21,7 @@ subtest {
     my $app = route -> {
         before { .auth = $test-auth }
 
-        delegate (*,) => route {
+        delegate <*> => route {
             get -> TestAuth $user {
                 content 'text/plain', $user.test();
             }
@@ -100,7 +100,7 @@ subtest {
     my $app = route -> {
         before { .auth = $test-auth }
 
-        delegate (*,) => route {
+        delegate <*> => route {
             get -> $user is auth {
                 content 'text/plain', $user.test();
             }
