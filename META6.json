@@ -7,7 +7,8 @@
     "authors"       : [ "Jonathan Worthington <jnthn@jnthn.net>" ],
     "license"       : "Artistic-2.0",
     "depends"       : [ "IO::Socket::Async::SSL", "OO::Monitors", "IO::Path::ChildSecure",
-                        "Base64", "HTTP::HPACK", "Cro::Core", "Cro::TLS", "JSON::Fast" ],
+                        "Base64", "HTTP::HPACK", "Cro::Core", "Cro::TLS", "JSON::Fast",
+                        "Crypt::Random" ],
     "provides"      : {
                 "Cro::HTTP::Auth": "lib/Cro/HTTP/Auth.pm6",
                 "Cro::HTTP::Body": "lib/Cro/HTTP/Body.pm6",
@@ -36,6 +37,7 @@
                 "Cro::HTTP::ResponseParser": "lib/Cro/HTTP/ResponseParser.pm6",
                 "Cro::HTTP::ResponseSerializer": "lib/Cro/HTTP/ResponseSerializer.pm6",
                 "Cro::HTTP::Router": "lib/Cro/HTTP/Router.pm6",
+                "Cro::HTTP::Session::InMemory": "lib/Cro/HTTP/Session/InMemory.pm6",
                 "Cro::HTTP::Server": "lib/Cro/HTTP/Server.pm6",
                 "Cro::HTTP::VersionSelector": "lib/Cro/HTTP/VersionSelector.pm6",
                 "Cro::HTTP2::ConnectionState": "lib/Cro/HTTP2/ConnectionState.pm6",
