@@ -317,7 +317,6 @@ module Cro::HTTP::Router {
             # request data.
             my @checks;
             my @make-tasks;
-            my @types = int8, int16, int32, int64, uint8, uint16, uint32, uint64;
 
             # If we need a signature bind test (due to subset/where).
             my $need-sig-bind = False;
@@ -342,6 +341,7 @@ module Cro::HTTP::Router {
             sub match-types($type,
                             :$lookup, :$target-name,
                             :$seg-index, :@matcher-target, :@constraints) {
+                my constant @types = int8, int16, int32, int64, uint8, uint16, uint32, uint64;
                 for @types {
                     if $type === $_ {
                         if $lookup {
