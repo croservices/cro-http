@@ -1,4 +1,5 @@
 use Cro;
+use Cro::HTTP::Auth;
 use Cro::HTTP::BodyParser;
 use Cro::HTTP::BodyParserSelector;
 use Cro::HTTP::BodySerializer;
@@ -232,8 +233,13 @@ module Cro::HTTP::Router {
                                 $imp(|cap);
                                 CATCH {
                                     when X::TypeCheck::Binding::Parameter {
-                                        if .parameter.named {
+                                        my $param = .parameter;
+                                        if $param.named {
                                             $status = 400;
+                                            last;
+                                        }
+                                        elsif $param.type ~~ Cro::HTTP::Auth {
+                                            $status = 401;
                                             last;
                                         }
                                     }
@@ -330,6 +336,17 @@ module Cro::HTTP::Router {
             my $signature = $handler.signature;
             my (:@positional, :@named) := $signature.params.classify:
                 { .named ?? 'named' !! 'positional' };
+
+            # If the first segment is an authorization constraint, extract
+            # and it and compile the check.
+            my $have-auth-param = False;
+            with @positional[0] -> $param {
+                if $param.type ~~ Cro::HTTP::Auth {
+                    @positional.shift;
+                    $have-auth-param = True;
+                    $need-sig-bind = True;
+                }
+            }
 
             # Compile segments definition into a matcher.
             my @segments-required;
@@ -504,6 +521,9 @@ module Cro::HTTP::Router {
                 !! '';
             my $form-cap = '{ my %unpacks; ' ~ @make-tasks.join(';') ~
                 '; $cap = Capture.new(:list(' ~
+                ($have-auth-param
+                    ?? '$req.auth' ~ (@positional ?? ', |' !! ',')
+                    !! '') ~
                 (@positional == 0
                     ?? ''
                     !! '@segs' ~ ($prefix-elems ?? "[$prefix-elems..*]" !! "")) ~
