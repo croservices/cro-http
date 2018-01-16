@@ -38,6 +38,13 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     has Target $.target is rw;
     has Str $.original-target;
 
+    # This property carries information about the authority making the request
+    # and may be populated with whatever object the application chooses. In a
+    # HTTP service it may contain information from a verified web token; in a
+    # HTTP application it may contain information about an ongoing session,
+    # together with information on - or a way to check - user rights.
+    has $.auth is rw;
+
     multi method Str(Cro::HTTP::Request:D:) {
         die X::Cro::HTTP::Request::Incomplete.new(:missing<method>) unless $!method;
         die X::Cro::HTTP::Request::Incomplete.new(:missing<target>) unless $!target;
