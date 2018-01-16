@@ -9,6 +9,7 @@
     "depends"       : [ "IO::Socket::Async::SSL", "OO::Monitors", "IO::Path::ChildSecure",
                         "Base64", "HTTP::HPACK", "Cro::Core", "Cro::TLS", "JSON::Fast" ],
     "provides"      : {
+                "Cro::HTTP::Auth": "lib/Cro/HTTP/Auth.pm6",
                 "Cro::HTTP::Body": "lib/Cro/HTTP/Body.pm6",
                 "Cro::HTTP::BodyParser": "lib/Cro/HTTP/BodyParser.pm6",
                 "Cro::HTTP::BodyParserSelector": "lib/Cro/HTTP/BodyParserSelector.pm6",
