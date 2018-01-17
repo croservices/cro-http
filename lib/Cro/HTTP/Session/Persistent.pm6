@@ -10,6 +10,8 @@ role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::Requ
     method save(Str $session-id, TSession $session) {...}
     method load(Str $session-id --> TSession) {...}
     method clear(--> Nil) {...}
+    method expiration() { $!expiration }
+    method cookie-name() { $!cookie-name }
 
     method process-requests(Supply $requests) {
         my %cookie-opts = max-age => $!expiration, :http-only;
