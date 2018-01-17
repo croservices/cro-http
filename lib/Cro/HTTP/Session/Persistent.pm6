@@ -6,7 +6,7 @@ role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::Requ
     has Duration $.expiration .= new(30 * 60);
     has &.now = { now };
 
-    method create(Str $session-id) {}    
+    method create(Str $session-id) {}
     method save(Str $session-id, TSession $session) {...}
     method load(Str $session-id --> TSession) {...}
     method clear(--> Nil) {...}
