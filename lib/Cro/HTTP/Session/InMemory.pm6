@@ -1,5 +1,5 @@
 use Cro::HTTP::Middleware;
-use Crypt::Random::Extra;
+use Cro::HTTP::Session::IdGenerator;
 use OO::Monitors;
 
 # The session state lookup table is held inside of a monitor, which protects
@@ -79,7 +79,7 @@ my monitor SessionStore {
 }
 
 role Cro::HTTP::Session::InMemory[::TSession] does Cro::HTTP::Middleware::RequestResponse {
-    has Str $.cookie-name = toke();
+    has Str $.cookie-name = generate-session-id();
     has Duration $.expiration .= new(30 * 60);
     has &.now = { now };
     has SessionStore $!store .= new(:$!expiration, :&!now);
@@ -115,16 +115,11 @@ role Cro::HTTP::Session::InMemory[::TSession] does Cro::HTTP::Middleware::Reques
             }
             orwith $res.request.auth -> $state {
                 # No cookie in the request, so it's a new session.
-                my $cookie-value = toke();
+                my $cookie-value = generate-session-id();
                 $res.set-cookie($!cookie-name, $cookie-value, |%cookie-opts);
                 $!store.start-session($cookie-value, $state);
             }
             emit $res;
         }
-    }
-
-    sub toke() {
-        my constant @CHARS = flat 'A'..'Z', 'a'..'z', '0'..'9';
-        crypt_random_sample(@CHARS, 64).join
     }
 }
