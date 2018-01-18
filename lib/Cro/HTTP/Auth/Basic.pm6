@@ -37,4 +37,3 @@ role Cro::HTTP::Auth::Basic[::TSession, Str $username-prop] does Cro::HTTP::Auth
 
     method authenticate(Str $user, Str $pass --> Bool) { ... }
 }
-
