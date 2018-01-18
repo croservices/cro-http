@@ -41,16 +41,13 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
 
             my $decoder = HTTP::HPACK::Decoder.new;
             whenever $in {
-                when Any {
-                    # Logically, Headers and Continuation are a single frame
-                    if !$breakable {
-                        if $_ !~~ Cro::HTTP2::Frame::Continuation
-                        || $break != .stream-identifier {
-                            die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
-                        }
+                if !$breakable {
+                    if $_ !~~ Cro::HTTP2::Frame::Continuation
+                    || $break != .stream-identifier {
+                        die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                     }
-                    proceed;
                 }
+
                 when Cro::HTTP2::Frame::Data {
                     my $stream = %streams{.stream-identifier};
                     self!check-data($stream, .stream-identifier, $curr-sid);
