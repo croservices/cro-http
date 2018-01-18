@@ -260,16 +260,4 @@ throws-like {
            (*.target eq '/resource')]], fail => True;
 }, X::Cro::HTTP2::Error, 'Unfinished header cannot be interrupted';
 
-my $p = Promise.new;
-test (Cro::HTTP2::Frame::Ping.new(
-             stream-identifier => 0,
-             flags => 0,
-             payload => 'Liberate'.encode)).List,
-     0, 'Ping',
-     [], test-supplies => $p;
-await Promise.anyof($p, Promise.in(5));
-if $p.status ~~ Kept {
-    pass 'Ping is sent';
-}
-
 done-testing;

@@ -117,9 +117,6 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     }
                     %push-promises-for-stream{.stream-identifier}:delete;
                 }
-                when Cro::HTTP2::Frame::Settings {
-                    $connection-state.settings.emit: $_;
-                }
                 when Cro::HTTP2::Frame::PushPromise {
                     my @headers = $decoder.decode-headers(Buf.new: .headers);
                     my $pp = Cro::HTTP::PushPromise.new(
@@ -131,9 +128,6 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     my @real-headers = @headers.grep({ not .name eq any <:method :scheme :authority :path :status> });
                     for @real-headers { $pp.append-header(.name => .value) }
                     push %push-promises-for-stream{.stream-identifier}, $pp;
-                }
-                when Cro::HTTP2::Frame::Ping {
-                    $connection-state.ping.emit: $_;
                 }
                 when Cro::HTTP2::Frame::GoAway {
                 }
