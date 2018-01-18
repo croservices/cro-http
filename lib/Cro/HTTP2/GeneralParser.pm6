@@ -25,7 +25,17 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
             my $curr-sid = 0;
             my %streams;
             my ($breakable, $break) = (True, $curr-sid);
-            my %push-promises;
+            my %push-promises-for-stream;
+            my %push-promises-by-promised-id;
+
+            sub emit-response($sid, $message) {
+                with %push-promises-by-promised-id{$sid}:delete {
+                    .set-response($message);
+                }
+                else {
+                    emit $message;
+                }
+            }
 
             whenever $connection-state.push-promise.Supply { emit $_ }
 
@@ -47,7 +57,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     $stream.body.emit: .data;
                     if .end-stream {
                         $stream.body.done;
-                        emit $stream.message;
+                        emit-response(.stream-identifier, $stream.message);
                     }
                 }
                 when Cro::HTTP2::Frame::Headers {
@@ -65,15 +75,11 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     }
                     my $message = %streams{.stream-identifier}.message;
 
-                    # Process push promises
-                    my @promises = %push-promises{.stream-identifier}<>.grep({so $_});
-                    if @promises.elems > 0 {
-                        if $message ~~ Cro::HTTP::Response {
-                            $message.add-push-promise($_) for @promises;
-                            $message.close-push-promises;
-                        }
-                    } else {
-                        $message.close-push-promises if $message ~~ Cro::HTTP::Response;
+                    # Process push promises targetting this response.
+                    if $message ~~ Cro::HTTP::Response {
+                        my @promises = @(%push-promises-for-stream{.stream-identifier} // []);
+                        $message.add-push-promise($_) for @promises;
+                        $message.close-push-promises;
                     }
 
                     if .end-headers {
@@ -82,7 +88,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                             # Message is complete without body
                             if self!message-full($message) {
                                 %streams{.stream-identifier}.body.done;
-                                emit $message;
+                                emit-response(.stream-identifier, $message);
                             } else {
                                 die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                             }
@@ -111,18 +117,10 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                         target => @headers.grep({.name eq ':path'})[0].value,
                         http-version => '2.0',
                         :method<GET>);
+                    %push-promises-by-promised-id{.promised-sid} = $pp;
                     my @real-headers = @headers.grep({ not .name eq any <:method :scheme :authority :path :status> });
                     for @real-headers { $pp.append-header(.name => .value) }
-                    my $promises = %push-promises{.stream-identifier};
-                    if $promises ~~ Array {
-                        $promises.push: $pp;
-                        %push-promises{.stream-identifier} = $promises;
-                    } elsif $promises ~~ Cro::HTTP::PushPromise {
-                        my @promises = $promises, $pp;
-                        %push-promises{.stream-identifier} = @promises;
-                    } else {
-                        %push-promises{.stream-identifier} = $pp;
-                    }
+                    push %push-promises-for-stream{.stream-identifier}, $pp;
                 }
                 when Cro::HTTP2::Frame::Ping {
                     $connection-state.ping.emit: $_;
@@ -145,7 +143,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                         %streams{.stream-identifier}.headers = Buf.new;
                         if %streams{.stream-identifier}.stream-end {
                             if self!message-full($message) {
-                                emit $message;
+                                emit-response(.stream-identifier, $message);
                             } else {
                                 die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                             }

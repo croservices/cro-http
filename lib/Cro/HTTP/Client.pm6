@@ -126,24 +126,11 @@ class Cro::HTTP::Client {
         has Bool $.dead = False;
         has $!next-stream-id = 1;
         has %!outstanding-stream-responses{Int};
-        has %!promised-streams{Int};
 
         submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
             $!tap = supply {
-                sub handle-promises($response) {
-                    whenever $response.push-promises {
-                        $!lock.protect: { %!promised-streams{.http2-stream-id} = $_ };
-                        $response.add-push-promise($_);
-                    }
-                }
-
                 whenever $out -> $response {
-                    handle-promises($response);
-                    if (%!outstanding-stream-responses{$response.http2-stream-id}) {
-                        self.response($response);
-                    } else {
-                        self!resolve-promise($response);
-                    }
+                    self.response($response);
                     LAST {
                         $!dead = True;
                         self.break-all-responses(X::AdHoc.new(message => 'Connection to server lost'));
@@ -156,13 +143,6 @@ class Cro::HTTP::Client {
                     }
                 }
             }.tap
-        }
-
-        method !resolve-promise($response) {
-            my $pp = $!lock.protect: { %!promised-streams{$response.http2-stream-id} };
-            die 'Got unexpected stream!' unless $pp;
-            $pp.set-response($response);
-            $!lock.protect: { %!promised-streams{$response.http2-stream-id}:delete };
         }
 
         method send-request($request --> Promise) {

@@ -31,15 +31,22 @@ my $client = Cro::HTTP::Client.new(:http<2>);
 
 given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
     my $res = await $resp;
-    react {
-        # Hangs
-        # whenever $res.push-promises -> $prom {
-        #     whenever $prom.response -> $resp {
-        #         say "Push promise for $prom.target() had status $resp.status()";
-        #     }
-        #     LAST { done }
-        # }
+    my @pps;
+    my @resps;
+    my $get-pps = start react {
+        whenever $res.push-promises -> $prom {
+            push @pps, $prom;
+            whenever $prom.response -> $resp {
+                push @resps, $resp;
+            }
+        }
     }
+    await Promise.anyof($get-pps, Promise.in(10));
+    is @pps.elems, 1, 'Got the expected 1 push promise';
+    is @pps[0].target, '/main.css', 'Push promise had correct status';
+    is @resps.elems, 1, 'Got the expected 1 response from the push promise';
+    is @resps[0].status, 200, 'Correct status from response';
+    is await(@resps[0].body), 'CSS by server push!', 'Correct push promise response body';
 }
 
 done-testing;
