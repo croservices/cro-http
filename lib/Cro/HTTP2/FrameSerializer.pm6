@@ -78,27 +78,27 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             }
             with $connection-state.settings {
                 whenever $connection-state.settings.Supply {
-                    when Bool { # Preface case
-                        # Emit server negotiated settings
-                        my $set = Cro::HTTP2::Frame::Settings.new(
-                            flags => 0, stream-identifier => 0,
-                            settings => (1 => 4096, 2 => 0,
-                                         3 => 100, 4 => 65535,
-                                         5 => 16384, 6 => 1000)
-                        );
-                        send-message($set);
-                    }
-                    default {
-                        for .settings -> $pair {
-                            if $pair.key == SETTINGS_MAX_FRAME_SIZE {
-                                $MAX-FRAME-SIZE = $pair.value;
-                            }
+                    for .settings -> $pair {
+                        if $pair.key == SETTINGS_MAX_FRAME_SIZE {
+                            $MAX-FRAME-SIZE = $pair.value;
+                        } elsif $pair.key == SETTINGS_ENABLE_PUSH {
+                            $!enable-push = $pair.value;
                         }
-                        my $ack = Cro::HTTP2::Frame::Settings.new(
-                            flags => 1, stream-identifier => 0, settings => ()
-                        );
-                        send-message($ack);
                     }
+                    # Emit server negotiated settings
+                    my $set = Cro::HTTP2::Frame::Settings.new(
+                        flags => 0, stream-identifier => 0,
+                        settings => (1 => 4096, 2 => $!enable-push ?? 1 !! 0,
+                                     3 => 100, 4 => 65535,
+                                     5 => $MAX-FRAME-SIZE, 6 => 1000)
+                    );
+                    send-message($set);
+
+                    # ack to settings
+                    my $ack = Cro::HTTP2::Frame::Settings.new(
+                        flags => 1, stream-identifier => 0, settings => ()
+                    );
+                    send-message($ack);
                 }
             }
             with $connection-state.window-size {

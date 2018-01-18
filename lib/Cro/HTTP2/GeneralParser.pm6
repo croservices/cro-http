@@ -25,6 +25,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
             my $curr-sid = 0;
             my %streams;
             my ($breakable, $break) = (True, $curr-sid);
+            my $enable-push = False;
             my %push-promises-for-stream;
             my %push-promises-by-promised-id;
 
@@ -38,6 +39,11 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
             }
 
             whenever $connection-state.push-promise.Supply { emit $_ }
+            whenever $connection-state.settings.Supply {
+                when Cro::HTTP2::Frame::Settings {
+                    $enable-push = $_.settings[1].value != 0;
+                }
+            }
 
             my $decoder = HTTP::HPACK::Decoder.new;
             whenever $in {
@@ -74,10 +80,12 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
 
                     # Process push promises targetting this response.
                     if $message ~~ Cro::HTTP::Response {
-                        my @promises = @(
-                            %push-promises-for-stream{.stream-identifier}:delete // []
-                        );
-                        $message.add-push-promise($_) for @promises;
+                        if $enable-push {
+                            my @promises = @(
+                                %push-promises-for-stream{.stream-identifier}:delete // []
+                            );
+                            $message.add-push-promise($_) for @promises;
+                        }
                         $message.close-push-promises;
                     }
 

@@ -27,7 +27,7 @@ my Cro::Service $service = Cro::HTTP::Server.new(
 $service.start;
 QUIT { $service.stop }
 
-my $client = Cro::HTTP::Client.new(:http<2>);
+my $client = Cro::HTTP::Client.new(:http<2>, :push-promises);
 
 given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
     my $res = await $resp;
@@ -47,6 +47,20 @@ given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
     is @resps.elems, 1, 'Got the expected 1 response from the push promise';
     is @resps[0].status, 200, 'Correct status from response';
     is await(@resps[0].body), 'CSS by server push!', 'Correct push promise response body';
+}
+
+$client = Cro::HTTP::Client.new(:http<2>);
+given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
+    my $res = await $resp;
+    my @pps;
+    my $get-pps = start react {
+        whenever $res.push-promises {
+            push @pps, $_;
+            flunk 'Got a push promise when they are disabled!';
+        }
+    }
+    await Promise.anyof($get-pps, Promise.in(10));
+    is @pps.elems, 0, 'Got zero push promises when they are disabled';
 }
 
 done-testing;
