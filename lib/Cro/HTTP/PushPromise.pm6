@@ -8,4 +8,8 @@ class Cro::HTTP::PushPromise is Cro::HTTP::Request {
     method set-response($resp) {
         $!response.keep($resp);
     }
+
+    method cancel-response() {
+        $!response.break('Response cancelled');
+    }
 }

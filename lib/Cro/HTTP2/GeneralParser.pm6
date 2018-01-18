@@ -74,7 +74,9 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
 
                     # Process push promises targetting this response.
                     if $message ~~ Cro::HTTP::Response {
-                        my @promises = @(%push-promises-for-stream{.stream-identifier} // []);
+                        my @promises = @(
+                            %push-promises-for-stream{.stream-identifier}:delete // []
+                        );
                         $message.add-push-promise($_) for @promises;
                         $message.close-push-promises;
                     }
@@ -103,6 +105,17 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                 when Cro::HTTP2::Frame::Priority {
                 }
                 when Cro::HTTP2::Frame::RstStream {
+                    with %push-promises-by-promised-id{.stream-identifier}:delete {
+                        .cancel-response();
+                    }
+                    with %streams{.stream-identifier}:delete {
+                        if .message {
+                            with .body {
+                                .quit('Stream reset');
+                            }
+                        }
+                    }
+                    %push-promises-for-stream{.stream-identifier}:delete;
                 }
                 when Cro::HTTP2::Frame::Settings {
                     $connection-state.settings.emit: $_;
