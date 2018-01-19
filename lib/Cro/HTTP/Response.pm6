@@ -1,9 +1,9 @@
+use Cro::HTTP::Cookie;
 use Cro::HTTP::BodyParserSelector;
 use Cro::HTTP::BodySerializerSelector;
-use Cro::HTTP::Cookie;
 use Cro::HTTP::Message;
-use Cro::HTTP::PushPromise;
 use Cro::HTTP::Request;
+use Cro::HTTP::PushPromise;
 
 my constant %reason-phrases = {
     100 => "Continue",
