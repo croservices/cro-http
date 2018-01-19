@@ -29,6 +29,7 @@
                 "Cro::HTTP::Middleware": "lib/Cro/HTTP/Middleware.pm6",
                 "Cro::HTTP::MimeTypes": "lib/Cro/HTTP/MimeTypes.pm6",
                 "Cro::HTTP::MultiValue": "lib/Cro/HTTP/MultiValue.pm6",
+                "Cro::HTTP::PushPromise": "lib/Cro/HTTP/PushPromise.pm6",
                 "Cro::HTTP::RawBodyParser": "lib/Cro/HTTP/RawBodyParser.pm6",
                 "Cro::HTTP::RawBodyParserSelector": "lib/Cro/HTTP/RawBodyParserSelector.pm6",
                 "Cro::HTTP::Request": "lib/Cro/HTTP/Request.pm6",
