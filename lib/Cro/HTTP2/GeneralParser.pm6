@@ -41,7 +41,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
             whenever $connection-state.push-promise.Supply { emit $_ }
             whenever $connection-state.settings.Supply {
                 when Cro::HTTP2::Frame::Settings {
-                    $enable-push = $_.settings[1].value != 0;
+                    $enable-push = .settings[1].value != 0 if (.settings.elems > 1);
                 }
             }
 
