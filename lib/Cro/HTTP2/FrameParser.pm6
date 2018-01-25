@@ -114,7 +114,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
     }
     my multi sub payload(1, Buf $data is rw, $length, *%header) {
         my $padded = %header<flags> +& 0x8 == 0x8;
-        my $priority = %header<flags> +& 0x8 == 0x20;
+        my $priority = %header<flags> +& 0x20 == 0x20;
         my $padding-length = $data[0] if $padded;
         with $padding-length {
             die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $_ >= $length;
@@ -133,7 +133,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
         } else {
             $exclusive = False;
         }
-        $headers = Buf.new: $payload.subbuf($exclusive ?? 5 !! 0, $length);
+        $headers = Buf.new: $payload.subbuf($priority ?? 5 !! 0, $length);
         Cro::HTTP2::Frame::Headers.new(padding-length => $padding-length // UInt,
                                        dependency => $dependency // UInt,
                                        weight => $weight // UInt,
