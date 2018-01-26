@@ -12,7 +12,8 @@ sub test(@frames, $count, $desc, @checks, :$fail) {
     my $parser = Cro::HTTP2::ResponseParser.new(:$ping);
     my $fake-in = Supplier.new;
     my $counter = 0;
-    $parser.transformer($fake-in.Supply).tap:
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
+    $parser.transformer($fake-in.Supply, :$connection-state).tap:
     -> $response {
         for @checks[$counter].kv -> $i, $check {
             ok $check($response), "check {$i + 1}";

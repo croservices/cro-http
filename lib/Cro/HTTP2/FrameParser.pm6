@@ -35,7 +35,6 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                 if $missing-preface {
                     if $data.subbuf(0,24) eq utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
                                                       46,48,13,10,13,10,83,77,13,10,13,10) {
-                        start $connection-state.settings.emit(True);
                         $data .= subbuf(24);
                         $missing-preface = False;
                     } else {
@@ -80,7 +79,11 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                                 }
                                 emit $result;
                             } elsif $result ~~ Cro::HTTP2::Frame::Settings {
-                                (start $connection-state.settings.emit($result)) unless $flags +& 1;
+                                unless $flags +& 1 {
+                                    $!client
+                                    ?? (start $connection-state.settings.emit($result))
+                                    !! ($connection-state.settings.emit($result));
+                                }
                             } elsif $result ~~ Cro::HTTP2::Frame::Ping {
                                 start $connection-state.ping.emit($result);
                             } else {
@@ -115,7 +118,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
     }
     my multi sub payload(1, Buf $data is rw, $length, *%header) {
         my $padded = %header<flags> +& 0x8 == 0x8;
-        my $priority = %header<flags> +& 0x8 == 0x20;
+        my $priority = %header<flags> +& 0x20 == 0x20;
         my $padding-length = $data[0] if $padded;
         with $padding-length {
             die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $_ >= $length;
@@ -134,7 +137,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
         } else {
             $exclusive = False;
         }
-        $headers = Buf.new: $payload.subbuf($exclusive ?? 5 !! 0, $length);
+        $headers = Buf.new: $payload.subbuf($priority ?? 5 !! 0, $length);
         Cro::HTTP2::Frame::Headers.new(padding-length => $padding-length // UInt,
                                        dependency => $dependency // UInt,
                                        weight => $weight // UInt,

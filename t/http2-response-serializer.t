@@ -13,7 +13,8 @@ sub test($response, $count, $desc, *@checks, :$fail) {
     my $serializer = Cro::HTTP2::ResponseSerializer.new;
     my $fake-in = Supplier.new;
     my $counter = 0;
-    $serializer.transformer($fake-in.Supply).tap:
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
+    $serializer.transformer($fake-in.Supply, :$connection-state).tap:
     -> $frame {
         for @checks[$counter].kv -> $i, $check {
             ok $check($frame), "check {$i + 1}";

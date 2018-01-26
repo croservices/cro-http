@@ -5,10 +5,11 @@ use Cro::HTTP::BodyParserSelector;
 use Cro::HTTP::BodySerializer;
 use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Middleware;
+use Cro::HTTP::MimeTypes;
+use Cro::HTTP::PushPromise;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 use IO::Path::ChildSecure;
-use Cro::HTTP::MimeTypes;
 
 class X::Cro::HTTP::Router::OnlyInHandler is Exception {
     has $.what;
@@ -141,6 +142,8 @@ module Cro::HTTP::Router {
                         }
                     }
                     $response.status //= 204;
+                    # Close push promises as we don't get a new ones
+                    $response.close-push-promises();
                     $response
                 }
             }
@@ -657,7 +660,7 @@ module Cro::HTTP::Router {
                         $*CRO-ROUTE-SET.delegate([$prefix], $transform);
                     }
                     default {
-                        die "Paris passed to 'delegate' must have a Str or Iterable key, not " ~ .^name;
+                        die "Pairs passed to 'delegate' must have a Str or Iterable key, not " ~ .^name;
                     }
                 }
             }
@@ -818,6 +821,35 @@ module Cro::HTTP::Router {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
         $resp.status = $status;
+    }
+
+    sub push-promise(Str $path, :$headers) is export {
+        with $headers {
+            if $headers ~~ Hash {
+                push-promise-internal($path, $headers.List)
+            } elsif $headers ~~ List {
+                push-promise-internal($path, $headers)
+            } else {
+                die "push-promise headers argument must be a Hash or a List, got {$headers.^name} instead";
+            }
+        }
+        else {
+            push-promise-internal($path, []);
+        }
+    }
+    sub push-promise-internal(Str $path, @headers) {
+        my $resp = $*CRO-ROUTER-RESPONSE //
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<push-promise>);
+        # TODO: We don't set http-version anywhere really, so check a request instead.
+        # To fix we need to introduce some rules to set appropriate http version
+        # during $*CRO-ROUTER-RESPONSE creation.
+        return unless ($*CRO-ROUTER-REQUEST.http-version // '') eq '2.0';
+        $resp.http-version = '2.0';
+        # TODO: target resolution
+        my $pp = Cro::HTTP::PushPromise.new(:method<GET>,
+                                            target => $path);
+        $pp.append-header($_) for @headers;
+        $resp.add-push-promise($pp);
     }
 
     my class BeforeMiddleTransform does Cro::HTTP::Middleware::Conditional {

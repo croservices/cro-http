@@ -11,6 +11,8 @@ use Cro::HTTP2::ResponseSerializer;
 use Cro::TLS;
 use Cro::TCP;
 
+my constant HTTP2-CIPHERS = 'AESGCM:HIGH:!DHE-RSA:!aNULL:!MD5';
+
 my class RequestParserExtension is ParserExtension {
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Request }
@@ -27,7 +29,7 @@ class Cro::HTTP::Server does Cro::Service {
     }
 
     only method new(Cro::Transform :$application!,
-                    :$host, :$port, :ssl(:%tls),
+                    :$host, :$port, :ssl(:tls(%tls-in)),
                     :$before-parse = (), :$before = (),
                     :$after = (), :$after-serialize = (),
                     :$add-body-parsers, :$body-parsers,
@@ -69,7 +71,13 @@ class Cro::HTTP::Server does Cro::Service {
                    :@after, :$after-serialize;
         my $http-val = $http // ();
 
+        my %tls = %tls-in;
+
         sub pack2(:$http2-only) {
+            %tls<ciphers> ||= HTTP2-CIPHERS;
+            %tls<prefer-server-ciphers> = True;
+            %tls<no-compression> = True;
+            %tls<no-session-resumption-on-renegotiation> = True;
             my $listener = Cro::TLS::Listener.new(|(:$host with $host), |(:$port with $port), |%tls);
             if $http2-only {
                 return Cro.compose(
@@ -84,7 +92,7 @@ class Cro::HTTP::Server does Cro::Service {
                     $application,
                     ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
                     |@after,
-                    Cro::HTTP2::ResponseSerializer.new,
+                    Cro::HTTP2::ResponseSerializer.new(:$host, :$port),
                     Cro::HTTP2::FrameSerializer.new,
                     |$after-serialize
                 )

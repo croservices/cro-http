@@ -6,6 +6,7 @@ use Cro;
 
 class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
     has $.client = False;
+    has $.enable-push = False;
 
     method consumes() { Cro::HTTP2::Frame }
     method produces() { Cro::TCP::Message }
@@ -20,7 +21,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                     46,48,13,10,13,10,83,77,13,10,13,10));
                 send-message Cro::HTTP2::Frame::Settings.new(
                     flags => 0, stream-identifier => 0,
-                    settings => (1 => 4096, 2 => 0,
+                    settings => (1 => 4096, 2 => $!enable-push ?? 1 !! 0,
                                  3 => 100, 4 => 65535,
                                  5 => 16384, 6 => 1000)
                 );
@@ -34,7 +35,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             }
 
             sub send-splitted($frame) {
-                my $is-header = $frame ~~ Cro::HTTP2::Frame::Headers;
+                my $is-header = $frame ~~ Cro::HTTP2::Frame::Headers|Cro::HTTP2::Frame::PushPromise;
                 my $payload = $is-header ?? $frame.headers !! $frame.data;
                 my $flag = $frame.flags == 4 ?? 0 !! 1 if $is-header;
                 # Send first piece
@@ -77,27 +78,27 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             }
             with $connection-state.settings {
                 whenever $connection-state.settings.Supply {
-                    when Bool { # Preface case
-                        # Emit server negotiated settings
-                        my $set = Cro::HTTP2::Frame::Settings.new(
-                            flags => 0, stream-identifier => 0,
-                            settings => (1 => 4096, 2 => 0,
-                                         3 => 100, 4 => 65535,
-                                         5 => 16384, 6 => 1000)
-                        );
-                        send-message($set);
-                    }
-                    default {
-                        for .settings -> $pair {
-                            if $pair.key == SETTINGS_MAX_FRAME_SIZE {
-                                $MAX-FRAME-SIZE = $pair.value;
-                            }
+                    for .settings -> $pair {
+                        if $pair.key == SETTINGS_MAX_FRAME_SIZE {
+                            $MAX-FRAME-SIZE = $pair.value;
+                        } elsif $pair.key == SETTINGS_ENABLE_PUSH {
+                            $!enable-push = $pair.value;
                         }
-                        my $ack = Cro::HTTP2::Frame::Settings.new(
-                            flags => 1, stream-identifier => 0, settings => ()
-                        );
-                        send-message($ack);
                     }
+                    # Emit server negotiated settings
+                    my $set = Cro::HTTP2::Frame::Settings.new(
+                        flags => 0, stream-identifier => 0,
+                        settings => (1 => 4096, 2 => $!enable-push ?? 1 !! 0,
+                                     3 => 100, 4 => 65535,
+                                     5 => $MAX-FRAME-SIZE, 6 => 1000)
+                    );
+                    send-message($set);
+
+                    # ack to settings
+                    my $ack = Cro::HTTP2::Frame::Settings.new(
+                        flags => 1, stream-identifier => 0, settings => ()
+                    );
+                    send-message($ack);
                 }
             }
             with $connection-state.window-size {
@@ -107,7 +108,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             }
 
             whenever $in -> Cro::HTTP2::Frame $frame {
-                if $frame ~~ Cro::HTTP2::Frame::Headers {
+                if $frame ~~ Cro::HTTP2::Frame::Headers|Cro::HTTP2::Frame::PushPromise {
                     if $frame.headers.elems + 9 > $MAX-FRAME-SIZE {
                         send-splitted($frame);
                     } else {

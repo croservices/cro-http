@@ -20,7 +20,7 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
                     value => $req.target);
                 @headers.unshift: HTTP::HPACK::Header.new(
                     name => ':scheme',
-                    value => 'https'); # XXX
+                    value => 'https'); # TODO We need to handle http case too?
                 @headers.unshift: HTTP::HPACK::Header.new(
                     name => ':method',
                     value => $req.method);

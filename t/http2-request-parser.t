@@ -8,20 +8,20 @@ my $encoder = HTTP::HPACK::Encoder.new;
 my ($buf, @headers);
 
 sub test(@frames, $count, $desc, @checks, :$fail, :$test-supplies) {
-    my ($ping, $settings);
     my $test-completed = Promise.new;
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
     with $test-supplies {
-        $ping = Supplier.new;
-        $settings = Supplier.new;
-        $ping.Supply.tap: -> $ping {
-            $test-completed.keep;
-            $test-supplies.keep;
-        };
+        my $ping = $connection-state.ping.Supply;
+        $ping.tap(
+            -> $_ {
+                $test-completed.keep;
+                $test-supplies.keep;
+            });
     }
-    my $parser = Cro::HTTP2::RequestParser.new(:$ping);
+    my $parser = Cro::HTTP2::RequestParser.new;
     my $fake-in = Supplier.new;
     my $counter = 0;
-    $parser.transformer($fake-in.Supply).tap:
+    $parser.transformer($fake-in.Supply, :$connection-state).tap:
     -> $request {
         for @checks[$counter].kv -> $i, $check {
             ok $check($request), "check {$i + 1}";
@@ -60,7 +60,7 @@ test (Cro::HTTP2::Frame::Headers.new(
      1, 'Headers',
      [[(*.method eq 'GET'),
        (*.target eq '/resource'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.header('Host') eq 'example.org'),
        (*.header('Accept') eq 'image/jpeg')],];
 
@@ -85,7 +85,7 @@ test (Cro::HTTP2::Frame::Headers.new(
      1, 'Headers + Continuation',
      [[(*.method eq 'POST'),
        (*.target eq '/resource'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.header('Host') eq 'example.org'),
        (*.header('Content-type')   eq 'image/jpeg'),
        (*.header('Content-length') eq '123')],];
@@ -103,7 +103,7 @@ test (Cro::HTTP2::Frame::Headers.new(
      1, 'Headers + Data',
      [[(*.method eq 'POST'),
        (*.target eq '/resource'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.body-blob.result eq $payload)],];
 
 $encoder = HTTP::HPACK::Encoder.new;
@@ -124,7 +124,7 @@ test (Cro::HTTP2::Frame::Headers.new(
       1, 'Headers + Continuation + Data',
       [[(*.method eq 'POST'),
         (*.target eq '/resource'),
-        (*.http-version eq 'http/2'),
+        (*.http-version eq '2.0'),
         (*.header('Host') eq 'example.org'),
         (*.header('Content-type')   eq 'image/jpeg'),
         (*.header('Content-length') eq '123'),
@@ -152,7 +152,7 @@ test (Cro::HTTP2::Frame::Headers.new(
      1, 'Headers + Continuation + Data + Headers',
      [[(*.method eq 'POST'),
        (*.target eq '/resource'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.header('Host') eq 'example.org'),
        (*.header('content-type')   eq 'image/jpeg'),
        (*.header('content-length') eq '123'),
@@ -176,10 +176,10 @@ test (Cro::HTTP2::Frame::Headers.new(
           data => $payload)),
      2, 'Header1 + Header2 + Data1',
      [[(*.method eq 'POST'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.target eq '/resource')],
       [(*.method eq 'POST'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.target eq '/resource'),
        (*.body-blob.result eq $payload)]];
 
@@ -203,11 +203,11 @@ test (Cro::HTTP2::Frame::Headers.new(
      2, 'Header1 + Header2 + Data1 + Data2',
      [[(*.method eq 'POST'),
        (*.target eq '/resource'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.body-blob.result eq $payload)],
       [(*.method eq 'POST'),
        (*.target eq '/resource'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.body-blob.result eq $payload ~ $payload)]];
 
 $encoder = HTTP::HPACK::Encoder.new;
@@ -230,10 +230,10 @@ test (Cro::HTTP2::Frame::Headers.new(
           data => $payload)),
      2, 'Header1 + Continuation1 + Header2 + Data1',
      [[(*.method eq 'POST'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.target eq '/resource')],
       [(*.method eq 'POST'),
-       (*.http-version eq 'http/2'),
+       (*.http-version eq '2.0'),
        (*.target eq '/resource'),
        (*.body-blob.result eq $payload)]];
 
@@ -253,23 +253,11 @@ throws-like {
               headers => $encoder.encode-headers(@headers[3..5]))),
          2, 'Header1 + Header2 + Continuation1',
          [[(*.method eq 'POST'),
-           (*.http-version eq 'http/2'),
+           (*.http-version eq '2.0'),
            (*.target eq '/resource')],
           [(*.method eq 'POST'),
-           (*.http-version eq 'http/2'),
+           (*.http-version eq '2.0'),
            (*.target eq '/resource')]], fail => True;
 }, X::Cro::HTTP2::Error, 'Unfinished header cannot be interrupted';
-
-my $p = Promise.new;
-test (Cro::HTTP2::Frame::Ping.new(
-             stream-identifier => 0,
-             flags => 0,
-             payload => 'Liberate'.encode)).List,
-     0, 'Ping',
-     [], test-supplies => $p;
-await Promise.anyof($p, Promise.in(5));
-if $p.status ~~ Kept {
-    pass 'Ping is sent';
-}
 
 done-testing;
