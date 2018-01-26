@@ -28,6 +28,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
             my $enable-push = False;
             my %push-promises-for-stream;
             my %push-promises-by-promised-id;
+            my $decoder = HTTP::HPACK::Decoder.new;
 
             sub emit-response($sid, $message) {
                 with %push-promises-by-promised-id{$sid}:delete {
@@ -41,11 +42,17 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
             whenever $connection-state.push-promise.Supply { emit $_ }
             whenever $connection-state.settings.Supply {
                 when Cro::HTTP2::Frame::Settings {
-                    $enable-push = .settings[1].value != 0 if (.settings.elems > 1);
+                    with .settings.grep(*.key == 1) {
+                        my $pair = $_.first;
+                        $decoder.set-dynamic-table-limit($pair.value) if $pair;
+                    }
+                    with .settings.grep(*.key == 2) {
+                        my $pair = $_.first;
+                        $enable-push = $pair.value != 0 if $pair;
+                    }
                 }
             }
 
-            my $decoder = HTTP::HPACK::Decoder.new;
             whenever $in {
                 if !$breakable {
                     if $_ !~~ Cro::HTTP2::Frame::Continuation
