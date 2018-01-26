@@ -92,7 +92,7 @@ class Cro::HTTP::Server does Cro::Service {
                     $application,
                     ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
                     |@after,
-                    Cro::HTTP2::ResponseSerializer.new,
+                    Cro::HTTP2::ResponseSerializer.new(:$host, :$port),
                     Cro::HTTP2::FrameSerializer.new,
                     |$after-serialize
                 )

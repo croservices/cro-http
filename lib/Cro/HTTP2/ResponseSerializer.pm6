@@ -2,10 +2,14 @@ use Cro;
 use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::Frame;
 use Cro::HTTP::Response;
+use Cro::TCP;
 use Cro::Transform;
 use HTTP::HPACK;
 
 class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
+    has Str $.host;
+    has Cro::Port $.port;
+
     method consumes() { Cro::HTTP::Response }
     method produces() { Cro::HTTP2::Frame   }
 
@@ -54,6 +58,9 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionSta
                         @headers.unshift: HTTP::HPACK::Header.new(
                             name => ':method',
                             value => .method);
+                        @headers.unshift: HTTP::HPACK::Header.new(
+                            name => ':authority',
+                            value => "{$!host}:{$!port}");
                         @promises.push: Cro::HTTP2::Frame::PushPromise.new(
                             flags => 4,
                             stream-identifier => $resp.request.http2-stream-id,
