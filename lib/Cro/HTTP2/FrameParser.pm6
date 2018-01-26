@@ -79,7 +79,11 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                                 }
                                 emit $result;
                             } elsif $result ~~ Cro::HTTP2::Frame::Settings {
-                                (start $connection-state.settings.emit($result)) unless $flags +& 1;
+                                unless $flags +& 1 {
+                                    $!client
+                                    ?? (start $connection-state.settings.emit($result))
+                                    !! ($connection-state.settings.emit($result));
+                                }
                             } elsif $result ~~ Cro::HTTP2::Frame::Ping {
                                 start $connection-state.ping.emit($result);
                             } else {
