@@ -460,7 +460,7 @@ class Cro::HTTP::Client {
         push @parts, $secure ?? Cro::TLS::Connector !! Cro::TCP::Connector;
         if $http eq '2' {
             push @parts, Cro::HTTP2::FrameParser.new(:client);
-            push @parts, Cro::HTTP2::ResponseParser.new;
+            push @parts, Cro::HTTP2::ResponseParser.new(:$enable-push);
         }
         elsif $http eq '1.1' || !$secure {
             push @parts, Cro::HTTP::ResponseParser.new;

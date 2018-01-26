@@ -19,13 +19,13 @@ my class Stream {
 
 role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
     has $!pseudo-headers;
+    has $.enable-push = False;
 
     method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
         supply {
             my $curr-sid = 0;
             my %streams;
             my ($breakable, $break) = (True, $curr-sid);
-            my $enable-push = False;
             my %push-promises-for-stream;
             my %push-promises-by-promised-id;
             my $decoder = HTTP::HPACK::Decoder.new;
@@ -48,7 +48,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     }
                     with .settings.grep(*.key == 2) {
                         my $pair = $_.first;
-                        $enable-push = $pair.value != 0 if $pair;
+                        $!enable-push = $pair.value != 0 if $pair;
                     }
                 }
             }
@@ -87,7 +87,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
 
                     # Process push promises targetting this response.
                     if $message ~~ Cro::HTTP::Response {
-                        if $enable-push {
+                        if $!enable-push {
                             my @promises = @(
                                 %push-promises-for-stream{.stream-identifier}:delete // []
                             );
