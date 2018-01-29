@@ -1,8 +1,8 @@
 use Cro::MediaType;
-use Cro::Message;
+use Cro::MessageWithBody;
 use Cro::HTTP::Header;
 
-role Cro::HTTP::Message does Cro::Message {
+role Cro::HTTP::Message does Cro::MessageWithBody {
     has Str $.http-version is rw;
     has Int $.http2-stream-id is rw;
     has Cro::HTTP::Header @!headers;
@@ -98,16 +98,6 @@ role Cro::HTTP::Message does Cro::Message {
 
     method set-body($!body --> Nil) {
         $!body-byte-stream = Nil;
-    }
-
-    method body-blob(--> Promise) {
-        Promise(supply {
-            my $joined = Buf.new;
-            whenever self.body-byte-stream -> $blob {
-                $joined.append($blob);
-                LAST emit $joined;
-            }
-        })
     }
 
     method body-text(--> Promise) {
