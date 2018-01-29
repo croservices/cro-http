@@ -10,6 +10,7 @@
                         "Base64", "HTTP::HPACK", "Cro::Core", "Cro::TLS", "JSON::Fast",
                         "Crypt::Random", "JSON::JWT" ],
     "provides"      : {
+                "Cro::HTTP::Auth": "lib/Cro/HTTP/Auth.pm6",
                 "Cro::HTTP::Auth::WebToken": "lib/Cro/HTTP/Auth/WebToken.pm6",
                 "Cro::HTTP::Auth::WebToken::Bearer": "lib/Cro/HTTP/Auth/WebToken/Bearer.pm6",
                 "Cro::HTTP::Auth::WebToken::FromCookie": "lib/Cro/HTTP/Auth/WebToken/FromCookie.pm6",
