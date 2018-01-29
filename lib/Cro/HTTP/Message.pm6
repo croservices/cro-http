@@ -100,32 +100,27 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
         $!body-byte-stream = Nil;
     }
 
-    method body-text(--> Promise) {
-        self.body-blob.then: -> $blob-promise {
-            my $blob = $blob-promise.result;
-            my $encoding;
-            with self.content-type {
-                with .parameters.first(*.key.fc eq 'charset') {
-                    $encoding = .value;
-                }
+    method body-text-encoding(Blob $blob) {
+        my $encoding;
+        with self.content-type {
+            with .parameters.first(*.key.fc eq 'charset') {
+                $encoding = .value;
             }
-            without $encoding {
-                # Decoder drops the BOM by itself, if it exists, so just use
-                # it for identification here.
-                if $blob[0] == 0xEF && $blob[1] == 0xBB && $blob[2] == 0xBF {
-                    $encoding = 'utf-8';
-                }
-                elsif $blob[0] == 0xFF && $blob[1] == 0xFE {
-                    $encoding = 'utf-16';
-                }
-                elsif $blob[0] == 0xFE && $blob[1] == 0xFF {
-                    $encoding = 'utf-16';
-                }
-            }
-            $encoding
-                ?? $blob.decode($encoding)
-                !! (try $blob.decode('utf-8')) // $blob.decode('latin-1')
         }
+        without $encoding {
+            # Decoder drops the BOM by itself, if it exists, so just use
+            # it for identification here.
+            if $blob[0] == 0xEF && $blob[1] == 0xBB && $blob[2] == 0xBF {
+                $encoding = 'utf-8';
+            }
+            elsif $blob[0] == 0xFF && $blob[1] == 0xFE {
+                $encoding = 'utf-16';
+            }
+            elsif $blob[0] == 0xFE && $blob[1] == 0xFF {
+                $encoding = 'utf-16';
+            }
+        }
+        $encoding // ('utf-8', 'latin-1')
     }
 
     method body(--> Promise) {
