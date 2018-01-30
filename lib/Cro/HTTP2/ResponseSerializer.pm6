@@ -1,4 +1,5 @@
 use Cro;
+use Cro::BodySerializerSelector;
 use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::Frame;
 use Cro::HTTP::Response;
@@ -31,7 +32,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionSta
                 if $resp.has-body {
                     try {
                         CATCH {
-                            when X::Cro::HTTP::BodySerializerSelector::NoneApplicable {
+                            when X::Cro::BodySerializerSelector::NoneApplicable {
                                 $resp.status = 500;
                                 $resp.remove-header({ True });
                                 $resp.append-header('Content-Length', 0);

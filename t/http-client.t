@@ -309,7 +309,7 @@ constant %key-cert := {
                           content-type => 'text/plain',
                           body => 'String');
     },
-    X::Cro::HTTP::BodySerializerSelector::NoneApplicable,
+    X::Cro::BodySerializerSelector::NoneApplicable,
     'Request to server without serializers ends up with client error';
 
     $client = Cro::HTTP::Client.new: body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
@@ -323,7 +323,7 @@ constant %key-cert := {
         await $client.get("$base/json", content-type => 'text/plain',
                           body => "Calling the Rain")
     },
-    X::Cro::HTTP::BodySerializerSelector::NoneApplicable,
+    X::Cro::BodySerializerSelector::NoneApplicable,
     'Request with incorrect content-type is rejected';
 
     $client = Cro::HTTP::Client.new: body-serializers => [Cro::HTTP::BodySerializer::JSON.new],
@@ -346,7 +346,7 @@ constant %key-cert := {
                             content-type => 'text/plain',
                             body => 'Funeral Dreams') -> $resp {
         throws-like { await($resp.body) },
-        X::Cro::HTTP::BodyParserSelector::NoneApplicable,
+        X::Cro::BodyParserSelector::NoneApplicable,
         'Attempt to get body without any parsers fails';
     };
 
@@ -361,7 +361,7 @@ constant %key-cert := {
     given await $client.get("$base/get-json", content-type => 'text/plain',
                             body => "Calling the Rain") -> $resp {
         throws-like { await($resp.body) },
-        X::Cro::HTTP::BodyParserSelector::NoneApplicable,
+        X::Cro::BodyParserSelector::NoneApplicable,
         'Attempt to get body without any parsers fails';
     }
 

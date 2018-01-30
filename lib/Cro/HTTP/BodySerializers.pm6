@@ -1,10 +1,9 @@
+use Cro::BodySerializer;
 use Cro::HTTP::Body;
 use Cro::HTTP::Message;
 use JSON::Fast;
 
-role Cro::HTTP::BodySerializer {
-    method is-applicable(Cro::HTTP::Message $message, $body --> Bool) { ... }
-    method serialize(Cro::HTTP::Message $message, $body --> Supply) { ... }
+role Cro::HTTP::BodySerializer does Cro::BodySerializer {
     method !set-default-content-type(Cro::HTTP::Message $message, Str $type --> Nil) {
         unless $message.has-header('content-type') {
             $message.append-header('Content-type', $type);

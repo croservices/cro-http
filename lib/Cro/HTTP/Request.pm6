@@ -1,6 +1,8 @@
+use Cro::BodyParserSelector;
+use Cro::BodySerializerSelector;
 use Cro::HTTP::Cookie;
-use Cro::HTTP::BodyParserSelector;
-use Cro::HTTP::BodySerializerSelector;
+use Cro::HTTP::BodyParserSelectors;
+use Cro::HTTP::BodySerializerSelectors;
 use Cro::HTTP::Message;
 use Cro::Uri::HTTP;
 
@@ -14,9 +16,9 @@ class X::Cro::HTTP::Request::Incomplete is Exception {
 class Cro::HTTP::Request does Cro::HTTP::Message {
     has Cro::Uri::HTTP $!cached-uri;
     has Str $!cached-uri-target = '';
-    has Cro::HTTP::BodyParserSelector $.body-parser-selector is rw =
+    has Cro::BodyParserSelector $.body-parser-selector is rw =
         Cro::HTTP::BodyParserSelector::RequestDefault;
-    has Cro::HTTP::BodySerializerSelector $.body-serializer-selector is rw =
+    has Cro::BodySerializerSelector $.body-serializer-selector is rw =
         Cro::HTTP::BodySerializerSelector::RequestDefault;
     has $.connection is rw;
 

@@ -1,3 +1,4 @@
+use Cro::BodySerializerSelector;
 use Cro::HTTP::Response;
 use Cro::TCP;
 use Cro::Transform;
@@ -23,7 +24,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                 my $body-byte-stream;
                 try {
                     CATCH {
-                        when X::Cro::HTTP::BodySerializerSelector::NoneApplicable {
+                        when X::Cro::BodySerializerSelector::NoneApplicable {
                             $response.status = 500;
                             $response.remove-header({ True });
                             $response.append-header('Content-length', 0);

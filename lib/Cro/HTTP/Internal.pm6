@@ -13,10 +13,10 @@ class ParserExtension does Cro::Transform {
         supply {
             whenever $pipeline -> $message {
                 if $.body-parsers.defined {
-                    $message.body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(parsers => @$.body-parsers);
+                    $message.body-parser-selector = Cro::BodyParserSelector::List.new(parsers => @$.body-parsers);
                 }
                 if $.add-body-parsers.defined {
-                    $message.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(parsers => @$.add-body-parsers,
+                    $message.body-parser-selector = Cro::BodyParserSelector::Prepend.new(parsers => @$.add-body-parsers,
                                                                                                next => $message.body-parser-selector);
                 }
                 emit $message;
@@ -36,10 +36,10 @@ class SerializerExtension does Cro::Transform {
         supply {
             whenever $pipeline -> $message {
                 if $.body-serializers.defined {
-                    $message.body-serializer-selector = Cro::HTTP::BodySerializerSelector::List.new(serializers => @$.body-serializers);
+                    $message.body-serializer-selector = Cro::BodySerializerSelector::List.new(serializers => @$.body-serializers);
                 }
                 if $.add-body-serializers.defined {
-                    $message.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(serializers => @$.add-body-serializers,
+                    $message.body-serializer-selector = Cro::BodySerializerSelector::Prepend.new(serializers => @$.add-body-serializers,
                                                                                                        next => $message.body-serializer-selector);
                 }
                 emit $message;

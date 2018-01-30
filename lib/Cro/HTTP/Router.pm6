@@ -1,9 +1,9 @@
 use Cro;
+use Cro::BodyParser;
+use Cro::BodyParserSelector;
+use Cro::BodySerializer;
+use Cro::BodySerializerSelector;
 use Cro::HTTP::Auth;
-use Cro::HTTP::BodyParser;
-use Cro::HTTP::BodyParserSelector;
-use Cro::HTTP::BodySerializer;
-use Cro::HTTP::BodySerializerSelector;
 use Cro::HTTP::Middleware;
 use Cro::HTTP::MimeTypes;
 use Cro::HTTP::PushPromise;
@@ -57,7 +57,7 @@ module Cro::HTTP::Router {
 
             method !add-body-parsers(Cro::HTTP::Request $request --> Nil) {
                 if @!body-parsers {
-                    $request.body-parser-selector = Cro::HTTP::BodyParserSelector::Prepend.new(
+                    $request.body-parser-selector = Cro::BodyParserSelector::Prepend.new(
                         parsers => @!body-parsers,
                         next => $request.body-parser-selector
                     );
@@ -66,7 +66,7 @@ module Cro::HTTP::Router {
 
             method !add-body-serializers(Cro::HTTP::Response $response --> Nil) {
                 if @!body-serializers {
-                    $response.body-serializer-selector = Cro::HTTP::BodySerializerSelector::Prepend.new(
+                    $response.body-serializer-selector = Cro::BodySerializerSelector::Prepend.new(
                         serializers => @!body-serializers,
                         next => $response.body-serializer-selector
                     );
@@ -132,7 +132,7 @@ module Cro::HTTP::Router {
                             when X::Cro::HTTP::Router::NoRequestBodyMatch {
                                 $response.status = 400;
                             }
-                            when X::Cro::HTTP::BodyParserSelector::NoneApplicable {
+                            when X::Cro::BodyParserSelector::NoneApplicable {
                                 $response.status = 400;
                             }
                             default {
@@ -198,8 +198,8 @@ module Cro::HTTP::Router {
 
         has Handler @!handlers;
         has $!path-matcher;
-        has Cro::HTTP::BodyParser @!body-parsers;
-        has Cro::HTTP::BodySerializer @!body-serializers;
+        has Cro::BodyParser @!body-parsers;
+        has Cro::BodySerializer @!body-serializers;
         has @!includes;
         has @!before;
         has @!after;
@@ -264,11 +264,11 @@ module Cro::HTTP::Router {
             @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before, :@!after));
         }
 
-        method add-body-parser(Cro::HTTP::BodyParser $parser --> Nil) {
+        method add-body-parser(Cro::BodyParser $parser --> Nil) {
             @!body-parsers.push($parser);
         }
 
-        method add-body-serializer(Cro::HTTP::BodySerializer $serializer --> Nil) {
+        method add-body-serializer(Cro::BodySerializer $serializer --> Nil) {
             @!body-serializers.push($serializer);
         }
 
@@ -591,11 +591,11 @@ module Cro::HTTP::Router {
         $*CRO-ROUTE-SET.add-handler('PATCH', &handler);
     }
 
-    sub body-parser(Cro::HTTP::BodyParser $parser --> Nil) is export {
+    sub body-parser(Cro::BodyParser $parser --> Nil) is export {
         $*CRO-ROUTE-SET.add-body-parser($parser);
     }
 
-    sub body-serializer(Cro::HTTP::BodySerializer $serializer --> Nil) is export {
+    sub body-serializer(Cro::BodySerializer $serializer --> Nil) is export {
         $*CRO-ROUTE-SET.add-body-serializer($serializer);
     }
 

@@ -1,15 +1,11 @@
+use Cro::BodyParser;
 use Cro::HTTP::Body;
 use Cro::HTTP::Header;
 use Cro::HTTP::Message;
 use Cro::MediaType;
 use JSON::Fast;
 
-role Cro::HTTP::BodyParser {
-    method is-applicable(Cro::HTTP::Message $message --> Bool) { ... }
-    method parse(Cro::HTTP::Message $message --> Promise) { ... }
-}
-
-class Cro::HTTP::BodyParser::BlobFallback does Cro::HTTP::BodyParser {
+class Cro::HTTP::BodyParser::BlobFallback does Cro::BodyParser {
     method is-applicable(Cro::HTTP::Message $message --> Bool) {
         True
     }
@@ -19,7 +15,7 @@ class Cro::HTTP::BodyParser::BlobFallback does Cro::HTTP::BodyParser {
     }
 }
 
-class Cro::HTTP::BodyParser::TextFallback does Cro::HTTP::BodyParser {
+class Cro::HTTP::BodyParser::TextFallback does Cro::BodyParser {
     method is-applicable(Cro::HTTP::Message $message --> Bool) {
         ($message.header('content-type') // '').starts-with('text/')
     }
@@ -29,7 +25,7 @@ class Cro::HTTP::BodyParser::TextFallback does Cro::HTTP::BodyParser {
     }
 }
 
-class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::HTTP::BodyParser {
+class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::BodyParser {
     has Str $.default-encoding = 'utf-8';
 
     method default-encoding() {
@@ -109,7 +105,7 @@ class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::HTTP::BodyParser {
     }
 }
 
-class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
+class Cro::HTTP::BodyParser::MultiPartFormData does Cro::BodyParser {
     method is-applicable(Cro::HTTP::Message $message --> Bool) {
         with $message.content-type {
             .type eq 'multipart' && .subtype eq 'form-data'
@@ -207,7 +203,7 @@ class Cro::HTTP::BodyParser::MultiPartFormData does Cro::HTTP::BodyParser {
     }
 }
 
-class Cro::HTTP::BodyParser::JSON does Cro::HTTP::BodyParser {
+class Cro::HTTP::BodyParser::JSON does Cro::BodyParser {
     method is-applicable(Cro::HTTP::Message $message --> Bool) {
         with $message.content-type {
             .type eq 'application' && .subtype eq 'json' || .suffix eq 'json'

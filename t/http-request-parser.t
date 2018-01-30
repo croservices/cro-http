@@ -1,5 +1,5 @@
-use Cro::HTTP::BodyParser;
-use Cro::HTTP::BodyParserSelector;
+use Cro::BodyParserSelector;
+use Cro::HTTP::BodyParsers;
 use Cro::HTTP::RequestParser;
 use Cro::HTTP::Request;
 use Cro::TCP;
@@ -637,7 +637,7 @@ parses 'Can pick default encoding for application/x-www-form-urlencoded',
     x=%C0%C1&%D5%D6=1
     REQUEST
     tests => {
-        .body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(:parsers[
+        .body-parser-selector = Cro::BodyParserSelector::List.new(:parsers[
             Cro::HTTP::BodyParser::WWWFormUrlEncoded.new(
                 default-encoding => 'latin-1'
             )
@@ -670,7 +670,7 @@ parses 'A _charset_ in application/x-www-form-urlencoded overrides configured de
     x=%C3%80b&%E3%82%A2%E3%82%A2=1&_charset_=utf-8
     REQUEST
     tests => {
-        .body-parser-selector = Cro::HTTP::BodyParserSelector::List.new(:parsers[
+        .body-parser-selector = Cro::BodyParserSelector::List.new(:parsers[
             Cro::HTTP::BodyParser::WWWFormUrlEncoded.new(
                 default-encoding => 'latin-1'
             )

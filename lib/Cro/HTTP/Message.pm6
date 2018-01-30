@@ -123,14 +123,7 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
         $encoding // ('utf-8', 'latin-1')
     }
 
-    method body(--> Promise) {
-        self.body-parser-selector.select(self).parse(self)
-    }
-
     method has-body() {
         $!body.DEFINITE || $!body-byte-stream.DEFINITE
     }
-
-    method body-parser-selector() { ... }
-    method body-serializer-selector() { ... }
 }

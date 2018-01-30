@@ -1229,7 +1229,7 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         has $.content;
     }
 
-    my class TestBodyParser does Cro::HTTP::BodyParser {
+    my class TestBodyParser does Cro::BodyParser {
         method is-applicable(Cro::HTTP::Message $message --> Bool) {
             with $message.content-type {
                 .type eq 'text' && .subtype eq 'x-test'
@@ -1292,7 +1292,7 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         has Int $.y;
     }
 
-    class TestSerializer does Cro::HTTP::BodySerializer {
+    class TestSerializer does Cro::BodySerializer {
         method is-applicable(Cro::HTTP::Message $message, $body --> Bool) {
             $body ~~ Point
         }
@@ -1578,7 +1578,7 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         has $.content;
     }
 
-    my class TestBodyParser1 does Cro::HTTP::BodyParser {
+    my class TestBodyParser1 does Cro::BodyParser {
         method is-applicable(Cro::HTTP::Message $message --> Bool) {
             with $message.content-type {
                 .type eq 'text' && .subtype eq 'x-test-1'
@@ -1592,7 +1592,7 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         }
     }
 
-    my class TestBodyParser2 does Cro::HTTP::BodyParser {
+    my class TestBodyParser2 does Cro::BodyParser {
         method is-applicable(Cro::HTTP::Message $message --> Bool) {
             with $message.content-type {
                 .type eq 'text' && .subtype eq 'x-test-2'
