@@ -6,8 +6,6 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
     has Str $.http-version is rw;
     has Int $.http2-stream-id is rw;
     has Cro::HTTP::Header @!headers;
-    has Supply $!body-byte-stream; # Typically set when receiving from network
-    has $!body;                    # Typically set when producing locally
 
     method headers() {
         @!headers.List
@@ -80,26 +78,6 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
         }
     }
 
-    method set-body-byte-stream(Supply $!body-byte-stream --> Nil) {
-        $!body = Nil;
-    }
-
-    method body-byte-stream(--> Supply) {
-        with $!body-byte-stream {
-            $_
-        }
-        orwith $!body {
-            self.body-serializer-selector.select(self, $_).serialize(self, $_)
-        }
-        else {
-            supply { }
-        }
-    }
-
-    method set-body($!body --> Nil) {
-        $!body-byte-stream = Nil;
-    }
-
     method body-text-encoding(Blob $blob) {
         my $encoding;
         with self.content-type {
@@ -121,9 +99,5 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
             }
         }
         $encoding // ('utf-8', 'latin-1')
-    }
-
-    method has-body() {
-        $!body.DEFINITE || $!body-byte-stream.DEFINITE
     }
 }
