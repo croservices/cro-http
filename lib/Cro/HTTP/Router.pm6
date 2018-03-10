@@ -939,7 +939,7 @@ module Cro::HTTP::Router {
         $resp.append-header('Cache-Control', $cache);
     }
 
-    sub static(IO() $base, *@path, :$mime-types) is export {
+    sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
         my $child = '.';
@@ -953,7 +953,19 @@ module Cro::HTTP::Router {
 
         my sub get_or_404($path) {
             if $path.e {
-                content $content-type, slurp($path, :bin);
+                if $path.d {
+                    for @indexes {
+                        my $index = $path.add($_);
+                        if $index.e {
+                            content $content-type, slurp($index, :bin);
+                            return;
+                        }
+                    }
+                    $resp.status = 404;
+                    return;
+                } else {
+                    content $content-type, slurp($path, :bin);
+                }
             } else {
                 $resp.status = 404;
             }

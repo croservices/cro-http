@@ -1845,4 +1845,50 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     }
 }
 
+{
+    my $app = route {
+        get -> {
+            static 't/samples/', :indexes(['index.xhtml']);
+        }
+
+        get -> 'index-plain' {
+            static 't/samples/', :indexes(['index.html', 'index.xhtml']);
+        }
+        get -> 'index-extended' {
+            static 't/samples/', :indexes(['index.xhtml', 'index.html']);
+        }
+        get -> 'no-index' {
+            static 't/samples/', :indexes([]);
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is body-text($r), "<HTML>Extended</HTML>\n", 'Get value from index';
+        is $r.status, 200, 'Static sets correct status code';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-plain');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is body-text($r), "<HTML></HTML>\n", 'static indexes order check, 1';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-extended');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is body-text($r), "<HTML>Extended</HTML>\n", 'static indexes order check, 2';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/no-index');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is $r.status, 404, 'No candidate served with empty indexes';
+    }
+}
+
 done-testing;
