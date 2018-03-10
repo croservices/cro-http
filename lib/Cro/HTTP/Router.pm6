@@ -939,7 +939,7 @@ module Cro::HTTP::Router {
         $resp.append-header('Cache-Control', $cache);
     }
 
-    sub static(Str $base, @path?, :$mime-types) is export {
+    sub static(IO() $base, *@path, :$mime-types) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
         my $child = '.';
@@ -948,11 +948,11 @@ module Cro::HTTP::Router {
         }
 
         my %fallback = $mime-types // {};
-        my $ext = $child eq '.' ?? $base.IO.extension !! $child.IO.extension;
+        my $ext = $child eq '.' ?? $base.extension !! $child.IO.extension;
         my $content-type = %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
 
         my sub get_or_404($path) {
-            if $path.IO.e {
+            if $path.e {
                 content $content-type, slurp($path, :bin);
             } else {
                 $resp.status = 404;
@@ -962,7 +962,7 @@ module Cro::HTTP::Router {
         if $child eq '.' {
             get_or_404($base);
         } else {
-            with $base.IO.&child-secure: $child {
+            with $base.&child-secure: $child {
                 get_or_404($_);
             } else {
                 $resp.status = 403;
