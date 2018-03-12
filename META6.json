@@ -24,7 +24,6 @@
                 "Cro::HTTP::Client": "lib/Cro/HTTP/Client.pm6",
                 "Cro::HTTP::Client::CookieJar": "lib/Cro/HTTP/Client/CookieJar.pm6",
                 "Cro::HTTP::Cookie": "lib/Cro/HTTP/Cookie.pm6",
-                "Cro::HTTP::DateTime": "lib/Cro/HTTP/DateTime.pm6",
                 "Cro::HTTP::Exception": "lib/Cro/HTTP/Exception.pm6",
                 "Cro::HTTP::Header": "lib/Cro/HTTP/Header.pm6",
                 "Cro::HTTP::Internal": "lib/Cro/HTTP/Internal.pm6",
