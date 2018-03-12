@@ -196,13 +196,13 @@ module Cro::HTTP::Router {
             }
         }
 
-        has Handler @!handlers;
+        has Handler @.handlers;
+        has Cro::BodyParser @.body-parsers;
+        has Cro::BodySerializer @.body-serializers;
+        has @.includes;
+        has @.before;
+        has @.after;
         has $!path-matcher;
-        has Cro::BodyParser @!body-parsers;
-        has Cro::BodySerializer @!body-serializers;
-        has @!includes;
-        has @!before;
-        has @!after;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -283,8 +283,6 @@ module Cro::HTTP::Router {
             @!after.push($middleware);
         }
 
-        method !handlers() { @!handlers }
-
         method delegate(@prefix, Cro::Transform $transform) {
             my $wildcard = @prefix[*-1] eq '*';
             my @new-prefix = @prefix;
@@ -300,7 +298,7 @@ module Cro::HTTP::Router {
                 .body-serializers = @!body-serializers;
             }
             for @!includes -> (:@prefix, :$includee) {
-                for $includee!handlers() {
+                for $includee.handlers() {
                     @!handlers.push(.copy-adding(:@prefix, :@!body-parsers, :@!body-serializers, :@!before, :@!after));
                 }
             }
