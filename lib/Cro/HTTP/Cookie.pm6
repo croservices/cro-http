@@ -1,4 +1,4 @@
-use Cro::HTTP::DateTime;
+use DateTime::Parse;
 
 class X::Cro::HTTP::Cookie::Unrecognized is Exception {
     has $.what;
@@ -31,7 +31,10 @@ grammar CookieString {
     token TOP          { <cookie-pair> ['; ' <cookie-av> ]* }
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
     proto token cookie-av {*}
-          token cookie-av:sym<expires>   { :i 'Expires=' <HTTP-date> }
+          token cookie-av:sym<expires>   { :i 'Expires=' [ <dt=DateTime::Parse::Grammar::rfc1123-date>    |
+                                                           <dt=DateTime::Parse::Grammar::rfc850-date>     |
+                                                           <dt=DateTime::Parse::Grammar::rfc850-var-date> |
+                                                           <dt=DateTime::Parse::Grammar::asctime-date>    ] }
           token cookie-av:sym<max-age>   { :i 'Max-Age=' '-'? <[1..9]> <[0..9]>* }
           token cookie-av:sym<domain>    { :i 'Domain=' <domain> }
           token cookie-av:sym<path>      { :i 'Path=' <path> }
@@ -58,12 +61,12 @@ class CookieBuilder {
     }
 
     method !data-deal($str) {
-        # XXX: can throw
-        DateTimeGrammar.parse($str, actions => DateTimeActions.new).made;
+        DateTime::Parse.new($str);
     }
 
     method cookie-av:sym<expires> ($/) {
-        make ('expires', self!data-deal(~$/<HTTP-date>));
+        my $res = self!data-deal(~$/<dt>);
+        make ('expires', $res);
     }
     method cookie-av:sym<max-age> ($/) {
         make ('max-age', Duration.new: (~$/).split('=')[1].Int);
@@ -92,6 +95,26 @@ class Cro::HTTP::Cookie {
     has Path $.path;
     has Bool $.secure;
     has Bool $.http-only;
+
+    sub rfc1123-formatter(DateTime $_ --> DateTime) is export {
+        my %month-names = 1 => 'Jan', 2 => 'Feb', 3 => 'Mar',
+                          4 => 'Apr', 5 => 'May', 6 => 'Jun',
+                          7 => 'Jul', 8 => 'Aug', 9 => 'Sep',
+                          10 => 'Oct', 11 => 'Nov', 12 => 'Dec';
+        my %amonth-names = %month-names.antipairs;
+
+        my %weekdays = 1 => 'Mon', 2 => 'Tue',
+                       3 => 'Wed', 4 => 'Thu',
+                       5 => 'Fri', 6 => 'Sat',
+                       7 => 'Sun';
+        my %aweekdays = %weekdays.antipairs;
+
+        my $rfc1123-format = sub ($self) { sprintf "%s, %02d %s %04d %02d:%02d:%02d GMT",
+                                           %weekdays{.day-of-week}, .day,
+                                           %month-names{.month}, .year,
+                                           .hour, .minute, .second given $self; }
+        DateTime.new(.Str, formatter => $rfc1123-format);
+    }
 
     submethod BUILD(:$!name, :$!value,
                     :$!expires=Nil, :$!max-age=Nil,

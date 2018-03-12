@@ -1,4 +1,3 @@
-use Cro::HTTP::DateTime;
 use Cro::HTTP::Cookie;
 use Test;
 
@@ -38,12 +37,6 @@ lives-ok {
 dies-ok { my Domain $d = "\n"; }, 'Incorrect domain name with bad character';
 dies-ok { my Domain $d = ""; }, 'Empty domain name cannot be created';
 dies-ok { my Domain $d = ' '; }, 'Domain name cannot contain spaces';
-
-
-# Time-related tests
-like 'Sun, 06 Nov 1994 08:49:37 GMT', /<HTTP-date>/, 'RFC 1123';
-like 'Sunday, 06-Nov-94 08:49:37 GMT', /<HTTP-date>/, 'RFC 850';
-like 'Sun Nov  6 08:49:37 1994', /<HTTP-date>/, 'ANSI C\'s asctime() format';
 
 isnt CookieString.parse('SID=31d4d86e407aad42; Path=/; Domain=example.com'), Nil, 'Set-Cookie string 1 parses';
 isnt CookieString.parse('lang=en-US; Path=/; Domain=example.com'), Nil, 'Set-Cookie string 2 parses';

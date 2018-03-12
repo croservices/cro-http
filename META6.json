@@ -8,7 +8,7 @@
     "license"       : "Artistic-2.0",
     "depends"       : [ "IO::Socket::Async::SSL", "OO::Monitors", "IO::Path::ChildSecure",
                         "Base64", "HTTP::HPACK", "Cro::Core", "Cro::TLS", "JSON::Fast",
-                        "Crypt::Random", "JSON::JWT" ],
+                        "Crypt::Random", "JSON::JWT", "DateTime::Parse" ],
     "provides"      : {
                 "Cro::HTTP::Auth": "lib/Cro/HTTP/Auth.pm6",
                 "Cro::HTTP::Auth::WebToken": "lib/Cro/HTTP/Auth/WebToken.pm6",
