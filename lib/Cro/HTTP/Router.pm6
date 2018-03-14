@@ -272,18 +272,18 @@ module Cro::HTTP::Router {
             @!body-serializers.push($serializer);
         }
 
-        method include(@prefix, RouteSet $includee) {
+        method add-include(@prefix, RouteSet $includee) {
             @!includes.push({ :@prefix, :$includee });
         }
 
-        method before($middleware) {
+        method add-before($middleware) {
             @!before.push($middleware);
         }
-        method after($middleware) {
+        method add-after($middleware) {
             @!after.push($middleware);
         }
 
-        method delegate(@prefix, Cro::Transform $transform) {
+        method add-delegate(@prefix, Cro::Transform $transform) {
             my $wildcard = @prefix[*-1] eq '*';
             my @new-prefix = @prefix;
             @new-prefix.pop if $wildcard;
@@ -600,17 +600,17 @@ module Cro::HTTP::Router {
     sub include(*@includees, *%includees --> Nil) is export {
         for @includees {
             when RouteSet  {
-                $*CRO-ROUTE-SET.include([], $_);
+                $*CRO-ROUTE-SET.add-include([], $_);
             }
             when Pair {
                 my ($prefix, $routes) = .kv;
                 if $routes ~~ RouteSet {
                     given $prefix {
                         when Str {
-                            $*CRO-ROUTE-SET.include([$prefix], $routes);
+                            $*CRO-ROUTE-SET.add-include([$prefix], $routes);
                         }
                         when Iterable {
-                            $*CRO-ROUTE-SET.include($prefix, $routes);
+                            $*CRO-ROUTE-SET.add-include($prefix, $routes);
                         }
                         default {
                             die "An 'include' prefix may be a Str or Iterable, but not " ~ .^name;
@@ -627,7 +627,7 @@ module Cro::HTTP::Router {
         }
         for %includees.kv -> $prefix, $routes {
             if $routes ~~ RouteSet {
-                $*CRO-ROUTE-SET.include([$prefix], $routes);
+                $*CRO-ROUTE-SET.add-include([$prefix], $routes);
             }
             else {
                 die "Can only use 'include' with `route` block, not a $routes.^name()";
@@ -652,10 +652,10 @@ module Cro::HTTP::Router {
                 }
                 given $prefix {
                     when Iterable {
-                        $*CRO-ROUTE-SET.delegate($prefix, $transform);
+                        $*CRO-ROUTE-SET.add-delegate($prefix, $transform);
                     }
                     when Str {
-                        $*CRO-ROUTE-SET.delegate([$prefix], $transform);
+                        $*CRO-ROUTE-SET.add-delegate([$prefix], $transform);
                     }
                     default {
                         die "Pairs passed to 'delegate' must have a Str or Iterable key, not " ~ .^name;
@@ -888,15 +888,15 @@ module Cro::HTTP::Router {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Request
         && .produces ~~ Cro::HTTP::Request {
-            $*CRO-ROUTE-SET.before($_)
+            $*CRO-ROUTE-SET.add-before($_)
         } else {
             die "before middleware must consume and produce Cro::HTTP::Request, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
     multi sub before(&middleware --> Nil) is export {
         my $conditional = BeforeMiddleTransform.new(block => &middleware);
-        $*CRO-ROUTE-SET.before($conditional.request);
-        $*CRO-ROUTE-SET.after($conditional.response);
+        $*CRO-ROUTE-SET.add-before($conditional.request);
+        $*CRO-ROUTE-SET.add-after($conditional.response);
     }
     multi sub before(Cro::HTTP::Middleware::Pair $pair --> Nil) {
         before($pair.request);
@@ -907,14 +907,14 @@ module Cro::HTTP::Router {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Response
         && .produces ~~ Cro::HTTP::Response {
-            $*CRO-ROUTE-SET.after($_)
+            $*CRO-ROUTE-SET.add-after($_)
         } else {
             die "after middleware must consume and produce Cro::HTTP::Response, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
     multi sub after(&middleware --> Nil) is export {
         my $transformer = AfterMiddleTransform.new(block => &middleware);
-        $*CRO-ROUTE-SET.after($transformer);
+        $*CRO-ROUTE-SET.add-after($transformer);
     }
 
     sub cache-control(:$public, :$private, :$no-cache, :$no-store,
