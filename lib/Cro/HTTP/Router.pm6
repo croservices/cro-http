@@ -44,7 +44,7 @@ module Cro::HTTP::Router {
     }
 
     class RouteSet does Cro::Transform {
-        my role Handler {
+        role Handler {
             has @.prefix;
             has @.body-parsers;
             has @.body-serializers;
