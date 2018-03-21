@@ -69,6 +69,14 @@ class X::Cro::HTTP::Client::InvalidVersion is Exception {
     }
 }
 
+class X::Cro::HTTP::Client::InvalidCookie is Exception {
+    has $.bad;
+    method message() {
+        "Cannot add $!bad.^name() as a cookie (expected a hash of keys to values, " ~
+        "or a list of Pair and Cro::HTTP::Cookie objects)"
+    }
+}
+
 class Cro::HTTP::Client {
     my class Pipeline {
         has Bool $.secure;
@@ -545,6 +553,19 @@ class Cro::HTTP::Client {
             }
             when 'auth' {
                 self!form-authentication: $request, %$value, %$value<if-asked>:exists;
+            }
+            when 'cookies' {
+                for $value.list {
+                    when Cro::HTTP::Cookie {
+                        $request.add-cookie($_);
+                    }
+                    when Pair {
+                        $request.add-cookie(.key, .value);
+                    }
+                    default {
+                        die X::Cro::HTTP::Client::InvalidCookie.new(bad => $_);
+                    }
+                }
             }
         }
         return $request;
