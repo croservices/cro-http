@@ -297,6 +297,11 @@ constant %key-cert := {
         is await($resp.body-text), 'It was a good attempt', 'Cookies were not handled';
     }
 
+    $client = Cro::HTTP::Client.new;
+    given await $client.get("$base/second-pass", :cookies(First => 'Done',)) -> $resp {
+        is await($resp.body-text), 'Done', 'Cookies set externally work';
+    }
+
     $client = Cro::HTTP::Client.new: content-type => 'text/plain';
     given await $client.get("$base/str", body => 'Traces') -> $resp {
         is await($resp.body), 'Traces', 'Permanent content-type setting works'
