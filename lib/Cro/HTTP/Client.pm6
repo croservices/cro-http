@@ -438,6 +438,7 @@ class Cro::HTTP::Client {
     method !build-pipeline($secure, $host, $port, $http, :$ca, :$enable-push) {
         my @parts;
         my $version-decision = Promise.new;
+        my $supports-alpn = supports-alpn();
         if self {
             push @parts, RequestSerializerExtension.new:
                 add-body-serializers => $.add-body-serializers,
@@ -448,7 +449,7 @@ class Cro::HTTP::Client {
             push @parts, Cro::HTTP2::FrameSerializer.new(:client, :$enable-push);
             $version-decision.keep('2');
         }
-        elsif $http eq '1.1' || !$secure {
+        elsif $http eq '1.1' || !$secure || !$supports-alpn {
             push @parts, Cro::HTTP::RequestSerializer.new;
             $version-decision.keep('1.1');
         }
@@ -470,7 +471,7 @@ class Cro::HTTP::Client {
             push @parts, Cro::HTTP2::FrameParser.new(:client);
             push @parts, Cro::HTTP2::ResponseParser.new(:$enable-push);
         }
-        elsif $http eq '1.1' || !$secure {
+        elsif $http eq '1.1' || !$secure || !$supports-alpn {
             push @parts, Cro::HTTP::ResponseParser.new;
         }
         else {
@@ -489,7 +490,7 @@ class Cro::HTTP::Client {
         }
         my $connector = Cro.compose(|@parts);
 
-        my %tls-config = $secure && $http ne '1.1'
+        my %tls-config = $supports-alpn && $secure && $http ne '1.1'
             ?? alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
             !! ();
         my $in = Supplier::Preserving.new;
