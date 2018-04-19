@@ -241,14 +241,14 @@ class Cro::HTTP::Client {
     has $!connection-cache = ConnectionCache.new;
     has $.http;
     has $.ca;
-    has $.base-uri;
+    has Cro::Uri $.base-uri;
     has $.push-promises = False;
 
     method persistent() {
         self ?? $!persistent !! False
     }
 
-    submethod BUILD(:$cookie-jar, :@!headers, :$!content-type, :$!base-uri = '',
+    submethod BUILD(:$cookie-jar, :@!headers, :$!content-type, :$base-uri,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
                     :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca,
@@ -266,6 +266,14 @@ class Cro::HTTP::Client {
         with $!http {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
                 die X::Cro::HTTP::Client::InvalidVersion.new;
+            }
+        }
+        with $base-uri {
+            when Cro::Uri {
+                $!base-uri = $_;
+            }
+            default {
+                $!base-uri = Cro::Uri.parse(~$_);
             }
         }
     }
@@ -316,9 +324,9 @@ class Cro::HTTP::Client {
         self.request($method, $url, %options)
     }
     multi method request(Str $method, $url, %options --> Promise) {
-        my $parsed-url = $url ~~ Cro::Uri
-                       ?? $url
-                       !! Cro::Uri.parse(self ?? $!base-uri ~ $url !! $url);
+        my $parsed-url = self && $!base-uri
+            ?? $!base-uri.add($url)
+            !! Cro::Uri.parse($url);
         my $http = self ?? $!http // %options<http> !! %options<http>;
         with $http {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
