@@ -474,7 +474,7 @@ class Cro::HTTP::Client {
                 ]
             );
         }
-        push @parts, $secure ?? Cro::TLS::Connector !! Cro::TCP::Connector;
+        push @parts, self.choose-connector($secure);
         if $http eq '2' {
             push @parts, Cro::HTTP2::FrameParser.new(:client);
             push @parts, Cro::HTTP2::ResponseParser.new(:$enable-push);
@@ -598,5 +598,9 @@ class Cro::HTTP::Client {
                 $request.append-header($_)
             }
         }
+    }
+
+    method choose-connector($secure) {
+        $secure ?? Cro::TLS::Connector !! Cro::TCP::Connector
     }
 }
