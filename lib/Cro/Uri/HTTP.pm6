@@ -2,6 +2,7 @@ use Cro::Uri :decode-percents;
 use Cro::HTTP::MultiValue;
 
 class Cro::Uri::HTTP is Cro::Uri {
+    has @!cached-query-list;
     has %!cached-query-hash;
 
     grammar Parser is Cro::Uri::GenericParser {
@@ -35,6 +36,19 @@ class Cro::Uri::HTTP is Cro::Uri {
         else {
             die X::Cro::Uri::ParseError.new(uri-string => $target)
         }
+    }
+
+    method query-list() {
+        # Race to compute this. The bind makes it thread-safe to put in place.
+        unless @!cached-query-list {
+            with self.query {
+                @!cached-query-list := list eager .split('&').map: -> $kv {
+                    my @kv := $kv.split('=', 2).list;
+                    Pair.new(key => decode-percents(@kv[0]), value => decode-percents(@kv[1] // ''))
+                }
+            }
+        }
+        @!cached-query-list
     }
 
     method query-hash() {

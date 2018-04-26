@@ -488,7 +488,7 @@ module Cro::HTTP::Router {
                             die "Cookies cannot be extracted to List. Maybe you want '%' instead of '@'";
                         }
                         default {
-                            push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.query-hash.List';
+                            push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.query-list';
                         }
                     }
                 }

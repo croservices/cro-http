@@ -100,6 +100,11 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
         $!cached-uri.query
     }
 
+    method query-list() {
+        self!ensure-cached-uri();
+        $!cached-uri.query-list
+    }
+
     method query-hash() {
         self!ensure-cached-uri();
         $!cached-uri.query-hash
