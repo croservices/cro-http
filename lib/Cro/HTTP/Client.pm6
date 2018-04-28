@@ -592,10 +592,11 @@ class Cro::HTTP::Client {
 
     method !set-headers($request, @headers) {
         for @headers {
-            if not ($_ ~~ Cro::HTTP::Header || $_ ~~ Pair) {
-                die X::Cro::HTTP::Client::IncorrectHeaderType.new(what => $_);
-            } else {
+            when Pair | Cro::HTTP::Header {
                 $request.append-header($_)
+            }
+            default {
+                die X::Cro::HTTP::Client::IncorrectHeaderType.new(what => $_);
             }
         }
     }
