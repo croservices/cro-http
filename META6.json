@@ -1,7 +1,7 @@
 {
     "perl"          : "6.*",
     "name"          : "Cro::HTTP",
-    "version"       : "0.7.4",
+    "version"       : "0.7.5",
     "description"   : "Asynchronous HTTP, both client and server side. Includes HTTP/2.0 support.",
     "tags"          : [ "HTTP", "Client", "Server" ],
     "authors"       : [ "Jonathan Worthington <jnthn@jnthn.net>" ],
