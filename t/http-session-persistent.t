@@ -52,7 +52,8 @@ my $service = Cro::HTTP::Server.new(
     :host('localhost'), :port(TEST_PORT), application => $app,
     before => FakePersistent.new(
         expiration => Duration.new(60 * 30),
-        now => { $fake-now }
+        now => { $fake-now },
+        cookie-name => '_session'
     )
 );
 $service.start;

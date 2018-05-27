@@ -2,7 +2,7 @@ use Cro::HTTP::Middleware;
 use Cro::HTTP::Session::IdGenerator;
 
 role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::RequestResponse {
-    has Str $.cookie-name = generate-session-id();
+    has Str $.cookie-name = die('Please specify a cookie name for the session cookie. Pick something distinctive to your application. This avoids the cookie name being used to fingerprint the application platform.');
     has Duration $.expiration .= new(30 * 60);
     has &.now = { now };
 
@@ -38,7 +38,7 @@ role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::Requ
             with $res.request.cookie-value($!cookie-name) {
                 $res.set-cookie($!cookie-name, $_, |%cookie-opts);
                 self.save($_, $res.request.auth);
-            } orwith $res.request.auth -> $state {
+            } orwith $res.request.auth {
                 # Setting a cookie
                 my $cookie-value = generate-session-id();
                 $res.set-cookie($!cookie-name, $cookie-value, |%cookie-opts);
