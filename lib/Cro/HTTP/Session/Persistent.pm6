@@ -42,7 +42,7 @@ role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::Requ
                 # Setting a cookie
                 my $cookie-value = generate-session-id();
                 $res.set-cookie($!cookie-name, $cookie-value, |%cookie-opts);
-                # Callign a create;
+                # Calling `create`
                 my $created = self.create($cookie-value);
                 if $created ~~ TSession {
                     self.save($cookie-value, $created);
