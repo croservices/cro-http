@@ -33,7 +33,11 @@ class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::BodyParser {
     }
 
     method is-applicable(Cro::HTTP::Message $message --> Bool) {
-        ($message.header('content-type') // '') eq 'application/x-www-form-urlencoded'
+        my $type-and-subtype = '';
+        if (my $content-type = $message.content-type) {
+            $type-and-subtype = $content-type.type-and-subtype.lc;
+        }
+        $type-and-subtype eq 'application/x-www-form-urlencoded';
     }
 
     method parse(Cro::HTTP::Message $message --> Promise) {
