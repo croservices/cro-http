@@ -947,7 +947,11 @@ module Cro::HTTP::Router {
 
         my %fallback = $mime-types // {};
         my $ext = $child eq '.' ?? $base.extension !! $child.IO.extension;
-        my $content-type = %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
+
+        my sub get-mime($ext) {
+            %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
+        }
+        my $content-type = get-mime($ext);
 
         my sub get_or_404($path) {
             if $path.e {
@@ -955,7 +959,7 @@ module Cro::HTTP::Router {
                     for @indexes {
                         my $index = $path.add($_);
                         if $index.e {
-                            content $content-type, slurp($index, :bin);
+                            content get-mime($index.extension), slurp($index, :bin);
                             return;
                         }
                     }
