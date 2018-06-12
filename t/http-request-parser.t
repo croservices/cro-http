@@ -597,6 +597,21 @@ parses 'Multiple entries with same name in application/x-www-form-urlencoded',
         isa-ok $body<c>, Str, 'Except when only one value for the name, then it is Str';
     };
 
+parses 'Charset present in content-type header field after application/x-www-form-urlencoded',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded; charset=UTF-8
+    Content-length: 7
+
+    a=1&b=2
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        is-deeply $body.list, (a => '1', b => '2'),
+            'WWWUrlEncode prasers works correct with charset in content-type';
+    };
+
+
 parses 'Basic %-encoded things in an application/x-www-form-urlencoded',
     q:to/REQUEST/.chop,
     POST /bar HTTP/1.1
