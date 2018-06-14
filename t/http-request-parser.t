@@ -611,6 +611,19 @@ parses 'Charset present in content-type header field after application/x-www-for
             'WWWUrlEncode prasers works correct with charset in content-type';
     };
 
+parses 'WWWFormUrlEncoded with empty body',
+    q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-length: 0
+
+    
+    REQUEST
+    tests => {
+        my $body = .body.result;
+        is-deeply $body.list, (),
+            'test `with message.content-type` returns Boolean';
+    };
+
 
 parses 'Basic %-encoded things in an application/x-www-form-urlencoded',
     q:to/REQUEST/.chop,
