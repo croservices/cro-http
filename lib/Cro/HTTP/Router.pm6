@@ -940,14 +940,16 @@ module Cro::HTTP::Router {
     sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+
         my $child = '.';
         for @path {
             $child = $child.IO.add: $_;
         }
-
         my %fallback = $mime-types // {};
-        my $ext = $child eq '.' ?? $base.extension !! $child.IO.extension;
-        my $content-type = %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
+
+        sub get-mime($ext) {
+            %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
+        }
 
         my sub get_or_404($path) {
             if $path.e {
@@ -955,14 +957,14 @@ module Cro::HTTP::Router {
                     for @indexes {
                         my $index = $path.add($_);
                         if $index.e {
-                            content $content-type, slurp($index, :bin);
+                            content get-mime($index.extension), slurp($index, :bin);
                             return;
                         }
                     }
                     $resp.status = 404;
                     return;
                 } else {
-                    content $content-type, slurp($path, :bin);
+                    content get-mime($path.extension), slurp($path, :bin);
                 }
             } else {
                 $resp.status = 404;

@@ -1860,6 +1860,11 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
         get -> 'no-index' {
             static 't/samples/', :indexes([]);
         }
+        get -> 'index-mime-type' {
+            static 't/samples/', :indexes(['index.html']), mime-types => {
+                'html' => 'text/html'
+            }
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -1888,6 +1893,13 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
     $source.emit($req);
     given $responses.receive -> $r {
         is $r.status, 404, 'No candidate served with empty indexes';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-mime-type');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        is $r.status, 200, 'Indexes with mime-types returns good status';
+        is $r.header('Content-Type'), 'text/html', 'Indexes with mime-types returns proper content-type';
     }
 }
 
