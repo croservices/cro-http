@@ -6,6 +6,8 @@ use Test;
 constant TEST_PORT = 31313;
 my $url = "http://localhost:{TEST_PORT}";
 
+
+
 my $app = route {
     get -> {
         content 'text/html', 'My response';
@@ -19,6 +21,12 @@ my $app = route {
     get -> 'error' {
         given response {
             $_.status = 500;
+        }
+    }
+
+    delegate <special *> => route {
+        get -> 'first' {
+            content 'text/plain', 'My response';
         }
     }
 }
@@ -42,6 +50,7 @@ my $app = route {
         await Cro::HTTP::Client.get("$url");
         await Cro::HTTP::Client.get("$url/route");
         await Cro::HTTP::Client.post("$url/route");
+        await Cro::HTTP::Client.get("$url/special/first");
         await Cro::HTTP::Client.get("$url/error");
         CATCH {
             default {
@@ -56,12 +65,13 @@ my $app = route {
     $out.close; $err.close;
 
     like (slurp 'out'),
-        /'[OK] 200 / - '      '127.0.0.1' || '::1' \n
-         '[OK] 200 /route - ' '127.0.0.1' || '::1' \n
-         '[OK] 200 /route - ' '127.0.0.1' || '::1' \n/,
+        /'[OK] 200 / - '      ('127.0.0.1' || '::1') \n
+         '[OK] 200 /route - ' ('127.0.0.1' || '::1') \n
+         '[OK] 200 /route - ' ('127.0.0.1' || '::1') \n
+         '[OK] 200 /special/first - ' ('127.0.0.1' || '::1') \n/,
         'Correct responses logged';
     like (slurp 'err'),
-        /'[ERROR] 500 /error - ' '127.0.0.1' || '::1' \n/,
+        /'[ERROR] 500 /error - ' ('127.0.0.1' || '::1') \n/,
         'Error responses logged';
 
     unlink 'out'.IO;
@@ -69,5 +79,7 @@ my $app = route {
 
     $service.stop();
 }
+
+
 
 done-testing;
