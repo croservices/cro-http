@@ -36,7 +36,7 @@ class Cro::HTTP::Server does Cro::Service {
                     :$after = (), :$after-serialize = (),
                     :$add-body-parsers, :$body-parsers,
                     :$add-body-serializers, :$body-serializers,
-                    :$http,
+                    :$http, :@allowed-methods,
                     :$label = "HTTP($port)") {
 
         my @before;
@@ -88,13 +88,16 @@ class Cro::HTTP::Server does Cro::Service {
                     $listener,
                     |$before-parse,
                     Cro::HTTP2::FrameParser.new,
-                    Cro::HTTP2::RequestParser.new,
+                    @allowed-methods.elems == 0 ?? Cro::HTTP2::RequestParser.new !! Cro::HTTP2::RequestParser.new(:@allowed-methods),
                     RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
                     |@before,
                     $application,
                     ResponseSerializerExtension.new(:$add-body-serializers, :$body-serializers),
                     |@after,
-                    Cro::HTTP2::ResponseSerializer.new(:$host, :$port),
+                    Cro::HTTP2::ResponseSerializer.new(
+                        |(:$host with $host),
+                        |(:$port with $port)
+                    ),
                     Cro::HTTP2::FrameSerializer.new,
                     |$after-serialize
                 )
@@ -114,7 +117,7 @@ class Cro::HTTP::Server does Cro::Service {
                 :$label,
                 $listener,
                 |$before-parse,
-                Cro::HTTP::RequestParser.new,
+                @allowed-methods.elems == 0 ?? Cro::HTTP::RequestParser.new !! Cro::HTTP::RequestParser.new(:@allowed-methods),
                 RequestParserExtension.new(:$add-body-parsers, :$body-parsers),
                 |@before,
                 $application,

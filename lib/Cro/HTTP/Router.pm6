@@ -917,6 +917,10 @@ module Cro::HTTP::Router {
         $*CRO-ROUTE-SET.add-after($transformer);
     }
 
+    sub http($method, &handler --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler($method, &handler);
+    }
+
     sub cache-control(:$public, :$private, :$no-cache, :$no-store,
                       Int :$max-age, Int :$s-maxage,
                       :$must-revalidate, :$proxy-revalidate,
