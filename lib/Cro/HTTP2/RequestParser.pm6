@@ -4,10 +4,17 @@ use Cro::HTTP::Internal;
 use Cro::Transform;
 
 class Cro::HTTP2::RequestParser does Cro::Transform does Cro::HTTP2::GeneralParser {
+    has %!allowed-methods;
     method consumes() { Cro::HTTP2::Frame  }
     method produces() { Cro::HTTP::Request }
 
-    submethod BUILD() {
+    submethod TWEAK(
+        :@allowed-methods = <GET HEAD POST PUT DELETE PATCH CONNECT OPTIONS>
+    ) {
+        %!allowed-methods{@allowed-methods} = True xx *;
+    }
+
+    submethod BUILD(:@allowed-methods) {
         $!pseudo-headers = <:method :scheme :authority :path :status>;
     }
 
