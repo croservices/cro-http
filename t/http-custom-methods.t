@@ -1,6 +1,7 @@
 use Cro::HTTP::Router;
 use Cro::HTTP::Client;
 use Cro::HTTP::Server;
+use Cro::TLS;
 use Test;
 
 constant HTTP_TEST_PORT = 31316;
@@ -43,7 +44,7 @@ my $app = route {
     }
 }
 
-{
+if supports-alpn() {
     my $https-server = Cro::HTTP::Server.new(
         port => HTTPS_TEST_PORT,
         application => $app,
