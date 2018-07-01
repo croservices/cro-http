@@ -62,7 +62,7 @@ monitor Cro::HTTP::Client::CookieJar {
                 $state.expiry-time = DateTime.now.later(seconds => $_.max-age)
             }
             elsif !$_.max-age.defined && $_.expires {
-                $state.presistent = True;
+                $state.persistent = True;
                 $state.expiry-time = $_.expires;
             } else {
                 $state.persistent = False;
