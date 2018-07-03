@@ -13,30 +13,31 @@ my $resp = Cro::HTTP::Response.new;
 $resp.set-body('Body');
 $resp.set-cookie('Foo', 'Bar', path => '/');
 $resp.set-cookie('Bar', 'Baz', path => '/');
+$resp.set-cookie('Baz', 'Foo', path => '/', expires => DateTime.now.later(hours => 5));
 
 $jar.add-from-response($resp, Cro::Uri.parse: 'http://example.com');
 
-is $jar.contents.elems, 2, 'Two cookies were added';
+is $jar.contents.elems, 3, 'Two cookies were added';
 
 $jar.add-from-response($resp, Cro::Uri.parse: 'http://example.com');
-is $jar.contents.elems, 2, 'Cookie addition is neutral';
+is $jar.contents.elems, 3, 'Cookie addition is neutral';
 
 $resp.set-cookie('Cookie1', 'Value1', path => '/', domain => 'example.com');
 $resp.set-cookie('BadCookie', 'Value2', path => '/', domain => 'example.foo');
 $jar.add-from-response($resp, Cro::Uri.parse: 'http://example.com');
-is $jar.contents.elems, 3, 'Cookie with bad domain was not added';
+is $jar.contents.elems, 4, 'Cookie with bad domain was not added';
 is $jar.contents(Cro::Uri.parse: 'http://example.foo').elems, 0, 'Uri-based check';
 
-is $jar.contents(Cro::Uri.parse: 'http://example.com').elems, 3, 'Good cookies are here';
+is $jar.contents(Cro::Uri.parse: 'http://example.com').elems, 4, 'Good cookies are here';
 
 $jar.clear(Cro::Uri.parse: 'http://example.foo');
-is $jar.contents.elems, 3, 'Clear for absent url leaves jar untouched';
+is $jar.contents.elems, 4, 'Clear for absent url leaves jar untouched';
 
 $jar.clear(Cro::Uri.parse('http://example.foo'), 'Cookie1');
-is $jar.contents.elems, 3, 'Clear for absent url with existing cookie name leaves jar untouched';
+is $jar.contents.elems, 4, 'Clear for absent url with existing cookie name leaves jar untouched';
 
 $jar.clear(Cro::Uri.parse('http://example.com'), 'Foo');
-is $jar.contents.elems, 2, 'One cookie was removed';
+is $jar.contents.elems, 3, 'One cookie was removed';
 
 $jar.clear(Cro::Uri.parse: 'http://example.com');
 is $jar.contents.elems, 0, 'All cookies from correct domain were removed';

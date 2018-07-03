@@ -83,7 +83,6 @@ monitor Cro::HTTP::Client::CookieJar {
         for $resp.cookies {
             $state = CookieState.new(creation-time => DateTime.now,
                                      last-access-time => DateTime.now);
-
             ($state.persistent, $state.expiry-time) = self!checkCookieAge($_);
             $domain = $_.domain // '';
             if not $domain eq '' {
