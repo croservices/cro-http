@@ -31,6 +31,10 @@ class X::Cro::HTTP::Error is Exception {
     method message() {
         "{$.response.get-response-phrase}"
     }
+
+    method request() {
+        $!response.request
+    }
 }
 
 class X::Cro::HTTP::Error::Client is X::Cro::HTTP::Error {}
