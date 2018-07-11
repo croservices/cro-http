@@ -391,13 +391,26 @@ constant %key-cert := {
 
     given await $client.get("$base/single-redirect") -> $resp {
         is $resp.status, 308, 'Get redirect response';
+        ok $resp.request.defined, 'Request is set for redirected response';
     }
 
     $client = Cro::HTTP::Client.new;
 
-    throws-like { await $client.get("$base/eternal-redirect") },
-        X::Cro::HTTP::Client::TooManyRedirects,
-        'Client detects too many redirects';
+    {
+        try {
+            await $client.get("$base/eternal-redirect");
+        }
+        CATCH {
+            when X::Cro::HTTP::Client::TooManyRedirects {
+                ok True, 'Client detects too many redirects';
+                ok .response.request.defined, 'Request is set for eternal redirect exception';
+                ok .request.defined, 'Request is accessible using X::Cro::HTTP::Client exception shortcut';
+            }
+            default {
+                ok False, 'Got wrong exception type for eternal redirect';
+            }
+        }
+    }
 
     given await $client.get("$base/single-redirect",
                             body => 'The Seed') -> $resp {
