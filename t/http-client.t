@@ -153,6 +153,10 @@ constant %key-cert := {
         ok $resp ~~ Cro::HTTP::Response, 'base-uri argument works';
     }
 
+    given await Cro::HTTP::Client.get("http://localhost:{HTTP_TEST_PORT}/") -> $resp {
+        ok $resp.request.defined, 'Request object is associated with response'
+    }
+
     given await Cro::HTTP::Client.get("$base/") -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /';
         is $resp.status, 200, 'Status is 200';
