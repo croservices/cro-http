@@ -369,6 +369,9 @@ class Cro::HTTP::Client {
                         $pipeline.close;
                     }
 
+                    # Set request object for recieved response regardless it's correct or not
+                    .request = $request-object;
+
                     if 200 <= .status < 400 || .status == 101 {
                         my $follow;
                         if self {
@@ -392,15 +395,11 @@ class Cro::HTTP::Client {
                                        ?? construct-url($_.header('location'))
                                        !! .header('location');
                             my $req = self.request($new-method, $new-url, %new-opts);
-                            whenever $req {
-                                .request = $request-object;
-                                .emit
-                            };
+                            whenever $req { .emit };
                         } else {
                             if self && $.cookie-jar.defined {
                                 $.cookie-jar.add-from-response($_, $parsed-url);
                             }
-                            .request = $request-object;
                             .emit
                         }
                     } elsif 400 <= .status < 500 {
@@ -413,10 +412,7 @@ class Cro::HTTP::Client {
                         if .status == 401 && (%options<auth><if-asked>:exists) {
                             my %opts = %options;
                             %opts<auth><if-asked>:delete;
-                            whenever self.request($method, $parsed-url, %options) {
-                                .request = $request-object;
-                                .emit;
-                            };
+                            whenever self.request($method, $parsed-url, %options) { .emit };
                         } else {
                             die X::Cro::HTTP::Error::Client.new(response => $_);
                         }
