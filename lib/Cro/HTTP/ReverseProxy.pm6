@@ -8,9 +8,8 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Response }
 
-    # submethod BUILD(:$!to) {}
-
     method transformer(Supply $pipeline --> Supply) {
+        $!to .= substr(0, *-1) if $!to.ends-with('/');
         supply whenever $pipeline -> $request {
             unless $request ~~ Cro::HTTP::Request {
                 die "Request middleware {self.^name} emitted a $request.^name(), " ~
@@ -19,7 +18,18 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
             my %options;
             %options<headers> = $request.headers;
             %options<body> = await $request.body if $request.has-body;
-            emit (await $!client.request($request.method, $!to, %options));
+
+            my $target = $request.target;
+            $target .= substr(1..*) if $target.starts-with('/');
+
+            try {
+                emit (await $!client.request($request.method, "{$!to}/$target", %options));
+            }
+            CATCH {
+                default {
+                    .note
+                }
+            }
         }
     }
 }

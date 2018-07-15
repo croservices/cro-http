@@ -4,6 +4,8 @@ use Cro::HTTP::Router;
 use Cro::HTTP::Server;
 use Test;
 
+plan *;
+
 constant HTTP_TEST_PORT_PROXY = 31323;
 constant HTTPS_TEST_PORT_PROXY = 31325;
 
@@ -47,8 +49,7 @@ END {
 
 # Proxying all incoming requests
 {
-    my $proxy-app = Cro::HTTP::ReverseProxy.new(to => "http://localhost:{HTTP_TEST_PORT_A}/base");
-
+    my $proxy-app = Cro::HTTP::ReverseProxy.new(to => "http://localhost:{HTTP_TEST_PORT_A}/");
     my $proxy = Cro::HTTP::Server.new(
         port => HTTP_TEST_PORT_PROXY,
         application => $proxy-app
@@ -61,3 +62,23 @@ END {
         is await($resp.body-text), 'Home A', 'Body text from Proxy A';
     }
 }
+
+# Proxying just some routes
+{
+    my $proxy-app = route {
+        delegate <user *> => Cro::HTTP::ReverseProxy.new(to => "http://localhost:{HTTP_TEST_PORT_A}/");
+    }
+    my $proxy = Cro::HTTP::Server.new(
+        port => HTTP_TEST_PORT_PROXY,
+        application => $proxy-app
+    );
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
+    given await $c.get('/user/base') -> $resp {
+        is await($resp.body-text), 'Home A', 'Body text from Proxy A';
+    }
+}
+
+done-testing;
