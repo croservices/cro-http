@@ -68,7 +68,7 @@ END {
 
     my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
     given await $c.get('/base') -> $resp {
-        is await($resp.body-text), 'Home A', 'Body text from Proxy A';
+        is await($resp.body-text), 'Home A', 'Body text from Proxy A for all requests';
     }
 }
 
@@ -86,7 +86,7 @@ END {
 
     my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
     given await $c.get('/user/base') -> $resp {
-        is await($resp.body-text), 'Home A', 'Body text from Proxy A';
+        is await($resp.body-text), 'Home A', 'Body text from Proxy A using delegate';
     }
 }
 
@@ -108,6 +108,23 @@ END {
     }
     given await $c.get('/images/base/fox') -> $resp {
         is await($resp.body-text), 'Tail and ears', 'Body text from Proxy B for request B';
+    }
+}
+
+# Controlling the target URL
+{
+    my @servers = "http://localhost:{HTTP_TEST_PORT_A}/", "http://localhost:{HTTP_TEST_PORT_B}/";
+    my $proxy-app = Cro::HTTP::ReverseProxy.new(to => { .has-header('a') ?? @servers[0] !! @servers[1] });
+    my $proxy = Cro::HTTP::Server.new(port => HTTP_TEST_PORT_PROXY, application => $proxy-app);
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
+    given await $c.get('/base') -> $resp {
+        is await($resp.body-text), 'Home B', 'Body text from Proxy B from block';
+    }
+    given await $c.get('/base', headers => [a => 'foo']) -> $resp {
+        is await($resp.body-text), 'Home A', 'Body text from Proxy A from block';
     }
 }
 
