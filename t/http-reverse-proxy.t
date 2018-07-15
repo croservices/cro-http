@@ -29,6 +29,10 @@ my $app-b = route {
     get -> 'base' {
         content 'text/html', 'Home B';
     }
+
+    get -> 'kitsune' {
+        content 'text/html', 'Tail and ears';
+    }
 }
 
 my $server-a = Cro::HTTP::Server.new(port => HTTP_TEST_PORT_A, application => $app-a);
@@ -45,6 +49,11 @@ END {
     $server-as.stop;
     $server-b.stop;
     $server-bs.stop;
+}
+
+{
+    dies-ok { Cro::HTTP::ReverseProxy.new }, 'Cannot create ReverseProxy without target';
+    dies-ok { Cro::HTTP::ReverseProxy.new(to => 'foo', to-absolute => 'bar') }, 'Cannot create ReverseProxy with double target';
 }
 
 # Proxying all incoming requests
@@ -78,6 +87,27 @@ END {
     my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
     given await $c.get('/user/base') -> $resp {
         is await($resp.body-text), 'Home A', 'Body text from Proxy A';
+    }
+}
+
+# Proxying without appending the target URL
+{
+    my $proxy-app = route {
+        delegate <images *> => Cro::HTTP::ReverseProxy.new(:to-absolute("http://localhost:{HTTP_TEST_PORT_B}/kitsune"));
+    }
+    my $proxy = Cro::HTTP::Server.new(
+        port => HTTP_TEST_PORT_PROXY,
+        application => $proxy-app
+    );
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
+    given await $c.get('/images/base/kitsune') -> $resp {
+        is await($resp.body-text), 'Tail and ears', 'Body text from Proxy B for request A';
+    }
+    given await $c.get('/images/base/fox') -> $resp {
+        is await($resp.body-text), 'Tail and ears', 'Body text from Proxy B for request B';
     }
 }
 
