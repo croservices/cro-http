@@ -121,10 +121,27 @@ END {
 
     my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
     given await $c.get('/base') -> $resp {
-        is await($resp.body-text), 'Home B', 'Body text from Proxy B from block';
+        is await($resp.body-text), 'Home B', 'Body text from Proxy B from code block';
     }
     given await $c.get('/base', headers => [a => 'foo']) -> $resp {
-        is await($resp.body-text), 'Home A', 'Body text from Proxy A from block';
+        is await($resp.body-text), 'Home A', 'Body text from Proxy A from code block';
+    }
+}
+
+{
+    my $to = {
+        my $p = Promise.new;
+        Promise.in(1).then({ $p.keep("http://localhost:{HTTP_TEST_PORT_B}/") });
+        $p;
+    };
+    my $proxy-app = Cro::HTTP::ReverseProxy.new(:$to);
+    my $proxy = Cro::HTTP::Server.new(port => HTTP_TEST_PORT_PROXY, application => $proxy-app);
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
+    given await $c.get('/base') -> $resp {
+        is await($resp.body-text), 'Home B', 'Body text from Proxy B for Promise-like proxy URL generator';
     }
 }
 

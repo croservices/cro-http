@@ -36,17 +36,32 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
             my %options = headers => $request.headers;
             %options<body> = await $request.body if $request.has-body;
 
-            my $target = $request.target;
-            $target .= substr(1..*) if $target.starts-with('/');
-            my $forward;
-            if $!destination ~~ Str {
-                $forward = $!to ?? "{$!destination}/$target" !! $!to-absolute;
-            } else {
-                my $tmp = self!trim-url($!destination($request));
-                $forward = $!to ?? "$tmp/$target" !! $tmp;
+            whenever self!make-destination($request) {
+                my $res = await $!client.request($request.method, $_, %options);
+                emit $res;
             }
+        }
+    }
 
-            emit (await $!client.request($request.method, $forward, %options));
+    method !make-destination(Cro::HTTP::Request $request) {
+        my $target = $request.target;
+        $target .= substr(1..*) if $target.starts-with('/');
+        if $!destination ~~ Str {
+            my $p = Promise.new;
+            $p.keep($!to ?? "{$!destination}/$target" !! $!to-absolute);
+            return $p;
+        } else {
+            my $dest-p = $!destination($request);
+            if $dest-p ~~ Awaitable {
+                return $dest-p.then({ .status ~~ Kept ?? do { my $url = self!trim-url(.result);
+                                                              $!to ?? "$url/$target" !! "$url"
+                                                            } !! die 'Failed to get URL' });
+            } else {
+                my $p = Promise.new;
+                my $tmp = self!trim-url($dest-p);
+                $p.keep($!to ?? "$tmp/$target" !! $tmp);
+                return $p;
+            }
         }
     }
 }
