@@ -5,9 +5,10 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
     has $.to;
     has $.to-absolute;
     has $!destination;
-    has $!client = Cro::HTTP::Client.new;
+    has $!client;
     has $.request;
     has $.response;
+    has %.ca;
 
     submethod TWEAK() {
         unless ($!to.defined ^^ $!to-absolute.defined) {
@@ -22,6 +23,9 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
         else {
             $!destination = $!to-absolute;
         }
+
+        my %args = %!ca ?? (:%!ca, :http<1.1 2>) !! ();
+        $!client = Cro::HTTP::Client.new(|%args);
     }
 
     method consumes() { Cro::HTTP::Request }
