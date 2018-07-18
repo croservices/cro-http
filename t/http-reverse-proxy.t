@@ -163,4 +163,38 @@ END {
     }
 }
 
+{
+    my class ProxyState {
+        has Str $.value;
+    }
+    my $proxy-app = Cro::HTTP::ReverseProxy.new(
+        to => "http://localhost:{HTTP_TEST_PORT_A}/",
+        request => sub ($request) {
+            $*PROXY-STATE = ProxyState.new(value => $request.header('state'));
+        },
+        response => {
+            .append-header('result', $*PROXY-STATE.value);
+        });
+
+    my $proxy = Cro::HTTP::Server.new(port => HTTP_TEST_PORT_PROXY, application => $proxy-app);
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
+    await Promise.allof(
+        start {
+            given await $c.get('/base', headers => [state => 'foo']) -> $resp {
+                ok $resp.header("result") eq 'foo', 'Proxy state was preserved';
+                is await($resp.body-text), 'Home A', 'Body text from Proxy A 1';
+            }
+        },
+        start {
+            given await $c.get('/base', headers => [state => 'bar']) -> $resp {
+                ok $resp.header("result") eq 'bar', 'Proxy state was preserved';
+                is await($resp.body-text), 'Home A', 'Body text from Proxy A 2';
+            }
+        }
+    );
+}
+
 done-testing;

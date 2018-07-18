@@ -31,6 +31,7 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
 
     method transformer(Supply $pipeline --> Supply) {
         supply whenever $pipeline -> $request {
+            my $*PROXY-STATE;
             sub send($request) {
                 my %options = headers => $request.headers,
                               body => await $request.body if $request.has-body;
@@ -38,7 +39,7 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
                 whenever self!make-destination($request) {
                     my $response = await $!client.request($request.method, $_, %options);
                     my $res = $!response ?? $!response($response) !! $response;
-                    $res = $response unless $res.defined;
+                    $res = $response unless $res.defined && $res ~~ Cro::HTTP::Response;
                     if $res ~~ Awaitable {
                         whenever $res { emit $_ }
                     } else {
@@ -53,7 +54,7 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
             }
 
             my $req = $!request ?? $!request($request) !! $request;
-            $req = $request unless $req.defined;
+            $req = $request unless $req.defined && $req ~~ Cro::HTTP::Request;
             if $req ~~ Awaitable {
                 whenever $req { send($req) }
             } else {
