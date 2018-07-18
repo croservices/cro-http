@@ -33,6 +33,9 @@ my $app-b = route {
     get -> 'kitsune' {
         content 'text/html', 'Tail and ears';
     }
+    get -> 'header', :$header {
+        content 'text/html', 'With header'
+    }
 }
 
 my $server-a = Cro::HTTP::Server.new(port => HTTP_TEST_PORT_A, application => $app-a);
@@ -142,6 +145,21 @@ END {
     my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
     given await $c.get('/base') -> $resp {
         is await($resp.body-text), 'Home B', 'Body text from Proxy B for Promise-like proxy URL generator';
+    }
+}
+
+{
+    my $proxy-app = Cro::HTTP::ReverseProxy.new(to =>  "http://localhost:{HTTP_TEST_PORT_B}/",
+                                                request => { .append-header('header', 'TRUE') },
+                                                response => { .append-header('back', 'TRUE') });
+    my $proxy = Cro::HTTP::Server.new(port => HTTP_TEST_PORT_PROXY, application => $proxy-app);
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
+    given await $c.get('/header') -> $resp {
+        ok $resp.has-header("Back"), "Has header set by response handler";
+        is await($resp.body-text), 'With header', 'Request handler was executed';
     }
 }
 

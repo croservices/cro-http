@@ -6,6 +6,8 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
     has $.to-absolute;
     has $!destination;
     has $!client = Cro::HTTP::Client.new;
+    has $.request;
+    has $.response;
 
     submethod TWEAK() {
         unless ($!to.defined ^^ $!to-absolute.defined) {
@@ -29,16 +31,33 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
 
     method transformer(Supply $pipeline --> Supply) {
         supply whenever $pipeline -> $request {
+            sub send($request) {
+                my %options = headers => $request.headers,
+                              body => await $request.body if $request.has-body;
+
+                whenever self!make-destination($request) {
+                    my $response = await $!client.request($request.method, $_, %options);
+                    my $res = $!response ?? $!response($response) !! $response;
+                    $res = $response unless $res.defined;
+                    if $res ~~ Awaitable {
+                        whenever $res { emit $_ }
+                    } else {
+                        emit $res;
+                    }
+                }
+            }
+
             unless $request ~~ Cro::HTTP::Request {
                 die "Request middleware {self.^name} emitted a $request.^name(), " ~
                     "but a Cro::HTTP::Request was required";
             }
-            my %options = headers => $request.headers;
-            %options<body> = await $request.body if $request.has-body;
 
-            whenever self!make-destination($request) {
-                my $res = await $!client.request($request.method, $_, %options);
-                emit $res;
+            my $req = $!request ?? $!request($request) !! $request;
+            $req = $request unless $req.defined;
+            if $req ~~ Awaitable {
+                whenever $req { send($req) }
+            } else {
+                send($req);
             }
         }
     }
