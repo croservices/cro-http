@@ -218,4 +218,22 @@ END {
     }
 }
 
+# Cross testing - case 1.1 to 2
+{
+    my $proxy-app = Cro::HTTP::ReverseProxy.new(to => "https://localhost:{HTTPS_TEST_PORT_A}/", :%ca);
+    my $proxy = Cro::HTTP::Server.new(
+        port => HTTPS_TEST_PORT_PROXY,
+        application => $proxy-app,
+        :http<1.1 2>,
+        tls => %key-cert
+    );
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "https://localhost:{HTTPS_TEST_PORT_PROXY}", :http<1.1>, :%ca);
+    given await $c.get('/base') -> $resp {
+        is await($resp.body-text), 'Home A', 'Proxy for http 1-2 scheme';
+    }
+}
+
 done-testing;
