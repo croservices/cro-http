@@ -53,7 +53,7 @@ my constant %reason-phrases = {
 
 class Cro::HTTP::Response does Cro::HTTP::Message {
     subset StatusCode of Int where { 100 <= $_ <= 599 }
-    has Cro::HTTP::Request $.request;
+    has Cro::HTTP::Request $.request is rw;
     has StatusCode $.status is rw;
     has Cro::BodyParserSelector $.body-parser-selector is rw =
         Cro::HTTP::BodyParserSelector::ResponseDefault;

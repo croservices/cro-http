@@ -31,6 +31,10 @@ class X::Cro::HTTP::Error is Exception {
     method message() {
         "{$.response.get-response-phrase}"
     }
+
+    method request() {
+        $!response.request
+    }
 }
 
 class X::Cro::HTTP::Error::Client is X::Cro::HTTP::Error {}
@@ -364,6 +368,9 @@ class Cro::HTTP::Client {
                     else {
                         $pipeline.close;
                     }
+
+                    # Set request object for recieved response regardless it's correct or not
+                    .request = $request-object;
 
                     if 200 <= .status < 400 || .status == 101 {
                         my $follow;
