@@ -48,8 +48,8 @@ sub test-example($frame, $result, $desc) {
                 };
             }
             $fake-in-p.emit: Cro::TCP::Message.new(
-                data => utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
-                                 46,48,13,10,13,10,83,77,13,10,13,10));
+                data => Buf.new(80,82,73,32,42,32,72,84,84,80,47,50,
+                                46,48,13,10,13,10,83,77,13,10,13,10));
             $fake-in-p.emit($message);
             $fake-in-p.done;
         }
@@ -95,13 +95,13 @@ sub test-multi($frame, @result, $size, $max-frame-size, $desc) {
 }
 
 test-example Cro::HTTP2::Frame::Data.new(flags => 1, stream-identifier => 1,
-                                         data => 'testdata'.encode),
+                                         data => Buf.new('testdata'.encode)),
     Buf.new([0x00, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00,
              0x01, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61]),
     'Simple data frame';
 
 test-example Cro::HTTP2::Frame::Data.new(flags => 9, stream-identifier => 1,
-                                         data => 'testdata'.encode,
+                                         data => Buf.new('testdata'.encode),
                                          padding-length => 10),
     Buf.new([0x00, 0x00, 0x13, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01,
              0x0A, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61, 0x74, 0x61,
@@ -158,7 +158,7 @@ test-example Cro::HTTP2::Frame::Settings.new(flags => 0, stream-identifier => 0,
     'Simple Settings frame';
 
 test-example Cro::HTTP2::Frame::PushPromise.new(flags => 4, stream-identifier => 1,
-                                                promised-sid => 4, headers => 'hello world'.encode),
+                                                promised-sid => 4, headers => Buf.new('hello world'.encode)),
     Buf.new([0x00, 0x00, 0x0F, 0x05, 0x04, 0x00, 0x00, 0x00, 0x01,
              0x00, 0x00, 0x00, 0x04,
              0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64]),
@@ -166,7 +166,7 @@ test-example Cro::HTTP2::Frame::PushPromise.new(flags => 4, stream-identifier =>
 
 test-example Cro::HTTP2::Frame::PushPromise.new(flags => 8, stream-identifier => 1,
                                                 padding-length => 1,
-                                                promised-sid => 4, headers => 'hello world'.encode),
+                                                promised-sid => 4, headers => Buf.new('hello world'.encode)),
     Buf.new([0x00, 0x00, 0x11, 0x05, 0x08, 0x00, 0x00, 0x00, 0x01,
              0x01, 0x00, 0x00, 0x00, 0x04,
              0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x00]),
@@ -185,14 +185,14 @@ dies-ok {
 
 test-example Cro::HTTP2::Frame::GoAway.new(flags => 0, stream-identifier => 0,
                                            last-sid => 64, error-code => REFUSED_STREAM,
-                                           debug => 'hello'.encode),
+                                           debug => Buf.new('hello'.encode)),
     Buf.new([0x00, 0x00, 0x0D, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x07, 0x68, 0x65, 0x6c, 0x6c, 0x6f]),
     'Simple GoAway frame';
 
 test-example Cro::HTTP2::Frame::GoAway.new(flags => 0, stream-identifier => 0,
                                            last-sid => 64, error-code => 50,
-                                           debug => 'hello'.encode),
+                                           debug => Buf.new('hello'.encode)),
     Buf.new([0x00, 0x00, 0x0D, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
              0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x02, 0x68, 0x65, 0x6c, 0x6c, 0x6f]),
     'GoAway frame with a custom error treats it as INTERNAL_ERROR';
@@ -204,7 +204,7 @@ test-example Cro::HTTP2::Frame::WindowUpdate.new(flags => 0, stream-identifier =
     'Simple WindowUpdate frame';
 
 test-example Cro::HTTP2::Frame::Continuation.new(flags => 4, stream-identifier => 1,
-                                                 headers => 'hello world'.encode),
+                                                 headers => Buf.new('hello world'.encode)),
     Buf.new([0x00, 0x00, 0x0B, 0x09, 0x04, 0x00, 0x00, 0x00, 0x01,
              0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64]),
     'Simple Continuation frame';

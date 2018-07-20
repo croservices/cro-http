@@ -33,8 +33,8 @@ sub test-dying($data, $exception, $code, $desc) {
     start {
         # Preface
         $fake-in.emit: Cro::TCP::Message.new(
-            data => utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
-                             46,48,13,10,13,10,83,77,13,10,13,10));
+            data => Buf.new(80,82,73,32,42,32,72,84,84,80,47,50,
+                            46,48,13,10,13,10,83,77,13,10,13,10));
         $fake-in.emit(Cro::TCP::Message.new: :$data);
     }
     await Promise.anyof($complete, Promise.in(5));
@@ -75,8 +75,8 @@ sub test-example($buffer, $result, $desc, :$settings-test) {
     start {
         # Preface
         $fake-in-p.emit: Cro::TCP::Message.new(
-            data => utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
-                             46,48,13,10,13,10,83,77,13,10,13,10));
+            data => Buf.new(80,82,73,32,42,32,72,84,84,80,47,50,
+                            46,48,13,10,13,10,83,77,13,10,13,10));
         $fake-in-p.emit(Cro::TCP::Message.new: data => $buffer);
         $fake-in-p.done;
     }
@@ -94,21 +94,21 @@ test-dying Buf.new([0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01,
 test-example Buf.new([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]),
              Cro::HTTP2::Frame::Data.new(
                  flags => 0, stream-identifier => 1,
-                 data => utf8.new),
+                 data => Buf.new),
              'Empty DATA frame';
 
 test-example Buf.new([0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
                       0x61]),
              Cro::HTTP2::Frame::Data.new(
                  flags => 0, stream-identifier => 1,
-                 data => 'a'.encode),
+                 data => Buf.new('a'.encode)),
              'DATA frame without padding';
 
 test-example Buf.new([0x00, 0x00, 0x07, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01,
                       0x00, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72]),
              Cro::HTTP2::Frame::Data.new(
                  flags => 8, stream-identifier => 1,
-                 padding-length => 0, data => 'header'.encode),
+                 padding-length => 0, data => Buf.new('header'.encode)),
              'DATA frame with zero padding';
 
 test-example Buf.new([0x00, 0x00, 0x12, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01,
@@ -116,7 +116,7 @@ test-example Buf.new([0x00, 0x00, 0x12, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01,
                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
              Cro::HTTP2::Frame::Data.new(
                  flags => 8, stream-identifier => 1,
-                 padding-length => 10, data => 'payload'.encode),
+                 padding-length => 10, data => Buf.new('payload'.encode)),
              'DATA frame with padding';
 
 test-dying Buf.new([0x00, 0x00, 0x01, 0x01, 0x08, 0x00, 0x00, 0x00, 0x01,
