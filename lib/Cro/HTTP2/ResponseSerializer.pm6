@@ -49,7 +49,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionSta
                     whenever $resp.push-promises() {
                         my @headers = .headers.map({ HTTP::HPACK::Header.new(
                                                            name  => .name.lc,
-                                                           value => .value.Str.lc) });
+                                                           value => .value.Str) });
                         @headers.unshift: HTTP::HPACK::Header.new(
                             name => ':path',
                             value => .target);
@@ -79,7 +79,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionSta
 
                 my @headers = $resp.headers.map({ HTTP::HPACK::Header.new(
                                                         name  => .name.lc,
-                                                        value => .value.Str.lc) });
+                                                        value => .value.Str) });
                 @headers.unshift: HTTP::HPACK::Header.new(
                     name => ':status',
                     value => $resp.status.Str);
