@@ -13,10 +13,23 @@ my $fake-now = now;
 
 my class SessionData does Cro::HTTP::Auth {
     has $.count is rw = 0;
+    has Bool $.login is rw = False;
 }
+
+subset Logged of SessionData where *.login;
+
 my $app = route {
     get -> SessionData $session, 'hits' {
         content 'text/plain', 'Visit ' ~ ++$session.count;
+    }
+
+    get -> SessionData $session, 'login' {
+        $session.login = True;
+        content 'text/plain', 'Logged in';
+    }
+
+    get -> Logged $session, 'hits2' {
+        content 'text/plain', 'Visit2 ' ~ ++$session.count;
     }
 }
 
@@ -46,15 +59,20 @@ monitor FakePersistent does Cro::HTTP::Session::Persistent[SessionData] {
             }
         };
     }
+
+    method purge() {
+        %!fake-db = hash;
+    }
 }
+
+my $persistent = FakePersistent.new:
+  expiration => Duration.new(60 * 30),
+  now => { $fake-now },
+  cookie-name => '_session';
 
 my $service = Cro::HTTP::Server.new(
     :host('localhost'), :port(TEST_PORT), application => $app,
-    before => FakePersistent.new(
-        expiration => Duration.new(60 * 30),
-        now => { $fake-now },
-        cookie-name => '_session'
-    )
+    before => $persistent
 );
 $service.start;
 END $service.stop();
@@ -112,6 +130,32 @@ given Cro::HTTP::Client.new(:cookie-jar) -> $client {
     $fake-now += Duration.new(31 * 60);
     given await $client.get("$url/hits") {
         is await(.body-text), 'Visit 1', 'Session expires appropriately';
+    }
+}
+
+given Cro::HTTP::Client.new(:cookie-jar) -> $client {
+    # Create session for two routes
+    given await $client.get("$url/login") {
+        is await(.body-text), 'Logged in', "Logging";
+    }
+    given await $client.get("$url/hits") {
+        is await(.body-text), 'Visit 1', "New session for route 1";
+    }
+    given await $client.get("$url/hits2") {
+        is await(.body-text), 'Visit2 2', "Using old session for route 2";
+    }
+
+    # Clearing DB
+    $persistent.purge;
+
+    given await $client.get("$url/hits") {
+        is await(.body-text), 'Visit 1', "New session for route 1";
+    }
+    given await $client.get("$url/login") {
+        is await(.body-text), 'Logged in', "Logging";
+    }
+    given await $client.get("$url/hits2") {
+        is await(.body-text), 'Visit2 2', "Using old session for route 2";
     }
 }
 

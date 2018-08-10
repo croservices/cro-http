@@ -14,7 +14,6 @@ role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::Requ
     method cookie-name() { $!cookie-name }
 
     method process-requests(Supply $requests) {
-        my %cookie-opts = max-age => $!expiration, :http-only;
         supply whenever $requests -> $req {
             self.clear();
             $req.auth = TSession.new;
@@ -23,9 +22,11 @@ role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::Requ
                 try {
                     my $session = self.load($cookie-value);
                     $req.auth = $session;
-                }
-                CATCH {
-                    $req.remove-cookie($!cookie-name);
+                    CATCH {
+                        default {
+                            $req.remove-cookie($!cookie-name);
+                        }
+                    }
                 }
             }
             emit $req;
@@ -33,7 +34,7 @@ role Cro::HTTP::Session::Persistent[::TSession] does Cro::HTTP::Middleware::Requ
     }
 
     method process-responses(Supply $responses) {
-        my %cookie-opts = max-age => $!expiration, :http-only;
+        my %cookie-opts = max-age => $!expiration, :http-only, path => '/';
         supply whenever $responses -> $res {
             with $res.request.cookie-value($!cookie-name) {
                 $res.set-cookie($!cookie-name, $_, |%cookie-opts);
