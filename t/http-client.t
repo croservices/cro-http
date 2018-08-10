@@ -83,22 +83,22 @@ constant %key-cert := {
         }
 
         # Cookie section
-        get -> 'first-pass' {
+        get -> 'cookie-one', :$First! is cookie {
+            content 'text/plain', 'First was sent';
+        }
+        get -> 'cookie-one' {
             set-cookie 'First', 'Done';
-            content 'text/plain', 'Done';
+            content 'text/plain', 'First is set';
         }
-        get -> 'second-pass', :$First! is cookie {
+        get -> 'cookie-two', :$Second! is cookie {
+            content 'text/plain', 'Second was sent';
+        }
+        get -> 'cookie-two' {
             set-cookie 'Second', 'Done';
-            content 'text/plain', 'Done';
+            content 'text/plain', 'Second is set';
         }
-        get -> 'second-pass', {
-            content 'text/plain', 'It was a good attempt';
-        }
-        get -> 'third-pass', :$First! is cookie, :$Second! is cookie {
-            content 'text/plain', 'Done';
-        }
-        get -> 'third-pass', {
-            content 'text/plain', 'Nice try';
+        get -> 'cookie-three', :$First! is cookie, :$Second! is cookie {
+            content 'text/plain', 'Cookies are present';
         }
         get -> 'eternal-redirect' {
             redirect :permanent, "http://localhost:{HTTP_TEST_PORT}/eternal-redirect";
@@ -286,24 +286,26 @@ constant %key-cert := {
     my $jar = Cro::HTTP::Client::CookieJar.new;
     lives-ok { $client = Cro::HTTP::Client.new(cookie-jar => $jar); }, 'Predefined jar of cookies';
 
-    await $client.get("$base/first-pass");
-    given await $client.get("$base/second-pass") -> $resp {
-        is await($resp.body-text), 'Done', 'Browser-like cookie handling works';
+    given await $client.get("$base/cookie-one") -> $resp {
+        is await($resp.body-text), 'First is set', 'Browser-like cookie handling works 1';
+    }
+    given await $client.get("$base/cookie-one") -> $resp {
+        is await($resp.body-text), 'First was sent', 'Browser-like cookie handling works 2';
     }
 
-    given await $client.get("$base/third-pass") -> $resp {
-        is await($resp.body-text), 'Done', 'Multiple cookie are handled well';
+    given await $client.get("$base/cookie-two") -> $resp {
+        is await($resp.body-text), 'Second is set', 'Browser-like cookie handling works 3';
     }
+    given await $client.get("$base/cookie-two") -> $resp {
+        is await($resp.body-text), 'Second was sent', 'Browser-like cookie handling works 4';
+    }
+
+    throws-like { await $client.get("$base/cookie-three") }, X::Cro::HTTP::Error::Client,
+      'Cookies for routes 1 and 2 were not sent for 3';
 
     $client = Cro::HTTP::Client.new;
-    await $client.get("$base/first-pass");
-    given await $client.get("$base/second-pass") -> $resp {
-        is await($resp.body-text), 'It was a good attempt', 'Cookies were not handled';
-    }
-
-    $client = Cro::HTTP::Client.new;
-    given await $client.get("$base/second-pass", :cookies(First => 'Done',)) -> $resp {
-        is await($resp.body-text), 'Done', 'Cookies set externally work';
+    given await $client.get("$base/cookie-three", :cookies(First => 'Done', Second => 'Done',)) -> $resp {
+        is await($resp.body-text), 'Cookies are present', 'Cookies set externally work';
     }
 
     $client = Cro::HTTP::Client.new: content-type => 'text/plain';
