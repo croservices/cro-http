@@ -187,8 +187,8 @@ subtest {
 
     {
         my $mw-app = route {
-            before LowerCase;
-            after StrictTransportSecurity.new(max-age => Duration.new(60));
+            before-matched LowerCase;
+            after-matched StrictTransportSecurity.new(max-age => Duration.new(60));
             delegate <*> => $application;
         }
 
@@ -200,9 +200,9 @@ subtest {
 
         given await Cro::HTTP::Client.get("$url/index.SHTML") -> $resp {
             is await($resp.body-text), 'Correct Answer',
-                'Request middleware works with before in route block';
+                'Request middleware works with before-matched in route block';
             is $resp.header('Strict-Transport-Security'), "max-age=60",
-                'Response middleware works with after in route block';
+                'Response middleware works with after-matched in route block';
         }
     }
 }, 'Request and response middleware written using a Cro::HTTP::Middleware roles';
@@ -239,7 +239,7 @@ subtest {
 
     {
         my $mw-app = route {
-            before ForbiddenWithoutAuthHeader;
+            before-matched ForbiddenWithoutAuthHeader;
             delegate <*> => $application;
         }
 
@@ -252,17 +252,17 @@ subtest {
         throws-like { await Cro::HTTP::Client.get("$url") },
             X::Cro::HTTP::Error::Client,
             response => { .status == 403 },
-            'Got 403 response from middleware when no auth header (before in router)';
+            'Got 403 response from middleware when no auth header (before-matched in router)';
 
         my %headers = Authorization => 'Bearer Polarer';
         given await Cro::HTTP::Client.get("$url", :%headers) -> $resp {
-            is $resp.status, 200, 'Got 200 normal response with an auth header (before in router)';
+            is $resp.status, 200, 'Got 200 normal response with an auth header (before-matched in router)';
         }
     }
 
     {
         my $mw-app = route {
-            before ForbiddenWithoutAuthHeader;
+            before-matched ForbiddenWithoutAuthHeader;
             include $application;
         }
 
@@ -275,12 +275,12 @@ subtest {
         throws-like { await Cro::HTTP::Client.get("$url") },
             X::Cro::HTTP::Error::Client,
             response => { .status == 403 },
-            'Got 403 response from middleware when no auth header (before + include in router)';
+            'Got 403 response from middleware when no auth header (before-matched + include in router)';
 
         my %headers = Authorization => 'Bearer Polarer';
         given await Cro::HTTP::Client.get("$url", :%headers) -> $resp {
             is $resp.status, 200,
-                'Got 200 normal response with an auth header (before + include in router)';
+                'Got 200 normal response with an auth header (before-matched + include in router)';
         }
     }
 }, 'Conditional response middleware using Cro::HTTP::Middleware::Conditional';
@@ -337,7 +337,7 @@ subtest {
 
     {
         my $mw-app = route {
-            before OverlySimpleCache.new;
+            before-matched OverlySimpleCache.new;
             delegate <*> => $application;
         }
 
@@ -348,22 +348,22 @@ subtest {
         LEAVE $service.stop();
 
         given await Cro::HTTP::Client.get("$url/counter") -> $resp {
-            is $resp.status, 200, 'Got 200 response on first request (before in router)';
-            ok $resp.has-header('X-Uncached'), 'Response part added header (before in router)';
-            is await($resp.body-text), '2', 'Expected body (before in router)';
+            is $resp.status, 200, 'Got 200 response on first request (before-matched in router)';
+            ok $resp.has-header('X-Uncached'), 'Response part added header (before-matched in router)';
+            is await($resp.body-text), '2', 'Expected body (before-matched in router)';
         }
 
         given await Cro::HTTP::Client.get("$url/counter") -> $resp {
-            is $resp.status, 200, 'Got 200 response on second request (before in router)';
+            is $resp.status, 200, 'Got 200 response on second request (before-matched in router)';
             nok $resp.has-header('X-Uncached'),
-                'Response part did not run on early response (before in router)';
-            is await($resp.body-text), '2', 'Got cached body (before in router)';
+                'Response part did not run on early response (before-matched in router)';
+            is await($resp.body-text), '2', 'Got cached body (before-matched in router)';
         }
     }
 
     {
         my $mw-app = route {
-            before OverlySimpleCache.new;
+            before-matched OverlySimpleCache.new;
             include $application;
         }
 
@@ -375,19 +375,19 @@ subtest {
 
         given await Cro::HTTP::Client.get("$url/counter") -> $resp {
             is $resp.status, 200,
-                'Got 200 response on first request (before + include in router)';
+                'Got 200 response on first request (before-matched + include in router)';
             ok $resp.has-header('X-Uncached'),
-                'Response part added header (before + include in router)';
-            is await($resp.body-text), '3', 'Expected body (before + include in router)';
+                'Response part added header (before-matched + include in router)';
+            is await($resp.body-text), '3', 'Expected body (before-matched + include in router)';
         }
 
         given await Cro::HTTP::Client.get("$url/counter") -> $resp {
             is $resp.status, 200,
-                'Got 200 response on second request (before + include in router)';
+                'Got 200 response on second request (before-matched + include in router)';
             nok $resp.has-header('X-Uncached'),
-                'Response part did not run on early response (before + include in router)';
+                'Response part did not run on early response (before-matched + include in router)';
             is await($resp.body-text), '3',
-                'Got cached body (before + include in router)';
+                'Got cached body (before-matched + include in router)';
         }
     }
 }, 'Request/response middleware using Cro::HTTP::Middleware::RequestResponse';
@@ -489,8 +489,8 @@ subtest {
     }
 
     my $inner-redef = route {
-        before PreHeaderMiddleware.new(:value<Rock>);
-        after  PostHeaderMiddleware.new(:value<Roll>);
+        before-matched PreHeaderMiddleware.new(:value<Rock>);
+        after-matched  PostHeaderMiddleware.new(:value<Roll>);
 
         get -> 'home-redef' {
             if request.header('Custom-header') eq 'foo,Rock' {
@@ -513,8 +513,8 @@ subtest {
 
     # Application with built-in middleware
     my $app = route {
-        before PreHeaderMiddleware.new(:value<foo>);
-        after  PostHeaderMiddleware.new(:value<bar>);
+        before-matched PreHeaderMiddleware.new(:value<foo>);
+        after-matched  PostHeaderMiddleware.new(:value<bar>);
         get -> {
             if request.header('Custom-header') eq 'foo' {
                 content 'text/html', "Correct Answer";
@@ -534,33 +534,33 @@ subtest {
         $service.start;
 
         given await Cro::HTTP::Client.get("$url/") -> $resp {
-            is $resp.header('Post-Custom'), 'bar', 'per-route after middleware for regular request works';
-            is await($resp.body-text), 'Correct Answer', 'per-route before middleware for regular request works';
+            is $resp.header('Post-Custom'), 'bar', 'per-route after-matched middleware for regular request works';
+            is await($resp.body-text), 'Correct Answer', 'per-route before-matched middleware for regular request works';
         }
 
         given await Cro::HTTP::Client.get("$url/d") -> $resp {
-            is $resp.header('Post-Custom'), 'bar', 'per-route after middleware for delegated request works';
-            is await($resp.body-text), 'Correct Answer', 'per-route before middleware for delegated request works';
+            is $resp.header('Post-Custom'), 'bar', 'per-route after-matched middleware for delegated request works';
+            is await($resp.body-text), 'Correct Answer', 'per-route before-matched middleware for delegated request works';
         }
 
         given await Cro::HTTP::Client.get("$url/home") -> $resp {
-            is $resp.header('Post-Custom'), 'bar', 'per-route after middleware for includee works';
-            is await($resp.body-text), 'Correct Answer', 'per-route before middleware for includee works';
+            is $resp.header('Post-Custom'), 'bar', 'per-route after-matched middleware for includee works';
+            is await($resp.body-text), 'Correct Answer', 'per-route before-matched middleware for includee works';
         }
 
         given await Cro::HTTP::Client.get("$url/home-redef") -> $resp {
-            is $resp.header('Post-Custom'), 'Roll,bar', 'per-route after middleware for includee works';
-            is await($resp.body-text), 'Correct Answer', 'per-route before middleware for includee works';
+            is $resp.header('Post-Custom'), 'Roll,bar', 'per-route after-matched middleware for includee works';
+            is await($resp.body-text), 'Correct Answer', 'per-route before-matched middleware for includee works';
         }
 
         LEAVE $service.stop();
     }
 
     my $block-app = route {
-        after {
+        after-matched {
             header 'Strict-transport-security', 'max-age=31536000; includeSubDomains';
         }
-        before {
+        before-matched {
             .append-header('Custom-header', 'Foo');
         }
         get -> {
@@ -579,15 +579,16 @@ subtest {
         $service.start;
 
         given await Cro::HTTP::Client.get("$url/") -> $resp {
-            is await($resp.body-text), 'Correct Answer', 'per-route block before middleware works';
-            is $resp.header('Strict-transport-security'), 'max-age=31536000; includeSubDomains', 'per-route block after middleware works';
+            is await($resp.body-text), 'Correct Answer', 'per-route block before-matched middleware works';
+            is $resp.header('Strict-transport-security'), 'max-age=31536000; includeSubDomains',
+                'per-route block after-matched middleware works';
         }
         LEAVE $service.stop();
     }
 
     dies-ok {
         my $block-app = route {
-            after PreHeaderMiddleware.new(:value<foo>);
+            after-matched PreHeaderMiddleware.new(:value<foo>);
             get -> {
                 content 'text/html', 'Dies';
             }
@@ -597,7 +598,7 @@ subtest {
 
 subtest {
     my $mw-app = route {
-        before {
+        before-matched {
             forbidden unless .has-header('Authorization');
         }
 
@@ -615,13 +616,13 @@ subtest {
     throws-like { await Cro::HTTP::Client.get("$url") },
         X::Cro::HTTP::Error::Client,
         response => { .status == 403 },
-        'Block form of before in router can produce an early response';
+        'Block form of before-matched in router can produce an early response';
 
     my %headers = Authorization => 'Bearer Polarer';
     given await Cro::HTTP::Client.get("$url", :%headers) -> $resp {
         is $resp.status, 200,
-            'Block form of before not producing a response also works';
+            'Block form of before-matched not producing a response also works';
     }
-}, 'Conditional response in block form of before in router';
+}, 'Conditional response in block form of before-matched in router';
 
 done-testing;
