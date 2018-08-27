@@ -203,6 +203,7 @@ module Cro::HTTP::Router {
         has @.before-matched;
         has @.after-matched;
         has $!path-matcher;
+        has @!handlers-to-add;  # Closures to defer adding, so they get all the middleware
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -261,7 +262,9 @@ module Cro::HTTP::Router {
         }
 
         method add-handler(Str $method, &implementation --> Nil) {
-            @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched));
+            @!handlers-to-add.push: {
+                @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched));
+            }
         }
 
         method add-body-parser(Cro::BodyParser $parser --> Nil) {
@@ -287,19 +290,25 @@ module Cro::HTTP::Router {
             my $wildcard = @prefix[*-1] eq '*';
             my @new-prefix = @prefix;
             @new-prefix.pop if $wildcard;
-            @!handlers.push: DelegateHandler.new:
-               prefix => @new-prefix,
-               :$transform, :$wildcard, before-matched => @!before-matched, after-matched => @!after-matched;
+            @!handlers-to-add.push: {
+                @!handlers.push: DelegateHandler.new:
+                   prefix => @new-prefix,
+                   :$transform, :$wildcard, before-matched => @!before-matched, after-matched => @!after-matched;
+           }
         }
 
         method definition-complete(--> Nil) {
+            while @!handlers-to-add.shift -> &add {
+                add();
+            }
             for @!handlers {
                 .body-parsers = @!body-parsers;
                 .body-serializers = @!body-serializers;
             }
             for @!includes -> (:@prefix, :$includee) {
                 for $includee.handlers() {
-                    @!handlers.push(.copy-adding(:@prefix, :@!body-parsers, :@!body-serializers, :@!before-matched, :@!after-matched));
+                    @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
+                        :@!before-matched, :@!after-matched);
                 }
             }
             self!generate-route-matcher();

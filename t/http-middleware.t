@@ -625,4 +625,77 @@ subtest {
     }
 }, 'Conditional response in block form of before-matched in router';
 
+{
+    my class LowerCase does Cro::HTTP::Middleware::Request {
+        method process(Supply $requests --> Supply) {
+            supply whenever $requests -> $request {
+                $request.target = $request.target.lc;
+                emit $request;
+            }
+        }
+    }
+    my class StrictTransportSecurity does Cro::HTTP::Middleware::Response {
+        has Duration:D $.max-age is required;
+
+        method process(Supply $responses --> Supply) {
+            supply whenever $responses -> $response {
+                $response.append-header:
+                    'Strict-Transport-Security',
+                    "max-age=$!max-age";
+                emit $response;
+            }
+        }
+    }
+    my $mw-app = route {
+        delegate <*> => $application;
+        after-matched StrictTransportSecurity.new(max-age => Duration.new(60));
+        before-matched LowerCase;
+    }
+
+    my Cro::Service $service = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $mw-app
+    );
+    $service.start;
+    LEAVE $service.stop();
+
+    given await Cro::HTTP::Client.get("$url/index.SHTML") -> $resp {
+        is await($resp.body-text), 'Correct Answer',
+            'before-matched applies even to delegate done before it';
+        is $resp.header('Strict-Transport-Security'), "max-age=60",
+            'after-matched applies even to delegate done after it';
+    }
+}
+
+{
+    my $block-app = route {
+        get -> {
+            if request.header('Custom-header') eq 'Foo' {
+                content 'text/html', 'Correct Answer';
+            } else {
+                content 'text/html', 'Incorrect answer';
+            }
+        }
+        after-matched {
+            header 'Strict-transport-security', 'max-age=31536000; includeSubDomains';
+        }
+        before-matched {
+            .append-header('Custom-header', 'Foo');
+        }
+    }
+
+    {
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $block-app
+        );
+        $service.start;
+
+        given await Cro::HTTP::Client.get("$url/") -> $resp {
+            is await($resp.body-text), 'Correct Answer', 'before-matched applies even to a route before it';
+            is $resp.header('Strict-transport-security'), 'max-age=31536000; includeSubDomains',
+                'after-matched middleware applies even to a route before it';
+        }
+        LEAVE $service.stop();
+    }
+}
+
 done-testing;
