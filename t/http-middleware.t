@@ -698,4 +698,173 @@ subtest {
     }
 }
 
+{
+    my $before-p = Promise.new;
+    my $before-m-p = Promise.new;
+    my $after-p = Promise.new;
+    my $after-m-p = Promise.new;
+
+    my $app = route {
+        before-matched { $before-m-p.keep }
+        before { $before-p.keep }
+        after { $after-p.keep }
+        after-matched { $after-m-p.keep }
+    }
+
+    my Cro::Service $service = Cro::HTTP::Server.new(
+        :host('localhost'), :port(TEST_PORT), application => $app
+    );
+    $service.start;
+    LEAVE $service.stop();
+
+    dies-ok { await Cro::HTTP::Client.get("$url") }, 'Dies when no matched rule';
+    ok $before-p.status ~~ Kept, 'before block was executed';
+    ok $before-m-p.status !~~ Kept, 'before-matched block was not executed';
+    ok $after-p.status ~~ Kept, 'after block was executed';
+    ok $after-m-p.status !~~ Kept, 'after-matched block was not executed';
+}
+
+{
+    {
+        my $app = route {
+            before { $_.target = $_.target.lc }
+            after { $_.append-header('Strict-Transport-Security', "max-age=60") }
+            get -> 'home' { content 'text/html', "Home" }
+        }
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $app
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        given await Cro::HTTP::Client.get("$url/HOME") -> $resp {
+            is $resp.header('Strict-transport-security'), 'max-age=60', "before and after is run from block definition";
+        }
+    }
+
+    {
+        my class LowerCase does Cro::HTTP::Middleware::Request {
+            method process(Supply $requests --> Supply) {
+                supply whenever $requests -> $request {
+                    $request.target = $request.target.lc;
+                    emit $request;
+                }
+            }
+        }
+        my class StrictTransportSecurity does Cro::HTTP::Middleware::Response {
+            has Duration:D $.max-age is required;
+
+            method process(Supply $responses --> Supply) {
+                supply whenever $responses -> $response {
+                    $response.append-header('Strict-Transport-Security', "max-age=$!max-age");
+                    emit $response;
+                }
+            }
+        }
+
+        my $app = route {
+            before LowerCase.new;
+            after StrictTransportSecurity.new(max-age => Duration.new(12341234));
+            get -> 'home' { content 'text/html', "Home" }
+        }
+
+        my Cro::Service $service = Cro::HTTP::Server.new(
+            :host('localhost'), :port(TEST_PORT), application => $app
+        );
+        $service.start;
+        LEAVE $service.stop();
+
+        given await Cro::HTTP::Client.get("$url/HOME") -> $resp {
+            is $resp.header('Strict-transport-security'), 'max-age=12341234', "before and after is run from class definition";
+        }
+    }
+
+    {
+        my class Middle does Cro::HTTP::Middleware::RequestResponse {
+            method process-requests(Supply $requests) {
+                supply whenever $requests -> $r {
+                    $r.target = $r.target.lc;
+                    emit $r;
+                }
+            }
+            method process-responses(Supply $responses) {
+                supply whenever $responses -> $r {
+                    $r.append-header('Strict-Transport-Security', "max-age=6420");
+                    emit $r;
+                }
+            }
+        }
+
+        my $app = route {
+            before Middle.new;
+            get -> 'home' { content 'text/html', "Home" }
+        }
+
+        my Cro::Service $service = Cro::HTTP::Server.new(:host('localhost'), :port(TEST_PORT), application => $app);
+        $service.start;
+        LEAVE $service.stop();
+
+        given await Cro::HTTP::Client.get("$url/HOME") -> $resp {
+            is $resp.header('Strict-transport-security'), 'max-age=6420', "before and after is run from RequestResponse(Pair) definition";
+        }
+    }
+}
+
+{
+    my class MySession does Cro::HTTP::Auth {
+        has $.is-logged-in;
+        has $.is-admin;
+    }
+
+    subset LoggedIn of MySession where *.is-logged-in;
+    subset Admin of MySession where *.is-admin;
+
+    my class Fake::Auth::Middleware does Cro::HTTP::Middleware::Request {
+        has $.second is rw = False;
+
+        method process(Supply $requests --> Supply) {
+            supply whenever $requests -> $request {
+                $request.auth = $!second ?? MySession.new(:is-admin) !! MySession.new(:is-logged-in);
+                $!second = True;
+                emit $request;
+            }
+        }
+    }
+
+    my $middle = Fake::Auth::Middleware.new;
+    my $app = route {
+        before $middle;
+        after { redirect '/401' if .status == 401 }
+        get -> LoggedIn $user, 'foo' {
+            content 'text/plain', 'user';
+        }
+        get -> Admin $user, 'foo' {
+            content 'text/plain', 'admin';
+        }
+        get -> Admin $user, 'private' {
+            content 'text/plain', 'Top secret info';
+        }
+        get -> '401' {
+            content 'text/plain', 'Too bad';
+        }
+    }
+
+    my Cro::Service $service = Cro::HTTP::Server.new(:host('localhost'), :port(TEST_PORT), application => $app);
+    $service.start;
+    LEAVE $service.stop();
+
+    given await Cro::HTTP::Client.get("$url/foo") -> $resp {
+        is (await $resp.body-text), 'user', 'Auth middleware is applied';
+    }
+    given await Cro::HTTP::Client.get("$url/foo") -> $resp {
+        is (await $resp.body-text), 'admin', 'Auth middleware is applied 2';
+    }
+
+    $middle.second = False;
+
+    given await Cro::HTTP::Client.get("$url/private") -> $resp {
+        is (await $resp.body-text), 'Too bad', 'After middleware is applied';
+    }
+}
+
 done-testing;

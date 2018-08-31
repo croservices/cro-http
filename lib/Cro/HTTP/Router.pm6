@@ -200,6 +200,8 @@ module Cro::HTTP::Router {
         has Cro::BodyParser @.body-parsers;
         has Cro::BodySerializer @.body-serializers;
         has @.includes;
+        has @.before;
+        has @.after;
         has @.before-matched;
         has @.after-matched;
         has $!path-matcher;
@@ -277,6 +279,13 @@ module Cro::HTTP::Router {
 
         method add-include(@prefix, RouteSet $includee) {
             @!includes.push({ :@prefix, :$includee });
+        }
+
+        method add-before($middleware) {
+            @!before.push($middleware);
+        }
+        method add-after($middleware) {
+            @!after.push($middleware);
         }
 
         method add-before-matched($middleware) {
@@ -575,7 +584,13 @@ module Cro::HTTP::Router {
         my $*CRO-ROUTE-SET = RouteSet.new;
         route-definition();
         $*CRO-ROUTE-SET.definition-complete();
-        return $*CRO-ROUTE-SET;
+        my @before = $*CRO-ROUTE-SET.before;
+        my @after = $*CRO-ROUTE-SET.after;
+        if @before || @after {
+            return Cro.compose(|@before, $*CRO-ROUTE-SET, |@after, :for-connection);
+        } else {
+            $*CRO-ROUTE-SET;
+        }
     }
 
     sub get(&handler --> Nil) is export {
@@ -891,6 +906,39 @@ module Cro::HTTP::Router {
                 }
             }
         }
+    }
+
+    multi sub before(Cro::Transform $middleware --> Nil) is export {
+        $_ = $middleware;
+        if .consumes ~~ Cro::HTTP::Request
+        && .produces ~~ Cro::HTTP::Request {
+            $*CRO-ROUTE-SET.add-before($_)
+        } else {
+            die "before middleware must consume and produce Cro::HTTP::Request, got ({.consumes.perl}) and ({.produces.perl}) instead";
+        }
+    }
+    multi sub before(&middleware --> Nil) is export {
+        my $conditional = BeforeMiddleTransform.new(block => &middleware);
+        $*CRO-ROUTE-SET.add-before($conditional.request);
+        $*CRO-ROUTE-SET.add-after($conditional.response);
+    }
+    multi sub before(Cro::HTTP::Middleware::Pair $pair --> Nil) {
+        before($pair.request);
+        after($pair.response);
+    }
+
+    multi sub after(Cro::Transform $middleware --> Nil) is export {
+        $_ = $middleware;
+        if .consumes ~~ Cro::HTTP::Response
+        && .produces ~~ Cro::HTTP::Response {
+            $*CRO-ROUTE-SET.add-after($_)
+        } else {
+            die "after middleware must consume and produce Cro::HTTP::Response, got ({.consumes.perl}) and ({.produces.perl}) instead";
+        }
+    }
+    multi sub after(&middleware --> Nil) is export {
+        my $transformer = AfterMiddleTransform.new(block => &middleware);
+        $*CRO-ROUTE-SET.add-after($transformer);
     }
 
     multi sub before-matched(Cro::Transform $middleware --> Nil) is export {
