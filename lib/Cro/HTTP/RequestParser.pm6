@@ -79,10 +79,21 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                             bad-request('Malformed HTTP version');
                         }
 
+                        # Replace multiple "/"s in the target with a
+                        # single "/". Only alter the substring before
+                        # "?" (i.e., alter path, not query string).
+                        sub normalize-target (Str $target --> Str) {
+                            my regex path-only { '/' '/' + <?before .* '?'> };
+                            my regex full      { '/' '/' +                  };
+                            return ($target.index('?').defined
+                                    ?? $target.subst(/<path-only>/, '/', :g)
+                                    !! $target.subst(/<full>/,      '/', :g));
+                        }
+
                         # Populate the request object.
                         $request.connection = $packet.connection;
                         $request.method = @parts[0];
-                        $request.target = @parts[1];
+                        $request.target = normalize-target @parts[1];
                         $request.http-version = @parts[2].substr(5);
 
                         $expecting = Header;
