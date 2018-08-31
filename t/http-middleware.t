@@ -867,4 +867,11 @@ subtest {
     }
 }
 
+{
+    my $inner = route { before { $_.target = $_.target.lc } }
+    throws-like { route { include $inner } },
+        X::AdHoc, message => /'delegate'/, 'Better exception message when user tries to include route with before/after';
+    lives-ok { route { delegate <*> => $inner } }, 'delegate does not cause an exception';
+}
+
 done-testing;

@@ -645,6 +645,9 @@ module Cro::HTTP::Router {
                     die "Can only use 'include' with 'route' block, not a $routes.^name()";
                 }
             }
+            when Cro::CompositeTransform::WithConnectionState {
+                die "Cannot 'include' `route` block that contains before or after middleware, try delegate instead";
+            }
             default {
                 die "Can only use 'include' with `route` block, not a " ~ .^name;
             }
