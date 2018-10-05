@@ -1,7 +1,6 @@
 language: perl6
 
 perl6:
-    - '2017.10'
     - '2018.04'
     - latest
 
