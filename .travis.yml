@@ -10,3 +10,4 @@ install:
     - zef install https://github.com/croservices/cro-core/archive/master.zip
     - zef install https://github.com/croservices/cro-tls/archive/master.zip
     - zef --debug --deps-only install .
+    - zef --debug install .
