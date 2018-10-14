@@ -4,6 +4,7 @@ use Cro::HTTP::Cookie;
 use Cro::HTTP::BodyParserSelectors;
 use Cro::HTTP::BodySerializerSelectors;
 use Cro::HTTP::Message;
+use Cro::TLS;
 use Cro::Uri::HTTP;
 
 class X::Cro::HTTP::Request::Incomplete is Exception {
@@ -46,6 +47,12 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     # HTTP application it may contain information about an ongoing session,
     # together with information on - or a way to check - user rights.
     has $.auth is rw;
+
+    # The request URI, used when the request is issued by the client. For the
+    # server side, we try to recreate it from the parts.
+    has Cro::Uri $!request-uri;
+
+    submethod TWEAK(:$!request-uri = Nil) { }
 
     multi method Str(Cro::HTTP::Request:D:) {
         die X::Cro::HTTP::Request::Incomplete.new(:missing<method>) unless $!method;
@@ -167,5 +174,28 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
         my @res = @cookies.grep({ not $_.name eq $name });
         self!pack-cookie(|@res);
         @res.elems !== @cookies.elems;
+    }
+
+    method uri(--> Cro::Uri) {
+        with $!request-uri {
+            # It's a client-issued request, so send the URI that was requested.
+            $_
+        }
+        orwith $!connection {
+            # It's a server-side request; assemble it from information available.
+            my $scheme = $!connection ~~ Cro::TLS::ServerConnection ?? 'https' !! 'http';
+            my $base = do with self.header('host') -> $authority {
+                Cro::Uri.new(:$scheme, :$authority)
+            }
+            else {
+                Cro::Uri.new: :$scheme, :host($!connection.?socket-host // 'localhost'),
+                    :port($!connection.?socket-port // ($scheme eq 'https' ?? 443 !! 80))
+            }
+            $base.add(self.original-target)
+        }
+        else {
+            # No idea how to provide it
+            Nil
+        }
     }
 }

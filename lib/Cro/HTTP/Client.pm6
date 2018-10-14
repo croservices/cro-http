@@ -533,8 +533,10 @@ class Cro::HTTP::Client {
     method !assemble-request(Str $method, Cro::Uri $url, %options --> Cro::HTTP::Request) {
         my $target = $url.path || '/';
         $target ~= "?{$url.query}" if $url.query;
-        my $request = Cro::HTTP::Request.new(:$method, :$target);
-        $request.append-header('Host', $url.host);
+        my $request = Cro::HTTP::Request.new(:$method, :$target, :request-uri($url));
+        my $port = $url.port;
+        $request.append-header('Host', $url.host ~
+            ($port && $port != 80 | 443 ?? ":$port" !! ""));
         if self {
             $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);

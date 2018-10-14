@@ -154,7 +154,8 @@ constant %key-cert := {
     }
 
     given await Cro::HTTP::Client.get("http://localhost:{HTTP_TEST_PORT}/") -> $resp {
-        ok $resp.request.defined, 'Request object is associated with response'
+        ok $resp.request.defined, 'Request object is associated with response';
+        is $resp.request.uri, "$base/", 'The uri property of the request object is set';
     }
 
     given await Cro::HTTP::Client.get("$base/") -> $resp {
@@ -417,6 +418,8 @@ constant %key-cert := {
     given await $client.get("$base/single-redirect",
                             body => 'The Seed') -> $resp {
         is await($resp.body), 'The Seed', 'Single permanent redirect works';
+        is $resp.request.uri, "$base/str",
+            'The uri property of the request object is the followed uri';
     }
 
     given await $client.post("$base/get-303", body => 'Lines') -> $resp {
