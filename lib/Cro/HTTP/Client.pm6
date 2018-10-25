@@ -1,3 +1,4 @@
+use v6.d.PREVIEW;
 use Base64;
 use OO::Monitors;
 use Cro::HTTP::Client::CookieJar;
