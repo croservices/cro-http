@@ -70,7 +70,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionSta
                         );
                         $_.http-version = '2.0';
                         $_.http2-stream-id = $push-promise-counter;
-                        $connection-state.push-promise.emit: $_;
+                        start $connection-state.push-promise.emit: $_;
                         $push-promise-counter += 2;
                     }
                 }
