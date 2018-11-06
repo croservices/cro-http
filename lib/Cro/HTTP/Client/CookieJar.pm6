@@ -34,7 +34,7 @@ monitor Cro::HTTP::Client::CookieJar {
     }
 
     method !default-path(Cro::Uri $uri --> Str) {
-        my $path = $uri.path ?? '/' !! $uri.path;
+        my $path = $uri.path // '/';
         return '/'  if $path eq '' || !$path.starts-with('/');
         return '/'  if $path eq '/';
         my $index = (rindex $path, '/') - 1;

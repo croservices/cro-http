@@ -1508,6 +1508,10 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
                 content 'text/plain', "Hello, $name $surname!";
             }
         }
+
+        get -> 'test', 'uri' {
+            content 'text/plain', ~request.uri;
+        }
     }
 
     my $http-server = Cro::HTTP::Server.new(
@@ -1536,6 +1540,10 @@ throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response
                                        body => %body) -> $resp {
         is await($resp.body-text), 'Hello, John Doe!',
         'json is handled with destructuring';
+    }
+    given await Cro::HTTP::Client.get("$base/test/uri") -> $resp {
+        is await($resp.body-text), "$base/test/uri",
+            'request.uri reconstructs full request URI';
     }
 }
 

@@ -33,8 +33,8 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                 $buffer = Buf.new;
 
                 if $missing-preface {
-                    if $data.subbuf(0,24) eq utf8.new(80,82,73,32,42,32,72,84,84,80,47,50,
-                                                      46,48,13,10,13,10,83,77,13,10,13,10) {
+                    if $data.subbuf(0,24) eq Buf.new(80,82,73,32,42,32,72,84,84,80,47,50,
+                                                     46,48,13,10,13,10,83,77,13,10,13,10) {
                         $data .= subbuf(24);
                         $missing-preface = False;
                     } else {
@@ -114,7 +114,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
         ?? $data.subbuf(1, $length - $padding-length - 1)
         !! $data.subbuf(0, $length);
         Cro::HTTP2::Frame::Data.new(padding-length => ($padding-length // UInt),
-                                    data => utf8.new($payload), |%header);
+                                    data => Buf.new($payload), |%header);
     }
     my multi sub payload(1, Buf $data is rw, $length, *%header) {
         my $padded = %header<flags> +& 0x8 == 0x8;
@@ -186,7 +186,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                      +| ($payload[1] +< 16)
                      +| ($payload[2] +< 8)
                      +|  $payload[3];
-        $headers = utf8.new: $payload.subbuf(4, $length);
+        $headers = Buf.new: $payload.subbuf(4, $length);
         Cro::HTTP2::Frame::PushPromise.new(padding-length => ($padding-length // UInt),
                                            :$promised-sid, :$headers, |%header);
     }
@@ -206,7 +206,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                    +| ($data[6] +< 8)
                    +|  $data[7];
         $error-code = ErrorCode($error-code) // INTERNAL_ERROR;
-        $debug = utf8.new: $data.subbuf(8, $length);
+        $debug = Buf.new: $data.subbuf(8, $length);
         Cro::HTTP2::Frame::GoAway.new(:$last-sid, :$error-code, :$debug, |%header);
     }
     my multi sub payload(8, Buf $data is rw, $length, *%header) {
@@ -218,11 +218,11 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
         Cro::HTTP2::Frame::WindowUpdate.new(:$increment, |%header);
     }
     my multi sub payload(9, Buf $data is rw, $length, *%header) {
-        my $headers = utf8.new: $data.subbuf(0, $length);
+        my $headers = Buf.new: $data.subbuf(0, $length);
         Cro::HTTP2::Frame::Continuation.new(:$headers, |%header);
     }
     my multi sub payload($unknown, Buf $data is rw, $length, *%header) {
-        my $payload = utf8.new: $data.subbuf(0, $length);
+        my $payload = Buf.new: $data.subbuf(0, $length);
         Cro::HTTP2::Frame::Unknown.new(:$payload, |%header);
     }
 }

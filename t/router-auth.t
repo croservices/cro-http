@@ -19,7 +19,7 @@ subtest {
 
     my $test-auth;
     my $app = route -> {
-        before { .auth = $test-auth }
+        before-matched { .auth = $test-auth }
 
         delegate <*> => route {
             get -> TestAuth $user {
@@ -98,7 +98,7 @@ subtest {
 
     my $test-auth;
     my $app = route -> {
-        before { .auth = $test-auth }
+        before-matched { .auth = $test-auth }
 
         delegate <*> => route {
             get -> $user is auth {
