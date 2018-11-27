@@ -63,7 +63,7 @@ monitor Cro::HTTP::Client::CookieJar {
             }
             elsif !$_.max-age.defined && $_.expires {
                 $state.persistent = True;
-                $state.expiry-time = $_.expires.in-timezone(DateTime.now.timezone);
+                $state.expiry-time = $_.expires.in-timezone($*TZ);
             } else {
                 $state.persistent = False;
                 $state.expiry-time = DateTime.now.later(years => 10);
