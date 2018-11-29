@@ -232,13 +232,7 @@ module Cro::HTTP::Router {
                     }
                     else {
                         my $status = 404;
-                        if $*WRONG-METHOD {
-                            $status = 405;
-                        }
-                        elsif $*MISSING-UNPACK {
-                            $status = 400;
-                        }
-                        elsif @*BIND-FAILS {
+                        if @*BIND-FAILS {
                             for @*BIND-FAILS -> $imp, \cap {
                                 $imp(|cap);
                                 CATCH {
@@ -256,6 +250,12 @@ module Cro::HTTP::Router {
                                     default {}
                                 }
                             }
+                        }
+                        elsif $*MISSING-UNPACK {
+                            $status = 400;
+                        }
+                        elsif $*WRONG-METHOD {
+                            $status = 405;
                         }
                         emit Cro::HTTP::Response.new(:$status, :$request);
                     }

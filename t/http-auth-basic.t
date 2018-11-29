@@ -21,6 +21,10 @@ my $app = route {
     get -> Cro::HTTP::Auth $session {
         content 'text/plain', 'You are ' ~ $session.username;
     }
+    post -> Cro::HTTP::Auth $session {
+        # This exists to cover a bug where a 405 got reported over a 401
+        content 'text/plain', 'POST';
+    }
 }
 
 my $service = Cro::HTTP::Server.new(
