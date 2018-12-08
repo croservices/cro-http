@@ -770,7 +770,7 @@ module Cro::HTTP::Router {
     proto created(|) is export {*}
     multi created(Str() $location --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<created>);
         $resp.status = 201;
         $resp.append-header('Location', $location);
     }
@@ -782,7 +782,7 @@ module Cro::HTTP::Router {
     proto redirect(|) is export {*}
     multi redirect(Str() $location, :$temporary, :$permanent, :$see-other --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<redirected>);
         if $permanent {
             $resp.status = 308;
         }
@@ -802,37 +802,37 @@ module Cro::HTTP::Router {
 
     proto not-found(|) is export {*}
     multi not-found(--> Nil) {
-        set-status(404);
+        set-status(404, :action<not-found>);
     }
     multi not-found($content-type, $body, *%options --> Nil) {
-        set-status(404);
+        set-status(404, :action<not-found>);
         content $content-type, $body, |%options;
     }
 
     proto bad-request(|) is export {*}
     multi bad-request(--> Nil) {
-        set-status(400);
+        set-status(400, :action<bad-request>);
     }
     multi bad-request($content-type, $body, *%options --> Nil) {
-        set-status(400);
+        set-status(400, :action<bad-request>);
         content $content-type, $body, |%options;
     }
 
     proto forbidden(|) is export {*}
     multi forbidden(--> Nil) {
-        set-status(403);
+        set-status(403, :action<forbidden>);
     }
     multi forbidden($content-type, $body, *%options --> Nil) {
-        set-status(403);
+        set-status(403, :action<forbidden>);
         content $content-type, $body, |%options;
     }
 
     proto conflict(|) is export {*}
     multi conflict(--> Nil) {
-        set-status(409);
+        set-status(409, :action<conflict>);
     }
     multi conflict($content-type, $body, *%options --> Nil) {
-        set-status(409);
+        set-status(409, :action<conflict>);
         content $content-type, $body, |%options;
     }
 
@@ -842,9 +842,9 @@ module Cro::HTTP::Router {
         $resp.set-cookie($name, $value, |%opts);
     }
 
-    sub set-status(Int $status --> Nil) {
+    sub set-status(Int $status, Str :$action = 'set-status' --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what($action));
         $resp.status = $status;
     }
 

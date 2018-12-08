@@ -23,6 +23,18 @@ throws-like { request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'request',
     'Can only use request term inside of a handler';
 throws-like { response }, X::Cro::HTTP::Router::OnlyInHandler, what => 'response',
     'Can only use response term inside of a handler';
+throws-like { created 'foo' }, X::Cro::HTTP::Router::OnlyInHandler, what => 'created',
+    'Can only use created term inside of a handler';
+throws-like { not-found }, X::Cro::HTTP::Router::OnlyInHandler, what => 'not-found',
+    'Can only use not-found term inside of a handler';
+throws-like { forbidden }, X::Cro::HTTP::Router::OnlyInHandler, what => 'forbidden',
+    'Can only use forbidden term inside of a handler';
+throws-like { redirect 'foo' }, X::Cro::HTTP::Router::OnlyInHandler, what => 'redirected',
+    'Can only use redirect term inside of a handler';
+throws-like { conflict }, X::Cro::HTTP::Router::OnlyInHandler, what => 'conflict',
+    'Can only use conflict term inside of a handler';
+throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-request',
+    'Can only use bad-request term inside of a handler';
 
 {
     my $app = route {
