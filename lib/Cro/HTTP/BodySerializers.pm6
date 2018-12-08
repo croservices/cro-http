@@ -152,7 +152,8 @@ class Cro::HTTP::BodySerializer::MultiPartFormData does Cro::HTTP::BodySerialize
 
     multi method serialize(Cro::HTTP::Message $message,
                            Cro::HTTP::Body::MultiPartFormData $data --> Supply) {
-        my $boundary = self.generate-boundary;
+        my $possible-ours = $message.content-type.parameters.first(*.key.lc eq 'boundary');
+        my $boundary = $possible-ours.defined ?? $possible-ours.value() !! self.generate-boundary;
         my $encoded = Buf.new;
         for $data.parts -> $part {
             $encoded.append("--$boundary\r\n".encode('ascii'));

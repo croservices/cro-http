@@ -5,7 +5,7 @@ use Cro::HTTP::Server;
 use JSON::JWT;
 use Test;
 
-constant TEST_PORT = 31321;
+constant TEST_PORT = 31328;
 my $url = "http://localhost:{TEST_PORT}";
 
 class MyTokenAuthBearer does Cro::HTTP::Auth::WebToken::Bearer {}

@@ -21,6 +21,10 @@ my $app = route {
     get -> Cro::HTTP::Auth $session {
         content 'text/plain', 'You are ' ~ $session.username;
     }
+    post -> Cro::HTTP::Auth $session {
+        # This exists to cover a bug where a 405 got reported over a 401
+        content 'text/plain', 'POST';
+    }
 }
 
 my $service = Cro::HTTP::Server.new(
@@ -38,14 +42,19 @@ given Cro::HTTP::Client.new -> $client {
     }
 }
 
-dies-ok {
-    await Cro::HTTP::Client.new.get("$url/", auth => { username => 'clouds',
-                                                       password => 'california'});
-}, 'Wrong credentials are not passed';
+throws-like
+        {
+            await Cro::HTTP::Client.new.get: "$url/",
+                    auth => { username => 'clouds', password => 'california'}
+        },
+        X::Cro::HTTP::Error::Client,
+        response => { .status == 401 },
+        '401 when wrong credentials are passed';
 
-throws-like {
-    await Cro::HTTP::Client.new.get("$url/");
-}, X::Cro::HTTP::Error::Client,
-'Request without credentials returns 401';
+throws-like
+        { await Cro::HTTP::Client.new.get("$url/") },
+        X::Cro::HTTP::Error::Client,
+        response => { .status == 401 },
+        'Request without credentials returns 401';
 
 done-testing;
