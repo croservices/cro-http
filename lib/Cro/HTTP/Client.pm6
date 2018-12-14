@@ -242,6 +242,7 @@ class Cro::HTTP::Client {
     has $.content-type;
     has $.follow;
     has %.auth;
+    has $.user-agent = 'Cro';
     has $.persistent;
     has $!connection-cache = ConnectionCache.new;
     has $.http;
@@ -257,7 +258,7 @@ class Cro::HTTP::Client {
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
                     :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca,
-                    :$!push-promises) {
+                    :$!push-promises, :$!user-agent) {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -539,6 +540,7 @@ class Cro::HTTP::Client {
         $request.append-header('Host', $url.host ~
             ($port && $port != 80 | 443 ?? ":$port" !! ""));
         if self {
+            $request.append-header('User-agent', $.user-agent) if $.user-agent && (%options<user-agent>:!exists);
             $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);
             $.cookie-jar.add-to-request($request, $url) if $.cookie-jar;
@@ -587,6 +589,16 @@ class Cro::HTTP::Client {
                 }
             }
         }
+
+        # Set User-agent, check if wasn't set already for us
+        unless $request.has-header('User-agent') {
+            if %options<user-agent>:exists {
+                $request.append-header('User-agent', $_) with %options<user-agent>;
+            } else {
+                $request.append-header('User-agent', 'Cro');
+            }
+        }
+
         return $request;
     }
 

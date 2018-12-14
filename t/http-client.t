@@ -200,14 +200,14 @@ constant %key-cert := {
     }
 
     given await Cro::HTTP::Client.get("$base/query?value=test") -> $resp {
-	ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /query?value=test';
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /query?value=test';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'TEST', 'Body text is correct';
     }
 
     given await Cro::HTTP::Client.get("$base/query") -> $resp {
-	ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /query';
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /query';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'No Query', 'Body text is correct';
@@ -274,9 +274,27 @@ constant %key-cert := {
         is await($resp.body-text), 'When you are Cro, it is fine to request', 'Default headers were sent';
     }
 
-    my $client = Cro::HTTP::Client.new(headers => [ User-agent => 'Cro' ]);
+    given await Cro::HTTP::Client.new.get("$base/path") -> $resp {
+        is await($resp.body-text), 'When you are Cro, it is fine to request', 'User-Agent if set for Client instance';
+    }
+
+    given await Cro::HTTP::Client.get("$base/path") -> $resp {
+        is await($resp.body-text), 'When you are Cro, it is fine to request', 'User-Agent if set if request invoked from Client type object';
+    }
+
+    given await Cro::HTTP::Client.new(user-agent => 'Cro/Cro').get("$base/path") -> $resp {
+        is await($resp.body-text), 'When you are Cro/Cro, it is fine to request', 'User-agent value is passed from instance';
+    }
+    given await Cro::HTTP::Client.new(user-agent => 'Cro/Cro').get("$base/path", :user-agent('Cro/Cro/Cro')) -> $resp {
+        is await($resp.body-text), 'When you are Cro/Cro/Cro, it is fine to request', 'User-agent value is passed from both instance and method with method one winning';
+    }
+
+    throws-like { await Cro::HTTP::Client.get("$base/path", user-agent => Nil); }, X::Cro::HTTP::Error::Client,
+        'User-agent header is not added if explicitly disabled';
+
+    my $client = Cro::HTTP::Client.new(headers => [ User-agent => 'Good Cro' ]);
     given await $client.get("$base/path") -> $resp {
-        is await($resp.body-text), 'When you are Cro, it is fine to request', 'Default headers were sent';
+        is await($resp.body-text), 'When you are Good Cro, it is fine to request', 'Default headers were sent, User-agent header has been overrode';
     }
 
     $client = Cro::HTTP::Client.new(headers => [ 1 ]);
