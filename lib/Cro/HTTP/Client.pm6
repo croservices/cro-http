@@ -593,7 +593,9 @@ class Cro::HTTP::Client {
         # Set User-agent, check if wasn't set already for us
         unless $request.has-header('User-agent') {
             if %options<user-agent>:exists {
-                $request.append-header('User-agent', $_) with %options<user-agent>;
+                with %options<user-agent> {
+                    $request.append-header('User-agent', $_) if $_;
+                }
             } else {
                 $request.append-header('User-agent', 'Cro');
             }

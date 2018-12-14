@@ -290,7 +290,13 @@ constant %key-cert := {
     }
 
     throws-like { await Cro::HTTP::Client.get("$base/path", user-agent => Nil); }, X::Cro::HTTP::Error::Client,
-        'User-agent header is not added if explicitly disabled';
+        'User-agent header is not added if explicitly set to Nil';
+
+    throws-like { await Cro::HTTP::Client.get("$base/path", user-agent => ''); }, X::Cro::HTTP::Error::Client,
+        'User-agent header is not added if explicitly set to empty string';
+
+    throws-like { await Cro::HTTP::Client.get("$base/path", :!user-agent); }, X::Cro::HTTP::Error::Client,
+        'User-agent header is not added if explicitly set to False';
 
     my $client = Cro::HTTP::Client.new(headers => [ User-agent => 'Good Cro' ]);
     given await $client.get("$base/path") -> $resp {
