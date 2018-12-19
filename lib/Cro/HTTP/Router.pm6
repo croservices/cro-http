@@ -1058,7 +1058,7 @@ module Cro::HTTP::Router {
         }
 
         sub get-extension($path) {
-            return ($path ~~ m/ '.' <-[ . ]> $ / ).Str;
+            return ($path ~~ m/ '.' ( <-[ \. ]>+ ) $ / )[0].Str;
         }
 
         if $path and my $resource = %?RESOURCES{$path} and $resource.IO.e {
