@@ -1063,6 +1063,7 @@ module Cro::HTTP::Router {
 
         if $path and my $resource = %?RESOURCES{$path} and $resource.IO.e {
             content get-mime(get-extension($path)), slurp($resource, :bin);
+            return;
         } else {
             for @indexes {
                 my $index = ($path, $_).grep(*.so).join: '/';
