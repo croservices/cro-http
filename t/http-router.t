@@ -1460,14 +1460,14 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML></HTML>\n", 'Static index is fine';
+        like body-text($r), rx{ '<HTML></HTML>' \n }, 'Static index is fine';
         is $r.status, 200, 'Static sets correct status code';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/css/my/dark.css');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "Rules are here!\n", 'Files with long path work';
+        like body-text($r), rx{ 'Rules are here!' \n }, 'Files with long path work';
         is $r.status, 200, 'Good status';
     }
 
@@ -1891,21 +1891,21 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML>Extended</HTML>\n", 'Get value from index';
+        like body-text($r), rx{ '<HTML>Extended</HTML>' \n }, 'Get value from index';
         is $r.status, 200, 'Static sets correct status code';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-plain');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML></HTML>\n", 'static indexes order check, 1';
+        like body-text($r), rx{ '<HTML></HTML>' \n }, 'static indexes order check, 1';
         is $r.status, 200, 'Good status';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-extended');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML>Extended</HTML>\n", 'static indexes order check, 2';
+        like body-text($r), rx{ '<HTML>Extended</HTML>' \n }, 'static indexes order check, 2';
         is $r.status, 200, 'Good status';
     }
 
