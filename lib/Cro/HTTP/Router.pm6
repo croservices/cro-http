@@ -1046,11 +1046,11 @@ module Cro::HTTP::Router {
         }
     }
     
-    sub static-resource(Str() $base, *@path, :$mime-types, :@indexes) is export {
+    sub static-resource(*@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
         die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
 
-        my $path = ($base, |@path).join: '/';
+        my $path = @path.grep(*.so).join: '/';
         my %fallback = $mime-types // {};
 
         sub get-mime($ext) {
@@ -1061,7 +1061,7 @@ module Cro::HTTP::Router {
             return ($path ~~ m/ '.' ( <-[ \. ]>+ ) $ / )[0].Str;
         }
 
-        if $path and my $resource = %?RESOURCES{$path} and $resource.IO.e {
+        if $path and my $resource = %?RESOURCES{$path} and $resource.IO.e and !$resource.IO.d {
             content get-mime(get-extension($path)), slurp($resource, :bin);
         } else {
             for @indexes {

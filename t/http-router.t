@@ -1923,4 +1923,60 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     }
 }
 
+{
+    my $app = route {
+        get -> 'index.html' {
+            static-resource 'index.html';
+        }
+        get -> 'test.txt' {
+            static-resource 'folder/test.txt';
+        }
+        get -> 'folder-indexes' {
+            static-resource 'folder', :indexes(['test.txt']);
+        }
+        get -> 'root-indexes1' {
+            static-resource '', :indexes(['index.html']);
+        }
+        get -> 'root-indexes2' {
+            static-resource :indexes(['index.html']);
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/index.html');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { '<HTML></HTML>' \n }, 'Get index.html from %*RESOURCES';
+        is $r.status, 200, 'Static-resource sets correct status code';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.txt');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx{ 'this is a test' \n }, 'Get folder/test.txt von %*RESOURCES';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/folder-indexes');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx{ 'this is a test' \n }, 'indexes in a folder of %*RESOURCES';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes1');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { '<HTML></HTML>' \n } , 'indexes in root of %*RESOURCES, 1';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes2');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { '<HTML></HTML>' \n }, 'indexes in root of %*RESOURCES, 2';
+        is $r.status, 200, 'Good status';
+    }
+}
+
 done-testing;
