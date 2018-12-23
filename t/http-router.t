@@ -1928,8 +1928,11 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         get -> 'index.html' {
             static-resource 'index.html';
         }
-        get -> 'test.txt' {
+        get -> 'test.1' {
             static-resource 'folder/test.txt';
+        }
+        get -> 'test.2' {
+            static-resource 'folder', 'test.txt';
         }
         get -> 'folder-indexes' {
             static-resource 'folder', :indexes(['test.txt']);
@@ -1950,10 +1953,17 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         is $r.status, 200, 'Static-resource sets correct status code';
     }
 
-    $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.txt');
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.1');
     $source.emit($req);
     given $responses.receive -> $r {
-        like body-text($r), rx{ 'this is a test' \n }, 'Get folder/test.txt von %*RESOURCES';
+        like body-text($r), rx{ 'this is a test' \n }, 'Get folder/test.txt from %*RESOURCES';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.2');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx{ 'this is a test' \n }, 'Get <folder test.txt> from %*RESOURCES';
         is $r.status, 200, 'Good status';
     }
 
