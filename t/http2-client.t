@@ -48,7 +48,7 @@ if supports-alpn() {
         cookie-name => 'my_session_cookie_name');
 
     $http.start;
-    END $http.stop;
+    END try $http.stop;
 
     given await Cro::HTTP::Client.post("$base/", :%ca,
                                        content-type => 'application/x-www-form-urlencoded',
