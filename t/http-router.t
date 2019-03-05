@@ -1460,14 +1460,14 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML></HTML>\n", 'Static index is fine';
+        like body-text($r), rx{ '<HTML></HTML>' \n }, 'Static index is fine';
         is $r.status, 200, 'Static sets correct status code';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/css/my/dark.css');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "Rules are here!\n", 'Files with long path work';
+        like body-text($r), rx{ 'Rules are here!' \n }, 'Files with long path work';
         is $r.status, 200, 'Good status';
     }
 
@@ -1891,21 +1891,21 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML>Extended</HTML>\n", 'Get value from index';
+        like body-text($r), rx{ '<HTML>Extended</HTML>' \n }, 'Get value from index';
         is $r.status, 200, 'Static sets correct status code';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-plain');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML></HTML>\n", 'static indexes order check, 1';
+        like body-text($r), rx{ '<HTML></HTML>' \n }, 'static indexes order check, 1';
         is $r.status, 200, 'Good status';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-extended');
     $source.emit($req);
     given $responses.receive -> $r {
-        is body-text($r), "<HTML>Extended</HTML>\n", 'static indexes order check, 2';
+        like body-text($r), rx{ '<HTML>Extended</HTML>' \n }, 'static indexes order check, 2';
         is $r.status, 200, 'Good status';
     }
 
@@ -1920,6 +1920,72 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         is $r.status, 200, 'Indexes with mime-types returns good status';
         is $r.header('Content-Type'), 'text/html', 'Indexes with mime-types returns proper content-type';
+    }
+}
+
+{
+    my $app = route {
+        get -> 'index.html' {
+            static-resource 'index.html';
+        }
+        get -> 'test.1' {
+            static-resource 'folder/test.txt';
+        }
+        get -> 'test.2' {
+            static-resource 'folder', 'test.txt';
+        }
+        get -> 'folder-indexes' {
+            static-resource 'folder', :indexes(['test.txt']);
+        }
+        get -> 'root-indexes1' {
+            static-resource '', :indexes(['index.html']);
+        }
+        get -> 'root-indexes2' {
+            static-resource :indexes(['index.html']);
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/index.html');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { '<HTML></HTML>' \n }, 'Get index.html from %*RESOURCES';
+        is $r.status, 200, 'Static-resource sets correct status code';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.1');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx{ 'this is a test' \n }, 'Get folder/test.txt from %*RESOURCES';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.2');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx{ 'this is a test' \n }, 'Get <folder test.txt> from %*RESOURCES';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/folder-indexes');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx{ 'this is a test' \n }, 'indexes in a folder of %*RESOURCES';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes1');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { '<HTML></HTML>' \n } , 'indexes in root of %*RESOURCES, 1';
+        is $r.status, 200, 'Good status';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes2');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { '<HTML></HTML>' \n }, 'indexes in root of %*RESOURCES, 2';
+        is $r.status, 200, 'Good status';
     }
 }
 
