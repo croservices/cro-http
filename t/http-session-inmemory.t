@@ -5,7 +5,7 @@ use Cro::HTTP::Server;
 use Cro::HTTP::Session::InMemory;
 use Test;
 
-constant TEST_PORT = 31318;
+constant TEST_PORT = 31320;
 my $url = "http://localhost:{TEST_PORT}";
 
 my $fake-now = now;
