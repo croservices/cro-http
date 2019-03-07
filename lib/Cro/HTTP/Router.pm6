@@ -1045,7 +1045,7 @@ module Cro::HTTP::Router {
             }
         }
     }
-    
+
     sub static-resource(*@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
         die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
