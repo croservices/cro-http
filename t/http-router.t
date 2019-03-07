@@ -1977,14 +1977,14 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes1');
     $source.emit($req);
     given $responses.receive -> $r {
-        like body-text($r), rx { '<HTML></HTML>' \n } , 'indexes in root of %*RESOURCES, 1';
+        like body-text($r), rx{ '<HTML></HTML>' \n } , 'indexes in root of %*RESOURCES, 1';
         is $r.status, 200, 'Good status';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes2');
     $source.emit($req);
     given $responses.receive -> $r {
-        like body-text($r), rx { '<HTML></HTML>' \n }, 'indexes in root of %*RESOURCES, 2';
+        like body-text($r), rx{ '<HTML></HTML>' \n }, 'indexes in root of %*RESOURCES, 2';
         is $r.status, 200, 'Good status';
     }
 }
