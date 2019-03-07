@@ -31,7 +31,7 @@ if supports-alpn() {
 
     my $client = Cro::HTTP::Client.new(:http<2>, :push-promises);
 
-    given $client.get("https://localhost:TEST_PORT/", :%ca) -> $resp {
+    given $client.get("https://localhost:{TEST_PORT}/", :%ca) -> $resp {
         my $res = await $resp;
         my @pps;
         my @resps;
@@ -52,7 +52,7 @@ if supports-alpn() {
     }
 
     $client = Cro::HTTP::Client.new(:http<2>);
-    given $client.get("https://localhost:TEST_PORT/", :%ca) -> $resp {
+    given $client.get("https://localhost:{TEST_PORT}/", :%ca) -> $resp {
         my $res = await $resp;
         my @pps;
         my $get-pps = start react {
