@@ -434,11 +434,11 @@ constant %key-cert := {
     }
 
     given await $client.post("$base/post-307", body => 'Heights') -> $resp {
-        is await($resp.body), 'Heights', '307 redirect carries request body';
+        is await($resp.body), 'Heights - 7', '307 redirect carries request body';
     }
 
     given await $client.post("$base/post-307-relative", body => 'Heights') -> $resp {
-        is await($resp.body), 'Heights', '307 relative redirect carries request body';
+        is await($resp.body), 'Heights - 7', '307 relative redirect carries request body';
     }
 
     throws-like { my $client = Cro::HTTP::Client.new(auth =>
