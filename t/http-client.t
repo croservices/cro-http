@@ -51,9 +51,9 @@ constant %key-cert := {
                 content 'text/plain', "$str";
             }
         }
-        post -> 'str' {
+        post -> 'str', :%headers is header {
             request-body-text -> $str {
-                content 'text/plain', "$str";
+                content 'text/plain', "$str - %headers<Content-length>";
             }
         }
         get -> 'blob' {
@@ -229,12 +229,18 @@ constant %key-cert := {
     }
 
     given await Cro::HTTP::Client.get("$base/str",
-                                      content-type => 'text/plain; charset=UTF-8',
-                                      body => 'Plain string') -> $resp {
+            content-type => 'text/plain; charset=UTF-8',
+            body => 'Plain string') -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with Str';
         is await($resp.body-text), 'Plain string', 'Str was sent and processed';
     }
 
+    given await Cro::HTTP::Client.post("$base/str",
+            content-type => 'text/plain; charset=UTF-8',
+            body => 'Plain string') -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Got a response from GET / with Str';
+        is await($resp.body-text), 'Plain string - 12', 'Str was sent and processed';
+    }
     given await Cro::HTTP::Client.get("$base/blob",
                                       content-type => 'image/jpeg', # Just to process as blob
                                       body => Blob.new("String".encode)) -> $resp {
