@@ -6,7 +6,7 @@ use Cro::TLS;
 use Test;
 
 if supports-alpn() {
-    constant TEST_PORT = 31290;
+    constant TEST_PORT = 31312;
     my $base = "https://localhost:{TEST_PORT}";
     constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
     constant %key-cert := {

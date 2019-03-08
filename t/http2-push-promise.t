@@ -6,7 +6,7 @@ use Cro;
 use Test;
 
 if supports-alpn() {
-    constant $TEST_PORT = 8883;
+    constant TEST_PORT = 31311;
     constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
     constant %tls := {
         private-key-file => 't/certs-and-keys/server-key.pem',
@@ -24,14 +24,14 @@ if supports-alpn() {
     };
 
     my Cro::Service $service = Cro::HTTP::Server.new(
-        :host<localhost>, :port($TEST_PORT), :$application, :http<2>, :%tls
+        :host<localhost>, :port(TEST_PORT), :$application, :http<2>, :%tls
     );
     $service.start;
     QUIT { $service.stop }
 
     my $client = Cro::HTTP::Client.new(:http<2>, :push-promises);
 
-    given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
+    given $client.get("https://localhost:{TEST_PORT}/", :%ca) -> $resp {
         my $res = await $resp;
         my @pps;
         my @resps;
@@ -52,7 +52,7 @@ if supports-alpn() {
     }
 
     $client = Cro::HTTP::Client.new(:http<2>);
-    given $client.get("https://localhost:$TEST_PORT/", :%ca) -> $resp {
+    given $client.get("https://localhost:{TEST_PORT}/", :%ca) -> $resp {
         my $res = await $resp;
         my @pps;
         my $get-pps = start react {

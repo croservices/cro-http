@@ -1,4 +1,4 @@
-our %mime =
+our %mime is export =
     'ez' => 'application/andrew-inset',
     'aw' => 'application/applixware',
     'atom' => 'application/atom+xml',

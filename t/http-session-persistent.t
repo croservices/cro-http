@@ -6,7 +6,7 @@ use Cro::HTTP::Session::Persistent;
 use OO::Monitors;
 use Test;
 
-constant TEST_PORT = 31319;
+constant TEST_PORT = 31322;
 my $url = "http://localhost:{TEST_PORT}";
 
 my $fake-now = now;

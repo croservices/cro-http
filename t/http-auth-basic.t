@@ -4,7 +4,7 @@ use Cro::HTTP::Router;
 use Cro::HTTP::Server;
 use Test;
 
-constant TEST_PORT = 31318;
+constant TEST_PORT = 31321;
 my $url = "http://localhost:{TEST_PORT}";
 
 class MyUser does Cro::HTTP::Auth {

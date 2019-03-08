@@ -4,8 +4,8 @@ use Cro::HTTP::Server;
 use Cro::TLS;
 use Test;
 
-constant HTTP_TEST_PORT = 31316;
-constant HTTPS_TEST_PORT = 31317;
+constant HTTP_TEST_PORT = 31318;
+constant HTTPS_TEST_PORT = 31319;
 constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
 constant %key-cert := {
     private-key-file => 't/certs-and-keys/server-key.pem',

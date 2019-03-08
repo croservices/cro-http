@@ -1001,6 +1001,10 @@ module Cro::HTTP::Router {
         $resp.append-header('Cache-Control', $cache);
     }
 
+    sub get-mime-or-default($ext, %fallback, :$default = 'application/octet-stream') {
+        %mime{$ext} // %fallback{$ext} // $default;
+    }
+
     sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -1011,24 +1015,20 @@ module Cro::HTTP::Router {
         }
         my %fallback = $mime-types // {};
 
-        sub get-mime($ext) {
-            %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
-        }
-
         my sub get_or_404($path) {
             if $path.e {
                 if $path.d {
                     for @indexes {
                         my $index = $path.add($_);
                         if $index.e {
-                            content get-mime($index.extension), slurp($index, :bin);
+                            content get-mime-or-default($index.extension, %fallback), slurp($index, :bin);
                             return;
                         }
                     }
                     $resp.status = 404;
                     return;
                 } else {
-                    content get-mime($path.extension), slurp($path, :bin);
+                    content get-mime-or-default($path.extension, %fallback), slurp($path, :bin);
                 }
             } else {
                 $resp.status = 404;
@@ -1045,7 +1045,7 @@ module Cro::HTTP::Router {
             }
         }
     }
-    
+
     sub static-resource(*@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
         die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -1053,23 +1053,20 @@ module Cro::HTTP::Router {
         my $path = @path.grep(*.so).join: '/';
         my %fallback = $mime-types // {};
 
-        sub get-mime($ext) {
-            %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
-        }
-
         sub get-extension($path) {
             return ($path ~~ m/ '.' ( <-[ \. ]>+ ) $ / )[0].Str;
         }
 
-        if $path and my $resource = %?RESOURCES{$path} and $resource.IO.e and !$resource.IO.d {
-            content get-mime(get-extension($path)), slurp($resource, :bin);
+        if $path && (my $resource = %?RESOURCES{$path}) && $resource.IO !~~ Slip && $resource.IO.e && !$resource.IO.d {
+            content get-mime-or-default(get-extension($path), %fallback), slurp($resource, :bin);
         } else {
             for @indexes {
                 my $index = ($path, $_).grep(*.so).join: '/';
-                my $resource = %?RESOURCES{$index};
-                if $resource.IO.e {
-                    content get-mime(get-extension($index)), slurp($resource, :bin);
-                    last;
+                with %?RESOURCES{$index} {
+                    if .IO !~~ Slip && .IO.e {
+                        content get-mime-or-default(get-extension($index), %fallback), slurp($_, :bin);
+                        last;
+                    }
                 }
             }
         }
