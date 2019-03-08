@@ -58,6 +58,9 @@
                 "Cro::HTTP2::ResponseSerializer": "lib/Cro/HTTP2/ResponseSerializer.pm6",
                 "Cro::Uri::HTTP": "lib/Cro/Uri/HTTP.pm6"
     },
-    "resources": [],
+    "resources": [
+        "index.html",
+        "folder/test.txt"
+    ],
     "source-url"    : "https://github.com/croservices/cro-http.git"
 }
