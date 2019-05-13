@@ -129,6 +129,8 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                                 .quit('Stream reset');
                             }
                         }
+                    } else {
+                        die 'Stream reset by the server';
                     }
                     %push-promises-for-stream{.stream-identifier}:delete;
                 }

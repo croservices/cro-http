@@ -48,8 +48,8 @@ module Cro::HTTP::Router {
             has @.prefix;
             has @.body-parsers;
             has @.body-serializers;
-            has @.before;
-            has @.after;
+            has @.before-matched;
+            has @.after-matched;
 
             method copy-adding() { ... }
             method signature() { ... }
@@ -106,14 +106,14 @@ module Cro::HTTP::Router {
             has Str $.method;
             has &.implementation;
 
-            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before!, :@after!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!) {
                 self.bless:
                     :$!method, :&!implementation,
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
-                    :before[flat @before, @!before],
-                    :after[flat @!after, @after]
+                    :before-matched[flat @before-matched, @!before-matched],
+                    :after-matched[flat @!after-matched, @after-matched]
             }
 
             method signature() {
@@ -149,16 +149,16 @@ module Cro::HTTP::Router {
             }
 
             method invoke(Cro::HTTP::Request $request, Capture $args) {
-                if @!before || @!after {
+                if @!before-matched || @!after-matched {
                     my $current = supply emit $request;
                     my %connection-state{Mu};
-                    $current = self!append-middleware($current, @!before, %connection-state);
+                    $current = self!append-middleware($current, @!before-matched, %connection-state);
                     my $response = supply whenever $current -> $req {
                         whenever self!invoke-internal($req, $args) {
                             emit $_;
                         }
                     }
-                    return self!append-middleware($response, @!after, %connection-state);
+                    return self!append-middleware($response, @!after-matched, %connection-state);
                 } else {
                     return self!invoke-internal($request, $args);
                 }
@@ -169,14 +169,14 @@ module Cro::HTTP::Router {
             has Cro::Transform $.transform;
             has Bool $.wildcard;
 
-            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before!, :@after!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!) {
                 self.bless:
                     :$!transform,
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
-                    before => @before.append(@!before),
-                    after => @!after.append(@after)
+                    before-matched => @before-matched.append(@!before-matched),
+                    after-matched => @!after-matched.append(@after-matched)
             }
 
             method signature() {
@@ -188,10 +188,10 @@ module Cro::HTTP::Router {
                 self!add-body-parsers($req);
                 my $current = supply emit $req;
                 my %connection-state{Mu};
-                $current = self!append-middleware($current, @!before, %connection-state);
+                $current = self!append-middleware($current, @!before-matched, %connection-state);
                 $current = $!transform.transformer($current);
                 $current = self!append-body-serializers($current);
-                $current = self!append-middleware($current, @!after, %connection-state);
+                $current = self!append-middleware($current, @!after-matched, %connection-state);
                 $current
             }
         }
@@ -202,7 +202,10 @@ module Cro::HTTP::Router {
         has @.includes;
         has @.before;
         has @.after;
+        has @.before-matched;
+        has @.after-matched;
         has $!path-matcher;
+        has @!handlers-to-add;  # Closures to defer adding, so they get all the middleware
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -229,13 +232,7 @@ module Cro::HTTP::Router {
                     }
                     else {
                         my $status = 404;
-                        if $*WRONG-METHOD {
-                            $status = 405;
-                        }
-                        elsif $*MISSING-UNPACK {
-                            $status = 400;
-                        }
-                        elsif @*BIND-FAILS {
+                        if @*BIND-FAILS {
                             for @*BIND-FAILS -> $imp, \cap {
                                 $imp(|cap);
                                 CATCH {
@@ -254,6 +251,12 @@ module Cro::HTTP::Router {
                                 }
                             }
                         }
+                        elsif $*MISSING-UNPACK {
+                            $status = 400;
+                        }
+                        elsif $*WRONG-METHOD {
+                            $status = 405;
+                        }
                         emit Cro::HTTP::Response.new(:$status, :$request);
                     }
                 }
@@ -261,7 +264,9 @@ module Cro::HTTP::Router {
         }
 
         method add-handler(Str $method, &implementation --> Nil) {
-            @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before, :@!after));
+            @!handlers-to-add.push: {
+                @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched));
+            }
         }
 
         method add-body-parser(Cro::BodyParser $parser --> Nil) {
@@ -283,23 +288,36 @@ module Cro::HTTP::Router {
             @!after.push($middleware);
         }
 
+        method add-before-matched($middleware) {
+            @!before-matched.push($middleware);
+        }
+        method add-after-matched($middleware) {
+            @!after-matched.push($middleware);
+        }
+
         method add-delegate(@prefix, Cro::Transform $transform) {
             my $wildcard = @prefix[*-1] eq '*';
             my @new-prefix = @prefix;
             @new-prefix.pop if $wildcard;
-            @!handlers.push(DelegateHandler.new(
-                                   prefix => @new-prefix,
-                                   :$transform, :$wildcard, before => @!before, after => @!after));
+            @!handlers-to-add.push: {
+                @!handlers.push: DelegateHandler.new:
+                   prefix => @new-prefix,
+                   :$transform, :$wildcard, before-matched => @!before-matched, after-matched => @!after-matched;
+           }
         }
 
         method definition-complete(--> Nil) {
+            while @!handlers-to-add.shift -> &add {
+                add();
+            }
             for @!handlers {
                 .body-parsers = @!body-parsers;
                 .body-serializers = @!body-serializers;
             }
             for @!includes -> (:@prefix, :$includee) {
                 for $includee.handlers() {
-                    @!handlers.push(.copy-adding(:@prefix, :@!body-parsers, :@!body-serializers, :@!before, :@!after));
+                    @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
+                        :@!before-matched, :@!after-matched);
                 }
             }
             self!generate-route-matcher();
@@ -566,7 +584,13 @@ module Cro::HTTP::Router {
         my $*CRO-ROUTE-SET = RouteSet.new;
         route-definition();
         $*CRO-ROUTE-SET.definition-complete();
-        return $*CRO-ROUTE-SET;
+        my @before = $*CRO-ROUTE-SET.before;
+        my @after = $*CRO-ROUTE-SET.after;
+        if @before || @after {
+            return Cro.compose(|@before, $*CRO-ROUTE-SET, |@after, :for-connection);
+        } else {
+            $*CRO-ROUTE-SET;
+        }
     }
 
     sub get(&handler --> Nil) is export {
@@ -620,6 +644,9 @@ module Cro::HTTP::Router {
                 else {
                     die "Can only use 'include' with 'route' block, not a $routes.^name()";
                 }
+            }
+            when Cro::CompositeTransform::WithConnectionState {
+                die "Cannot 'include' `route` block that contains before or after middleware, try delegate instead";
             }
             default {
                 die "Can only use 'include' with `route` block, not a " ~ .^name;
@@ -743,7 +770,7 @@ module Cro::HTTP::Router {
     proto created(|) is export {*}
     multi created(Str() $location --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<created>);
         $resp.status = 201;
         $resp.append-header('Location', $location);
     }
@@ -755,7 +782,7 @@ module Cro::HTTP::Router {
     proto redirect(|) is export {*}
     multi redirect(Str() $location, :$temporary, :$permanent, :$see-other --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<redirected>);
         if $permanent {
             $resp.status = 308;
         }
@@ -775,37 +802,37 @@ module Cro::HTTP::Router {
 
     proto not-found(|) is export {*}
     multi not-found(--> Nil) {
-        set-status(404);
+        set-status(404, :action<not-found>);
     }
     multi not-found($content-type, $body, *%options --> Nil) {
-        set-status(404);
+        set-status(404, :action<not-found>);
         content $content-type, $body, |%options;
     }
 
     proto bad-request(|) is export {*}
     multi bad-request(--> Nil) {
-        set-status(400);
+        set-status(400, :action<bad-request>);
     }
     multi bad-request($content-type, $body, *%options --> Nil) {
-        set-status(400);
+        set-status(400, :action<bad-request>);
         content $content-type, $body, |%options;
     }
 
     proto forbidden(|) is export {*}
     multi forbidden(--> Nil) {
-        set-status(403);
+        set-status(403, :action<forbidden>);
     }
     multi forbidden($content-type, $body, *%options --> Nil) {
-        set-status(403);
+        set-status(403, :action<forbidden>);
         content $content-type, $body, |%options;
     }
 
     proto conflict(|) is export {*}
     multi conflict(--> Nil) {
-        set-status(409);
+        set-status(409, :action<conflict>);
     }
     multi conflict($content-type, $body, *%options --> Nil) {
-        set-status(409);
+        set-status(409, :action<conflict>);
         content $content-type, $body, |%options;
     }
 
@@ -815,9 +842,9 @@ module Cro::HTTP::Router {
         $resp.set-cookie($name, $value, |%opts);
     }
 
-    sub set-status(Int $status --> Nil) {
+    sub set-status(Int $status, Str :$action = 'set-status' --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
-            die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what($action));
         $resp.status = $status;
     }
 
@@ -917,6 +944,39 @@ module Cro::HTTP::Router {
         $*CRO-ROUTE-SET.add-after($transformer);
     }
 
+    multi sub before-matched(Cro::Transform $middleware --> Nil) is export {
+        $_ = $middleware;
+        if .consumes ~~ Cro::HTTP::Request
+        && .produces ~~ Cro::HTTP::Request {
+            $*CRO-ROUTE-SET.add-before-matched($_)
+        } else {
+            die "before-matched middleware must consume and produce Cro::HTTP::Request, got ({.consumes.perl}) and ({.produces.perl}) instead";
+        }
+    }
+    multi sub before-matched(&middleware --> Nil) is export {
+        my $conditional = BeforeMiddleTransform.new(block => &middleware);
+        $*CRO-ROUTE-SET.add-before-matched($conditional.request);
+        $*CRO-ROUTE-SET.add-after-matched($conditional.response);
+    }
+    multi sub before-matched(Cro::HTTP::Middleware::Pair $pair --> Nil) {
+        before-matched($pair.request);
+        after-matched($pair.response);
+    }
+
+    multi sub after-matched(Cro::Transform $middleware --> Nil) is export {
+        $_ = $middleware;
+        if .consumes ~~ Cro::HTTP::Response
+        && .produces ~~ Cro::HTTP::Response {
+            $*CRO-ROUTE-SET.add-after-matched($_)
+        } else {
+            die "after-matched middleware must consume and produce Cro::HTTP::Response, got ({.consumes.perl}) and ({.produces.perl}) instead";
+        }
+    }
+    multi sub after-matched(&middleware --> Nil) is export {
+        my $transformer = AfterMiddleTransform.new(block => &middleware);
+        $*CRO-ROUTE-SET.add-after-matched($transformer);
+    }
+
     sub http($method, &handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler($method, &handler);
     }
@@ -941,6 +1001,10 @@ module Cro::HTTP::Router {
         $resp.append-header('Cache-Control', $cache);
     }
 
+    sub get-mime-or-default($ext, %fallback, :$default = 'application/octet-stream') {
+        %mime{$ext} // %fallback{$ext} // $default;
+    }
+
     sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -951,24 +1015,20 @@ module Cro::HTTP::Router {
         }
         my %fallback = $mime-types // {};
 
-        sub get-mime($ext) {
-            %mime{$ext} // %fallback{$ext} // 'application/octet-stream';
-        }
-
         my sub get_or_404($path) {
             if $path.e {
                 if $path.d {
                     for @indexes {
                         my $index = $path.add($_);
                         if $index.e {
-                            content get-mime($index.extension), slurp($index, :bin);
+                            content get-mime-or-default($index.extension, %fallback), slurp($index, :bin);
                             return;
                         }
                     }
                     $resp.status = 404;
                     return;
                 } else {
-                    content get-mime($path.extension), slurp($path, :bin);
+                    content get-mime-or-default($path.extension, %fallback), slurp($path, :bin);
                 }
             } else {
                 $resp.status = 404;
@@ -985,4 +1045,33 @@ module Cro::HTTP::Router {
             }
         }
     }
+
+    sub static-resource(*@path, :$mime-types, :@indexes) is export {
+        my $resp = $*CRO-ROUTER-RESPONSE //
+        die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+
+        my $path = @path.grep(*.so).join: '/';
+        my %fallback = $mime-types // {};
+
+        sub get-extension($path) {
+            return ($path ~~ m/ '.' ( <-[ \. ]>+ ) $ / )[0].Str;
+        }
+
+        if $path && (my $resource = %?RESOURCES{$path}) && $resource.IO !~~ Slip && $resource.IO.e && !$resource.IO.d {
+            content get-mime-or-default(get-extension($path), %fallback), slurp($resource, :bin);
+        } else {
+            for @indexes {
+                my $index = ($path, $_).grep(*.so).join: '/';
+                with %?RESOURCES{$index} {
+                    if .IO !~~ Slip && .IO.e {
+                        content get-mime-or-default(get-extension($index), %fallback), slurp($_, :bin);
+                        last;
+                    }
+                }
+            }
+        }
+
+        $resp.status //= 404;
+    }
+
 }

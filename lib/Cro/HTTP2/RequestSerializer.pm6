@@ -14,7 +14,7 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
 
                 my @headers = $req.headers.map({ HTTP::HPACK::Header.new(
                                                        name  => .name.lc,
-                                                       value => .value.Str.lc) });
+                                                       value => .value.Str) });
                 @headers.unshift: HTTP::HPACK::Header.new(
                     name => ':path',
                     value => $req.target);

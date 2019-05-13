@@ -106,7 +106,7 @@ role Cro::HTTP::Session::InMemory[::TSession] does Cro::HTTP::Middleware::Reques
 
     method process-responses(Supply $responses) {
         supply whenever $responses -> $res {
-            my %cookie-opts = max-age => $!expiration, :http-only;
+            my %cookie-opts = max-age => $!expiration, :http-only, path => '/';
             with $res.request.cookie-value($!cookie-name) {
                 # Already have a session cookie; put one in the response
                 # with an updated expiration time (we already bumped the

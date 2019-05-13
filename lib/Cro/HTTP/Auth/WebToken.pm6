@@ -12,7 +12,7 @@ role Cro::HTTP::Auth::WebToken does Cro::HTTP::Middleware::Request {
             my $token = self.get-token($req);
             my $auth = Nil;
             $auth = self!decode($token) if $token;
-            
+
             if $auth ~~ Hash {
                 with $auth<exp> {
                     $auth = Nil if Instant.from-posix($_) < now;

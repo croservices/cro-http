@@ -4,7 +4,7 @@ use Cro::HTTP::Router;
 use Cro::HTTP::Server;
 use Test;
 
-constant TEST_PORT = 31318;
+constant TEST_PORT = 31321;
 my $url = "http://localhost:{TEST_PORT}";
 
 class MyUser does Cro::HTTP::Auth {
@@ -20,6 +20,10 @@ class MyBasicAuth does Cro::HTTP::Auth::Basic[MyUser, "username"] {
 my $app = route {
     get -> Cro::HTTP::Auth $session {
         content 'text/plain', 'You are ' ~ $session.username;
+    }
+    post -> Cro::HTTP::Auth $session {
+        # This exists to cover a bug where a 405 got reported over a 401
+        content 'text/plain', 'POST';
     }
 }
 
@@ -38,14 +42,19 @@ given Cro::HTTP::Client.new -> $client {
     }
 }
 
-dies-ok {
-    await Cro::HTTP::Client.new.get("$url/", auth => { username => 'clouds',
-                                                       password => 'california'});
-}, 'Wrong credentials are not passed';
+throws-like
+        {
+            await Cro::HTTP::Client.new.get: "$url/",
+                    auth => { username => 'clouds', password => 'california'}
+        },
+        X::Cro::HTTP::Error::Client,
+        response => { .status == 401 },
+        '401 when wrong credentials are passed';
 
-throws-like {
-    await Cro::HTTP::Client.new.get("$url/");
-}, X::Cro::HTTP::Error::Client,
-'Request without credentials returns 401';
+throws-like
+        { await Cro::HTTP::Client.new.get("$url/") },
+        X::Cro::HTTP::Error::Client,
+        response => { .status == 401 },
+        'Request without credentials returns 401';
 
 done-testing;
