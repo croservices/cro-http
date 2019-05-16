@@ -97,34 +97,34 @@ like $req.Str, /'Foo=Bar; Bar=Baz' || 'Bar=Baz; Foo=Bar'/,  'Set string is corre
 
 $jar.clear;
 $jar.add-cookie(
-  Cro::HTTP::Cookie.new(
-    name    => 'Test',
-    value   => 'Cookie',
-    max-age => Duration.new(3600e0),
-    domain  => 'example.com',
-    path    => '/'
-  )
+    Cro::HTTP::Cookie.new(
+        name    => 'Test',
+        value   => 'Cookie',
+        max-age => Duration.new(3600e0),
+        domain  => 'example.com',
+        path    => '/'
+    )
 );
-ok $jar.contents.elems == 1,                        'A single cookie was added, successfully';
-ok $jar.contents[0].cookie.name   eq 'Test',        'Added cookie has correct name';
-ok $jar.contents[0].cookie.value  eq 'Cookie',      'Added cookie has correct value';
-ok $jar.contents[0].cookie.domain eq 'example.com', 'Added cookie has proper domain';
-ok $jar.contents[0].cookie.path   eq '/',           'Added cookie has proper path';
+is $jar.contents.elems,            1,             'A single cookie was added, successfully';
+is $jar.contents[0].cookie.name  , 'Test',        'Added cookie has correct name';
+is $jar.contents[0].cookie.value , 'Cookie',      'Added cookie has correct value';
+is $jar.contents[0].cookie.domain, 'example.com', 'Added cookie has proper domain';
+is $jar.contents[0].cookie.path  , '/',           'Added cookie has proper path';
 ok DateTime.now.later(seconds => 3600) - $jar.contents[0].expiry-time <= 1,
-  'Cookie has proper expiration time';
+    'Cookie has proper expiration time';
 # Add cookie with no expiry
 $jar.add-cookie(
-  Cro::HTTP::Cookie.new(
-    name   => 'Test1',
-    value  => 'Cookie',
-    domain => 'example.com',
-    path   => '/'
-  )
+    Cro::HTTP::Cookie.new(
+        name   => 'Test1',
+        value  => 'Cookie',
+        domain => 'example.com',
+        path   => '/'
+    )
 );
 # Retrieve cookie from jar and check that the expiry is set 10 years later
-ok $jar.contents.elems == 2, 'A second cookie was added successfully';
-ok $jar.contents[1].persistent.not, 'New cookie is not persistent';
+is $jar.contents.elems,         2,     'A second cookie was added successfully';
+is $jar.contents[1].persistent, False, 'New cookie is not persistent';
 ok DateTime.now.later(years => 10) - $jar.contents[1].expiry-time <= 1,
-  'New cookie has expected expiration time with no max-age set';
+    'New cookie has expected expiration time with no max-age set';
 
 done-testing;
