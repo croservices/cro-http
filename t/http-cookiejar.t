@@ -116,7 +116,7 @@ ok DateTime.now.later(seconds => 3600) - $jar.contents[0].expiry-time <= 1,
 $jar.add-cookie(
     Cro::HTTP::Cookie.new(
         name   => 'Test1',
-        value  => 'Cookie',
+        value  => 'Cookie2',
         domain => 'example.com',
         path   => '/'
     )
@@ -126,5 +126,8 @@ is $jar.contents.elems,         2,     'A second cookie was added successfully';
 is $jar.contents[1].persistent, False, 'New cookie is not persistent';
 ok DateTime.now.later(years => 10) - $jar.contents[1].expiry-time <= 1,
     'New cookie has expected expiration time with no max-age set';
+$jar.add-to-request($req, Cro::Uri.parse: 'http://example.com/');
+like $req.Str, /'Test=Cookie'/, 'First cookie was added to request';
+like $req.Str, /'Test1=Cookie2'/, 'Second cookie was added to request'; 
 
 done-testing;
