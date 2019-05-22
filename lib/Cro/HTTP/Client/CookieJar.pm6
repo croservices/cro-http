@@ -49,6 +49,31 @@ monitor Cro::HTTP::Client::CookieJar {
         False
     }
 
+    method !get-cookie-lifetime(Cro::HTTP::Cookie $cookie, CookieState $state) {
+        if $cookie.max-age.defined {
+            $state.persistent = True;
+            $state.expiry-time = DateTime.now.later(seconds => $cookie.max-age);
+        }
+        elsif !$cookie.max-age.defined && $cookie.expires {
+            $state.persistent = True;
+            $state.expiry-time = $cookie.expires.in-timezone($*TZ);
+        } else {
+            $state.persistent = False;
+            $state.expiry-time = DateTime.now.later(years => 10);
+        }
+    }
+
+    method add-cookie(Cro::HTTP::Cookie $cookie --> Nil) {
+        my $state = CookieState.new(
+            creation-time => DateTime.now,
+            last-access-time => DateTime.now
+        );
+
+        self!get-cookie-lifetime($cookie, $state);
+        $state.cookie = $cookie.clone;
+        @!cookies.push: $state;
+    }
+
     method add-from-response(Cro::HTTP::Response $resp, Cro::Uri $uri) {
         my $state;
         my $domain;
@@ -57,18 +82,8 @@ monitor Cro::HTTP::Client::CookieJar {
         for $resp.cookies {
             $state = CookieState.new(creation-time => DateTime.now,
                                      last-access-time => DateTime.now);
-            if $_.max-age.defined {
-                $state.persistent = True;
-                $state.expiry-time = DateTime.now.later(seconds => $_.max-age);
-            }
-            elsif !$_.max-age.defined && $_.expires {
-                $state.persistent = True;
-                $state.expiry-time = $_.expires.in-timezone($*TZ);
-            } else {
-                $state.persistent = False;
-                $state.expiry-time = DateTime.now.later(years => 10);
-            }
 
+            self!get-cookie-lifetime($_, $state);
             $domain = $_.domain // '';
             if not $domain eq '' {
                 next unless self!domain-match($domain, $uri.host);
