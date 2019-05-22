@@ -50,17 +50,17 @@ monitor Cro::HTTP::Client::CookieJar {
     }
 
     method !get-cookie-lifetime(Cro::HTTP::Cookie $cookie, CookieState $state) {
-      if $cookie.max-age.defined {
-          $state.persistent = True;
-          $state.expiry-time = DateTime.now.later(seconds => $cookie.max-age);
-      }
-      elsif !$cookie.max-age.defined && $cookie.expires {
-          $state.persistent = True;
-          $state.expiry-time = $cookie.expires.in-timezone($*TZ);
-      } else {
-          $state.persistent = False;
-          $state.expiry-time = DateTime.now.later(years => 10);
-      }
+        if $cookie.max-age.defined {
+            $state.persistent = True;
+            $state.expiry-time = DateTime.now.later(seconds => $cookie.max-age);
+        }
+        elsif !$cookie.max-age.defined && $cookie.expires {
+            $state.persistent = True;
+            $state.expiry-time = $cookie.expires.in-timezone($*TZ);
+        } else {
+            $state.persistent = False;
+            $state.expiry-time = DateTime.now.later(years => 10);
+        }
     }
 
     method add-cookie(Cro::HTTP::Cookie $cookie --> Nil) {
