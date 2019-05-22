@@ -4,6 +4,7 @@ use Cro::BodyParserSelector;
 use Cro::BodySerializer;
 use Cro::BodySerializerSelector;
 use Cro::HTTP::Auth;
+use Cro::HTTP::LogTimelineSchema;
 use Cro::HTTP::Middleware;
 use Cro::HTTP::MimeTypes;
 use Cro::HTTP::PushPromise;
@@ -127,7 +128,10 @@ module Cro::HTTP::Router {
                 self!add-body-serializers($response);
                 start {
                     {
-                        &!implementation(|$args);
+                        my $log-timeline-task = $request.annotations<log-timeline>;
+                        Cro::HTTP::LogTimeline::Handle.log: $log-timeline-task, -> {
+                            &!implementation(|$args);
+                        }
                         CATCH {
                             when X::Cro::HTTP::Router::NoRequestBodyMatch {
                                 $response.status = 400;
@@ -217,7 +221,11 @@ module Cro::HTTP::Router {
                     my $*WRONG-METHOD = False;
                     my $*MISSING-UNPACK = False;
                     my @*BIND-FAILS;
-                    with $request.path ~~ $!path-matcher {
+                    my $log-timeline-task = $request.annotations<log-timeline>;
+                    my $routing-outcome = Cro::HTTP::LogTimeline::Route.log: $log-timeline-task, -> {
+                        $request.path ~~ $!path-matcher
+                    }
+                    with $routing-outcome {
                         my ($handler-idx, $args) = .ast;
                         my $handler := @!handlers[$handler-idx];
                         whenever $handler.invoke($request, $args) -> $response {

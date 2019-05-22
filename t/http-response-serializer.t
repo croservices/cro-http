@@ -2,6 +2,7 @@ use Test;
 use Cro::HTTP::Response;
 use Cro::HTTP::ResponseSerializer;
 use Cro::TCP;
+use Log::Timeline;
 
 sub is-response(Supply $source, Str $expected-output, $desc) {
     my $rs = Cro::HTTP::ResponseSerializer.new();
@@ -15,9 +16,13 @@ sub is-response(Supply $source, Str $expected-output, $desc) {
     is $joined-output.decode('utf-8'), $expected-buf.decode('utf-8'), $desc;
 }
 
+# Fake request for testing purposes.
+my $request = Cro::HTTP::Request.new(:http-version<1.1>);
+$request.annotations<timeline-request> = Log::Timeline::Ongoing::Unlogged;
+
 is-response
     supply {
-        emit Cro::HTTP::Response.new(:204status);
+        emit Cro::HTTP::Response.new(:204status, :$request);
     },
     q:to/RESPONSE/, 'Basic 204 status response serialized correctly';
         HTTP/1.1 204 No Content
@@ -26,7 +31,7 @@ is-response
 
 is-response
     supply {
-        given Cro::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status, :$request) {
             .append-header('Content-type', 'text/plain');
             .set-body("Wow it's like, plain text!\n".encode('utf-8'));
             .emit;
@@ -42,7 +47,7 @@ is-response
 
 is-response
     supply {
-        given Cro::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status, :$request) {
             my $body-stream = supply {
                 emit "The first response\n".encode('utf-8');
                 emit "The second\nwith a newline in it\n".encode('utf-8');
@@ -65,7 +70,7 @@ is-response
 
 is-response
     supply {
-        given Cro::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status, :$request) {
             my $body-stream = supply {
                 emit "Not confused ".encode('utf-8');
                 emit Blob.new;
@@ -87,7 +92,7 @@ is-response
 
 is-response
     supply {
-        given Cro::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status, :$request) {
             .append-header('Content-type', 'application/json');
             .set-body({});
             .emit;
@@ -103,7 +108,7 @@ is-response
 
 is-response
     supply {
-        given Cro::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status, :$request) {
             .append-header('Content-type', 'application/json');
             .set-body([4,5,6]);
             .emit;
@@ -119,7 +124,7 @@ is-response
 
 is-response
     supply {
-        given Cro::HTTP::Response.new(:200status) {
+        given Cro::HTTP::Response.new(:200status, :$request) {
             .append-header('Content-type', 'application/vnd.foobar+json');
             .set-body({});
             .emit;

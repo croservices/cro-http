@@ -2,6 +2,7 @@ use Cro::TCP;
 use Cro::HTTP::Exception;
 use Cro::HTTP::RawBodyParserSelector;
 use Cro::HTTP::Request;
+use Cro::HTTP::LogTimelineSchema;
 
 class Cro::HTTP::RequestParser does Cro::Transform {
     has %!allowed-methods;
@@ -84,6 +85,8 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         $request.method = @parts[0];
                         $request.target = @parts[1];
                         $request.http-version = @parts[2].substr(5);
+                        $request.annotations<log-timeline> = Cro::HTTP::LogTimeline::Serve.start:
+                                :method($request.method), :target($request.target);
 
                         $expecting = Header;
                     }

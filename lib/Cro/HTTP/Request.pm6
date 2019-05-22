@@ -52,6 +52,9 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     # server side, we try to recreate it from the parts.
     has Cro::Uri $!request-uri;
 
+    # Extra annotations placed on a request, for things like request logging.
+    has %.annotations;
+
     submethod TWEAK(:$!request-uri = Nil) { }
 
     multi method Str(Cro::HTTP::Request:D:) {

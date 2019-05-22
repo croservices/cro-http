@@ -1,4 +1,5 @@
 use Cro::BodySerializerSelector;
+use Cro::HTTP::LogTimelineSchema;
 use Cro::HTTP::Response;
 use Cro::TCP;
 use Cro::Transform;
@@ -10,6 +11,8 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
     method transformer(Supply $response-stream) {
         supply {
             whenever $response-stream -> Cro::HTTP::Response $response {
+                my $log-timeline-task = $response.request.annotations<log-timeline>;
+
                 # No body expected or allowed for 204 or less than 200.
                 my int $status = $response.status;
                 if $status == 204 || ($status < 200 && $status != 101) {
@@ -39,15 +42,20 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                     # Has Content-length header, so already all available; no need
                     # for chunked.
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
+                    my $resp-body-task = Cro::HTTP::LogTimeline::ResponseBody.start: $log-timeline-task;
                     whenever $body-byte-stream -> $data {
                         emit Cro::TCP::Message.new(:$data);
-                        LAST maybe-connection-close();
+                        LAST {
+                            $resp-body-task.end();
+                            maybe-connection-close();
+                        }
                     }
                 }
                 else {
                     # Chunked-encode body as it becomes available.
                     $response.append-header('Transfer-encoding', 'chunked');
                     emit Cro::TCP::Message.new(data => $response.Str.encode('latin-1'));
+                    my $resp-body-task = Cro::HTTP::LogTimeline::ResponseBody.start: $log-timeline-task;
                     whenever $body-byte-stream -> $data {
                         if $data.elems {
                             my $header = ($data.elems.base(16) ~ "\r\n").encode('ascii');
@@ -59,6 +67,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                             emit Cro::TCP::Message.new(data =>
                                 BEGIN Blob.new(ord("0"), 13, 10, 13, 10)
                             );
+                            $resp-body-task.end();
                             maybe-connection-close();
                         }
                     }
@@ -67,6 +76,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                 # Closes the connection if the sender was using HTTP/1.0 or
                 # sent Connection: close.
                 sub maybe-connection-close() {
+                    $log-timeline-task.end();
                     with $response.request {
                         done if .http-version eq '1.0';
                         with .header('connection') {
