@@ -64,14 +64,14 @@ monitor Cro::HTTP::Client::CookieJar {
     }
 
     method add-cookie(Cro::HTTP::Cookie $cookie --> Nil) {
-      my $state = CookieState.new(
-        creation-time => DateTime.now,
-        last-access-time => DateTime.now
-      );
+        my $state = CookieState.new(
+            creation-time => DateTime.now,
+            last-access-time => DateTime.now
+        );
 
-      self!get-cookie-lifetime($cookie, $state);
-      $state.cookie = $cookie.clone;
-      @!cookies.push: $state;
+        self!get-cookie-lifetime($cookie, $state);
+        $state.cookie = $cookie.clone;
+        @!cookies.push: $state;
     }
 
     method add-from-response(Cro::HTTP::Response $resp, Cro::Uri $uri) {
