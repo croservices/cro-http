@@ -128,6 +128,6 @@ ok DateTime.now.later(years => 10) - $jar.contents[1].expiry-time <= 1,
     'New cookie has expected expiration time with no max-age set';
 $jar.add-to-request($req, Cro::Uri.parse: 'http://example.com/');
 like $req.Str, /'Test=Cookie'/, 'First cookie was added to request';
-like $req.Str, /'Test1=Cookie2'/, 'Second cookie was added to request'; 
+like $req.Str, /'Test1=Cookie2'/, 'Second cookie was added to request';
 
 done-testing;
