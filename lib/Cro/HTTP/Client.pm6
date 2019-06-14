@@ -370,7 +370,7 @@ class Cro::HTTP::Client {
                         $pipeline.close;
                     }
 
-                    # Set request object for recieved response regardless it's correct or not
+                    # Set request object for received response regardless it's correct or not
                     .request = $request-object;
 
                     if 200 <= .status < 400 || .status == 101 {
