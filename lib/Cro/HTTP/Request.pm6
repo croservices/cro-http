@@ -124,11 +124,11 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     method !unpack-cookie(--> List) {
         my @str = self.headers.grep({ .name.lc eq 'cookie' });
         return () if @str.elems == 0;
-        @str = @str[0].value.split('; ').List;
+        @str = @str[0].value.split(/';' ' '?/).List;
         my @res;
         for @str {
             my ($name, $value) = $_.split('=');
-            @res.push: Cro::HTTP::Cookie.new(:$name, :$value);
+            @res.push: Cro::HTTP::Cookie.new(:$name, :$value) if $name;
         }
         @res;
     }

@@ -194,6 +194,13 @@ use Test;
 }
 
 {
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    $req.append-header('Cookie: foo=WP+Cookie+check;');
+    is $req.cookie-value('foo'), 'WP+Cookie+check',
+            'Can cope with trailing ; in cookie line';
+}
+
+{
     my $req = Cro::HTTP::Request.new(method => 'GET', target => '/products/category/items/');
     is $req.target(), '/products/category/items/', 'Target is set';
     is $req.original-target().Str, '/products/category/items/', 'original-target equals target';
