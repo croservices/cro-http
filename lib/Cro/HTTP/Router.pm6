@@ -593,23 +593,23 @@ module Cro::HTTP::Router {
         }
     }
 
-    sub get(&handler --> Nil) is export {
+    multi get(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('GET', &handler);
     }
 
-    sub post(&handler --> Nil) is export {
+    multi post(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('POST', &handler);
     }
 
-    sub put(&handler --> Nil) is export {
+    multi put(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('PUT', &handler);
     }
 
-    sub delete(&handler --> Nil) is export {
+    multi delete(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('DELETE', &handler);
     }
 
-    sub patch(&handler --> Nil) is export {
+    multi patch(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('PATCH', &handler);
     }
 
