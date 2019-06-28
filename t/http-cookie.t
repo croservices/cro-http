@@ -41,6 +41,8 @@ dies-ok { my Domain $d = ' '; }, 'Domain name cannot contain spaces';
 isnt Cro::HTTP::Cookie::CookieString.parse('SID=31d4d86e407aad42; Path=/; Domain=example.com'), Nil, 'Set-Cookie string 1 parses';
 isnt Cro::HTTP::Cookie::CookieString.parse('lang=en-US; Path=/; Domain=example.com'), Nil, 'Set-Cookie string 2 parses';
 isnt Cro::HTTP::Cookie::CookieString.parse('lang=; Expires=Sun, 06 Nov 1994 08:49:37 GMT'), Nil, 'Set-Cookie string 3 parses';
+isnt Cro::HTTP::Cookie::CookieString.parse('cookie_name=value;path=/'), Nil,
+        'Set-Cookie ala buggy Tomcat (missing space); we tolerate this';
 
 # Cookie class
 dies-ok { Cro::HTTP::Cookie.new }, 'Cookie cannot be created with no arguments';

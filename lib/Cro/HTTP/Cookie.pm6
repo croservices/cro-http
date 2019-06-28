@@ -28,7 +28,7 @@ my regex path { <[\x1F..\xFF] - [;]>+ }
 my subset Path of Str is export where /^ <path> $/;
 
 grammar Cro::HTTP::Cookie::CookieString {
-    token TOP          { <cookie-pair> ['; ' <cookie-av> ]* }
+    token TOP          { <cookie-pair> [';' ' '? <cookie-av> ]* }
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
     proto token cookie-av {*}
           token cookie-av:sym<expires>   { :i 'Expires=' [ <dt=DateTime::Parse::Grammar::rfc1123-date>    |
