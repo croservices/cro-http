@@ -113,16 +113,16 @@ is-request
         my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
         $req.append-header('Host', 'localhost');
         $req.append-header('Content-type', 'application/json');
-        $req.set-body({ foo => [1,2,3] });
+        $req.set-body({});
         emit $req;
     },
     q:to/REQUEST/.chop, 'application/json content serializes Hash to JSON';
         POST /foo HTTP/1.1
         Host: localhost
         Content-type: application/json
-        Content-length: 16
+        Content-length: 2
 
-        {"foo": [1,2,3]}
+        {}
         REQUEST
 
 is-request
@@ -147,16 +147,16 @@ is-request
         my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
         $req.append-header('Host', 'localhost');
         $req.append-header('Content-type', 'application/vnd.foobar+json');
-        $req.set-body({ foo => [1,2,3] });
+        $req.set-body([1,2,3]);
         emit $req;
     },
     q:to/REQUEST/.chop, 'Media type with +json suffix also serializes JSON';
         POST /foo HTTP/1.1
         Host: localhost
         Content-type: application/vnd.foobar+json
-        Content-length: 16
+        Content-length: 7
 
-        {"foo": [1,2,3]}
+        [1,2,3]
         REQUEST
 
 is-request
