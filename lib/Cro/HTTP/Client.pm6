@@ -242,7 +242,7 @@ class Cro::HTTP::Client {
     has $.content-type;
     has $.follow;
     has %.auth;
-    has $.user-agent = 'Cro';
+    has $.user-agent;
     has $.persistent;
     has $!connection-cache = ConnectionCache.new;
     has $.http;
@@ -258,7 +258,8 @@ class Cro::HTTP::Client {
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
                     :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca,
-                    :$!push-promises, :$!user-agent) {
+                    :$!push-promises, :$user-agent = 'Cro') {
+        $!user-agent = $user-agent;
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -540,9 +541,11 @@ class Cro::HTTP::Client {
         $request.append-header('Host', $url.host ~
             ($port && $port != 80 | 443 ?? ":$port" !! ""));
         if self {
-            $request.append-header('User-agent', $.user-agent) if $.user-agent && (%options<user-agent>:!exists);
-            $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);
+            unless $request.has-header('user-agent') {
+                $request.append-header('User-agent', $.user-agent) if $.user-agent && (%options<user-agent>:!exists);
+            }
+            $request.append-header('content-type', $.content-type) if $.content-type;
             $.cookie-jar.add-to-request($request, $url) if $.cookie-jar;
             if %!auth && !(%options<auth>:exists) {
                 self!form-authentication($request, %!auth, %options<if-asked>:exists);
@@ -596,6 +599,8 @@ class Cro::HTTP::Client {
                 with %options<user-agent> {
                     $request.append-header('User-agent', $_) if $_;
                 }
+            } elsif self && $!user-agent {
+                $request.append-header('User-agent', $!user-agent);
             } else {
                 $request.append-header('User-agent', 'Cro');
             }
