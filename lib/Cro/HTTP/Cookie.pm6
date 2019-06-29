@@ -8,7 +8,7 @@ class X::Cro::HTTP::Cookie::Unrecognized is Exception {
 }
 
 my regex cookie-name { <[\x1F..\xFF] - [() \< \> @,;: \\ \x22 /\[\] ?={} \x20 \x1F \x7F]>+ };
-subset CookieName of Str where /^ <cookie-name> $/;
+my subset CookieName of Str is export where /^ <cookie-name> $/;
 
 my regex octet { <[\x21
                   \x23..\x2B
@@ -16,19 +16,19 @@ my regex octet { <[\x21
                   \x3C..\x5B
                   \x5D..\x7E]>*};
 my regex cookie-value { [ <octet> || '("' <octet> '")' ] };
-subset CookieValue of Str where /^ <cookie-value> $/;
+my subset CookieValue of Str is export where /^ <cookie-value> $/;
 
 my regex name  { <[\w\d]> (<[\w\d-]>* <[\w\d]>)* };
 # In Domain regex first dot comes from
 # RFC 6265 and is intended to be ignored.
 my regex domain { '.'? (<name> ['.'<name>]*) }
-subset Domain of Str where /^ <domain> $/;
+my subset Domain of Str is export where /^ <domain> $/;
 
 my regex path { <[\x1F..\xFF] - [;]>+ }
-subset Path of Str where /^ <path> $/;
+my subset Path of Str is export where /^ <path> $/;
 
-grammar CookieString {
-    token TOP          { <cookie-pair> ['; ' <cookie-av> ]* }
+grammar Cro::HTTP::Cookie::CookieString {
+    token TOP          { <cookie-pair> [';' ' '? <cookie-av> ]* }
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
     proto token cookie-av {*}
           token cookie-av:sym<expires>   { :i 'Expires=' [ <dt=DateTime::Parse::Grammar::rfc1123-date>    |
@@ -45,7 +45,7 @@ grammar CookieString {
 
 class Cro::HTTP::Cookie { ... }
 
-class CookieBuilder {
+class Cro::HTTP::Cookie::CookieBuilder {
     method TOP($/) {
         my ($name, $value) = $<cookie-pair>.made;
         my %args;
@@ -134,7 +134,7 @@ class Cro::HTTP::Cookie {
 
     method to-cookie() { "$!name=$!value" }
     method from-set-cookie(Str $str) {
-        my $cookie = CookieString.parse($str, :actions(CookieBuilder.new));
+        my $cookie = Cro::HTTP::Cookie::CookieString.parse($str, :actions(Cro::HTTP::Cookie::CookieBuilder.new));
         die X::Cro::HTTP::Cookie::Unrecognized.new(what => $str) unless $cookie;
         $cookie.made;
     }

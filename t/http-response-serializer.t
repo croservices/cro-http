@@ -89,16 +89,16 @@ is-response
     supply {
         given Cro::HTTP::Response.new(:200status) {
             .append-header('Content-type', 'application/json');
-            .set-body({ foo => [1,2,3] });
+            .set-body({});
             .emit;
         }
     },
     q:b:to/RESPONSE/.chop, 'application/json encodes Hash as JSON';
         HTTP/1.1 200 OK
         Content-type: application/json
-        Content-length: 16
+        Content-length: 2
 
-        {"foo": [1,2,3]}
+        {}
         RESPONSE
 
 is-response
@@ -121,16 +121,16 @@ is-response
     supply {
         given Cro::HTTP::Response.new(:200status) {
             .append-header('Content-type', 'application/vnd.foobar+json');
-            .set-body({ foo => [1,2,3] });
+            .set-body({});
             .emit;
         }
     },
     q:b:to/RESPONSE/.chop, 'application/vnd.foobar+json encodes Hash as JSON';
         HTTP/1.1 200 OK
         Content-type: application/vnd.foobar+json
-        Content-length: 16
+        Content-length: 2
 
-        {"foo": [1,2,3]}
+        {}
         RESPONSE
 
 done-testing;

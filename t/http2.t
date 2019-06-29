@@ -39,6 +39,7 @@ my Cro::Service $http2-service = Cro::HTTP::Server.new(
 );
 
 $http2-service.start;
+END try $http2-service.stop;
 
 my $client = Cro::HTTP::Client.new(:http<2>);
 
@@ -60,8 +61,5 @@ for ^3 {
     }
 }
 
-$http2-service.stop;
-
 await Promise.anyof($p, Promise.in(2));
-
 is $counter, 3, 'Concurrent responses are handled';
