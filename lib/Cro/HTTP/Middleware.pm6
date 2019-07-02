@@ -1,14 +1,58 @@
+use Cro::HTTP::LogTimelineSchema;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 use Cro::Transform;
 use Cro;
+use Log::Timeline;
+
+sub wrap-request-logging(Any $middleware, Supply $pipeline, &process --> Supply) {
+    if Log::Timeline.has-output {
+        my $pre = supply whenever $pipeline -> $request {
+            my %annotations := $request.annotations;
+            my $task = Cro::HTTP::LogTimeline::RequestMiddleware.start:
+                    %annotations<log-timeline>,
+                    :middleware($middleware.^name);
+            %annotations<log-timeline-middleware> = $task;
+            emit $request;
+        }
+        my $processed = process($pre);
+        supply whenever $processed -> $request {
+            .end with $request.annotations<log-timeline-middleware>;
+            emit $request;
+        }
+    }
+    else {
+        process($pipeline)
+    }
+}
+
+sub wrap-response-logging(Any $middleware, Supply $pipeline, &process --> Supply) {
+    if Log::Timeline.has-output {
+        my $pre = supply whenever $pipeline -> $response {
+            my %annotations := $response.request.annotations;
+            my $task = Cro::HTTP::LogTimeline::ResponseMiddleware.start:
+                    %annotations<log-timeline>,
+                    :middleware($middleware.^name);
+            %annotations<log-timeline-middleware> = $task;
+            emit $response;
+        }
+        my $processed = process($pre);
+        supply whenever $processed -> $response {
+            .end with $response.request.annotations<log-timeline-middleware>;
+            emit $response;
+        }
+    }
+    else {
+        process($pipeline)
+    }
+}
 
 role Cro::HTTP::Middleware::Request does Cro::Transform {
     method consumes() { Cro::HTTP::Request }
     method produces() { Cro::HTTP::Request }
 
     method transformer(Supply $pipeline --> Supply) {
-        supply whenever self.process($pipeline) -> $request {
+        supply whenever wrap-request-logging(self, $pipeline, { self.process($_) }) -> $request {
             $request ~~ Cro::HTTP::Request
                 ?? emit($request)
                 !! die "Request middleware {self.^name} emitted a $request.^name(), " ~
@@ -24,7 +68,7 @@ role Cro::HTTP::Middleware::Response does Cro::Transform {
     method produces() { Cro::HTTP::Response }
 
     method transformer(Supply $pipeline --> Supply) {
-        supply whenever self.process($pipeline) -> $response {
+        supply whenever wrap-response-logging(self, $pipeline, { self.process($_) }) -> $response {
             $response ~~ Cro::HTTP::Response
                 ?? emit($response)
                 !! die "Response middleware {self.^name} emitted a $response.^name(), " ~
@@ -57,7 +101,7 @@ role Cro::HTTP::Middleware::Conditional does Cro::HTTP::Middleware::Pair {
         method produces() { Cro::HTTP::Request }
 
         method transformer(Supply $pipeline, :$connection-state! --> Supply) {
-            supply whenever $!middleware.process($pipeline) {
+            supply whenever wrap-request-logging($!middleware, $pipeline, { $!middleware.process($_) }) {
                 when Cro::HTTP::Request {
                     emit $_;
                 }
@@ -107,7 +151,7 @@ role Cro::HTTP::Middleware::RequestResponse does Cro::HTTP::Middleware::Pair {
         method produces() { Cro::HTTP::Request }
 
         method transformer(Supply $pipeline, :$connection-state! --> Supply) {
-            supply whenever $!middleware.process-requests($pipeline) {
+            supply whenever wrap-request-logging($!middleware, $pipeline, { $!middleware.process-requests($_) }) {
                 when Cro::HTTP::Request {
                     emit $_;
                 }
@@ -136,7 +180,7 @@ role Cro::HTTP::Middleware::RequestResponse does Cro::HTTP::Middleware::Pair {
                         emit $skipped.response;
                     }
                 }
-                whenever $!middleware.process-responses($pipeline) -> $response {
+                whenever wrap-response-logging($!middleware, $pipeline, { $!middleware.process-responses($_) }) -> $response {
                     emit $response;
                 }
             }
