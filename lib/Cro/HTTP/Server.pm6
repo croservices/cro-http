@@ -11,9 +11,9 @@ use Cro::HTTP2::ResponseSerializer;
 use Cro::TLS;
 use Cro::TCP;
 
-# Use Mozilla "Modern Compatibility" ciphers by default
-# See: https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility
-my constant HTTP2-CIPHERS = 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256';
+# Use Mozilla "Intermediate compatibility (recommended)" ciphers by default
+# See: https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28recommended.29
+my constant HTTP2-CIPHERS = 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
 
 my class RequestParserExtension is ParserExtension {
     method consumes() { Cro::HTTP::Request }
