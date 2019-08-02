@@ -93,6 +93,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                             $expecting = Header; next if $data.elems > 0;
                         } else {
                             $buffer.append: $data;
+                            last;
                         }
                     }
                 }
