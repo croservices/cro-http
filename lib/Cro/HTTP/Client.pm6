@@ -258,8 +258,7 @@ class Cro::HTTP::Client {
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
                     :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca,
-                    :$!push-promises, :$user-agent = 'Cro') {
-        $!user-agent = $user-agent;
+                    :$!push-promises, :$!user-agent = 'Cro') {
         when $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
