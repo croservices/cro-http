@@ -27,7 +27,11 @@ my subset Domain of Str is export where /^ <domain> $/;
 my regex path { <[\x1F..\xFF] - [;]>+ }
 my subset Path of Str is export where /^ <path> $/;
 
+enum Cro::HTTP::Cookie::SameSite <Strict Lax None>;
+
 grammar Cro::HTTP::Cookie::CookieString {
+    my @same-site-opts = Cro::HTTP::Cookie::SameSite.enums.map(*.key);
+
     token TOP          { <cookie-pair> [';' ' '? <cookie-av> ]* }
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
     proto token cookie-av {*}
@@ -40,6 +44,7 @@ grammar Cro::HTTP::Cookie::CookieString {
           token cookie-av:sym<path>      { :i 'Path=' <path> }
           token cookie-av:sym<secure>    { :i 'Secure' }
           token cookie-av:sym<httponly>  { :i 'HttpOnly' }
+          token cookie-av:sym<samesite>  { :i 'SameSite=' @same-site-opts }
           token cookie-av:sym<extension> { :i <path> }
 }
 
@@ -83,6 +88,12 @@ class Cro::HTTP::Cookie::CookieBuilder {
     method cookie-av:sym<httponly> ($/) {
         make ('http-only', True);
     }
+    method cookie-av:sym<samesite> ($/) {
+        my %ss = Cro::HTTP::Cookie::SameSite.enums.map({
+            .key => Cro::HTTP::Cookie::SameSite(.value)
+        });
+        make ('same-site', %ss{$/.split('=')[1].tclc});
+    }
     method cookie-av:sym<extension> ($/) {}
 }
 
@@ -95,6 +106,7 @@ class Cro::HTTP::Cookie {
     has Path $.path;
     has Bool $.secure;
     has Bool $.http-only;
+    has Cro::HTTP::Cookie::SameSite $.same-site;
 
     sub rfc1123-formatter(DateTime $_ --> DateTime) is export {
         my %month-names = 1 => 'Jan', 2 => 'Feb', 3 => 'Mar',
@@ -119,7 +131,8 @@ class Cro::HTTP::Cookie {
     submethod BUILD(:$!name, :$!value,
                     :$!expires=Nil, :$!max-age=Nil,
                     :$!domain=Nil,:$!path=Nil,
-                    :$!secure=False, :$!http-only=False) {};
+                    :$!secure=False, :$!http-only=False,
+                    :$!same-site=Nil) {};
 
     method to-set-cookie() {
         my $base = "$!name=$!value";
@@ -129,6 +142,7 @@ class Cro::HTTP::Cookie {
         $base ~= "; Path=$!path" if $!path;
         $base ~= "; Secure" if $!secure;
         $base ~= "; HttpOnly" if $!http-only;
+        $base ~= "; SameSite={$!same-site.key}" if $!same-site.defined;
         $base;
     }
 

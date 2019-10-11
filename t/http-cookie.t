@@ -61,6 +61,7 @@ dies-ok { $c.domain    = 'new' }, 'Domain is read only';
 dies-ok { $c.path      = '/'   }, 'Path is read only';
 dies-ok { $c.secure    = True  }, 'Secure is read only';
 dies-ok { $c.http-only = True  }, 'Http-only is read only';
+dies-ok { $c.same-site = Cro::HTTP::Cookie::SameSite::Strict }, 'SameSite is read only';
 
 is $c.to-set-cookie, 'UID=TEST', 'Set cookie 1 works';
 is $c.to-cookie, 'UID=TEST', 'Cookie 1 works';
@@ -97,5 +98,18 @@ is $c.to-cookie, 'UID=TEST', 'Cookie 4 works';
 
 $cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
 is $cookie.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Cookie 4 can be parsed';
+
+# SameSite tests
+$cookie = quietly Cro::HTTP::Cookie.from-set-cookie: 'mycookie=raisin; SameSite=Dog';
+is $cookie.to-set-cookie, 'mycookie=raisin', 'Invalid SameSite value discarded';
+
+for (
+    'mycookie=raisin; SameSite=Strict',
+    'mycookie=raisin; SameSite=Lax',
+    'mycookie=raisin; SameSite=None',
+).kv -> $i, $cookie-str {
+    my $cookie = Cro::HTTP::Cookie.from-set-cookie: $cookie-str;
+    is $cookie.to-set-cookie, $cookie-str, "Valid SameSite value cookie $i can be parsed";
+}
 
 done-testing;
