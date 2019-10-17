@@ -51,16 +51,33 @@ my constant %reason-phrases = {
     505 => "HTTP Version not supported"
 };
 
+#| A HTTP response. In a client context, this is the response resulting from a
+#| HTTP request. In a server context, it is the response being produced to send
+#| back to the client.
 class Cro::HTTP::Response does Cro::HTTP::Message {
     subset StatusCode of Int where { 100 <= $_ <= 599 }
+
+    #| The HTTP request that this is a response to
     has Cro::HTTP::Request $.request is rw;
+
+    #| The HTTP status code of the response
     has StatusCode $.status is rw;
+
+    #| An object deciding how the response body is parsed; used in a client
+    #| context
     has Cro::BodyParserSelector $.body-parser-selector is rw =
         Cro::HTTP::BodyParserSelector::ResponseDefault;
+
+    #| An object deciding how the response body is serialized; used in a server
+    #| context
     has Cro::BodySerializerSelector $.body-serializer-selector is rw =
         Cro::HTTP::BodySerializerSelector::ResponseDefault;
+
     has $!push-promises = Supplier::Preserving.new;
 
+    #| The HTTP response as a string, including the response line and any
+    #| headers; in HTTP/1.1, this is what shall be sent over the network,
+    #| while in other HTTP versions it is just informative
     multi method Str(Cro::HTTP::Response:D:) {
         my $status = $!status // (self.has-body ?? 200 !! 204);
         my $reason = %reason-phrases{$status} // 'Unknown';
@@ -72,13 +89,16 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
         "HTTP Response\n" ~ self.Str.trim.subst("\r\n", "\n", :g).indent(2)
     }
 
+    #| Add a Set-cookie header to the response
     method set-cookie($name, $value, *%options) {
-        my $cookie-line = Cro::HTTP::Cookie.new(name => $name, value => $value, |%options).to-set-cookie;
+        my $cookie-line = Cro::HTTP::Cookie.new(:$name, :$value, |%options).to-set-cookie;
         my $is-dup = so self.headers.map({ .name.lc eq 'set-cookie' && .value.starts-with("$name=") }).any;
         die "Cookie with name '$name' is already set" if $is-dup;
         self.append-header('Set-Cookie', $cookie-line);
     }
 
+    #| Get a Cro::HTTP::Cookie instance for each cookie that is set by the
+    #| response
     method cookies() {
         self.headers.grep({ .name.lc eq 'set-cookie' }).map({ Cro::HTTP::Cookie.from-set-cookie: .value });
     }
@@ -87,16 +107,21 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
         "Server responded with $!status {%reason-phrases{$!status} // 'Unknown'}";
     }
 
+    #| Adds a push promise to the HTTP response
     method add-push-promise(Cro::HTTP::PushPromise $pp --> Nil) {
         $!push-promises.emit: $pp;
     }
 
+    #| Gets a Supply of push promises that have been sent on the request; on a
+    #| HTTP/1.1 request, this is always a done Supply
     method push-promises(--> Supply) {
-        ($!http-version // '') eq '2.0' ??
-        $!push-promises.Supply !!
-        supply { done };
+        ($!http-version // '') eq '2.0'
+                ?? $!push-promises.Supply
+                !! supply { done };
     }
 
+    #| Indicate that there will be no further push promises sent with this
+    #| response
     method close-push-promises() {
         $!push-promises.done;
     }

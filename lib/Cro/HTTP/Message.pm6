@@ -3,29 +3,43 @@ use Cro::MessageWithBody;
 use Cro::HTTP::Header;
 
 role Cro::HTTP::Message does Cro::MessageWithBody {
+    #| The HTTP version used for the request
     has Str $.http-version is rw;
+
+    #| If this is a HTTP/2.0 request, the stream ID
     has Int $.http2-stream-id is rw;
+
     has Cro::HTTP::Header @!headers;
 
+    #| Get a list of headers, as Cro::HTTP::Header objects
     method headers() {
         @!headers.List
     }
 
+    #| Append a header to the HTTP message
     multi method append-header(Cro::HTTP::Header $header --> Nil) {
         @!headers.push($header);
     }
 
+    #| Append a header to the HTTP message (the string must parse as a valid
+    #| HTTP header, such as 'Content-type: text/html')
     multi method append-header(Str $header --> Nil) {
         @!headers.push(Cro::HTTP::Header.parse($header));
     }
 
+    #| Append a header to the HTTP message by specifying its name and value
     multi method append-header(Str $name, Str(Cool) $value --> Nil) {
         @!headers.push(Cro::HTTP::Header.new(:$name, :$value));
     }
+
+    #| Append a header to the HTTP message using a Pair, where the key is the
+    #| header name and the value is the header value
     multi method append-header(Pair $header --> Nil) {
         @!headers.push(Cro::HTTP::Header.new(name => $header.key, value => $header.value));
     }
 
+    #| Remove all headers with the specified name; returns the number of
+    #| headers that were removed
     multi method remove-header(Str $name --> Int) {
         my $folded = $name.fc;
         my $removed = 0;
@@ -33,23 +47,32 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
         $removed
     }
 
+    #| Remove a header matching the specified predicate; returns the number
+    #| of headers that removed
     multi method remove-header(&predicate --> Int) {
         my $removed = 0;
         @!headers .= grep({ not predicate($_) && ++$removed });
         $removed
     }
 
+    #| Remove the exact header passed (compared by object equality, so this
+    #| must have been obtained by first calling the headers method on this
+    #| message); returns the number of headers removed
     multi method remove-header(Cro::HTTP::Header $header --> Int) {
         my $removed = 0;
         @!headers .= grep({ not $_ === $header && ++$removed });
         $removed
     }
 
+    #| Checks if the message has a header with the specified name
     method has-header(Str $header-name --> Bool) {
         my $folded = $header-name.fc;
         so @!headers.first(*.name.fc eq $folded)
     }
 
+    #| Get the header with the specified name as a string; if there are
+    #| many headers with that name, their values will be joined with a
+    #| comma, and Nil will be returned if there are no headers
     method header(Str $header-name) {
         my $folded = $header-name.fc;
         my @matching := @!headers.grep(*.name.fc eq $folded).list;
@@ -60,6 +83,8 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
                 !! @matching.map(*.value).join(',')
     }
 
+    #| Get the value(s) of the header(s) with the specified name as a
+    #| List; if there is no header with such a name, the list will be empty
     method header-list(Str $header-name) {
         my $folded = $header-name.fc;
         @!headers.grep(*.name.fc eq $folded).map(*.value).list
@@ -69,6 +94,8 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
         @!headers.map({ .name ~ ": " ~ .value ~ "\r\n" }).join
     }
 
+    #| Gets a Cro::MediaType object representing the Content-type header of
+    #| the message, and returning Nil if there is no such header
     method content-type() {
         with self.header('content-type') {
             Cro::MediaType.parse($_)
@@ -78,6 +105,10 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
         }
     }
 
+    #| Determines the encoding of the message, preferentially by looking
+    #| for a charset parameter in the content-type, but falling back to
+    #| trying to infer the encoding from the content of the specified
+    #| blob; may return a List of potential encodings
     method body-text-encoding(Blob $blob) {
         my $encoding;
         with self.content-type {

@@ -26,19 +26,28 @@ my class RequestSerializerExtension is SerializerExtension {
     method produces() { Cro::HTTP::Request }
 }
 
+#| Thrown by the HTTP client when a request results in an unsuccessful response
 class X::Cro::HTTP::Error is Exception {
-    has $.response;
+    #| The response object of the unsuccessful request
+    has Cro::HTTP::Response $.response;
 
+    #| The response phrase in the HTTP response
     method message() {
         "{$.response.get-response-phrase}"
     }
 
-    method request() {
+    #| The request that resulted in the unsuccessful response.
+    method request(--> Cro::HTTP::Request) {
         $!response.request
     }
 }
 
+#| Thrown by the HTTP client when it receives a response indicating a client
+#| error (4xx response code)
 class X::Cro::HTTP::Error::Client is X::Cro::HTTP::Error {}
+
+#| Thrown by the HTTP client when it receives a response indicating a server
+#| error (5xx response code)
 class X::Cro::HTTP::Error::Server is X::Cro::HTTP::Error {}
 
 class X::Cro::HTTP::Client::BodyAlreadySet is Exception {
@@ -55,6 +64,8 @@ class X::Cro::HTTP::Client::IncorrectHeaderType is Exception {
     }
 }
 
+#| Thrown if the number of redirects resulting from a HTTP request exceeds the
+#| redirect limit (often indicates a redirect loop)
 class X::Cro::HTTP::Client::TooManyRedirects is Exception {
     method message() {
         "Too many redirects"
@@ -82,6 +93,10 @@ class X::Cro::HTTP::Client::InvalidCookie is Exception {
     }
 }
 
+#| A HTTP client. Can be used by calling methods on the type object, or by making an
+#| instance of the client. An instance can maintain a pool of connections to re-use
+#| for multiple requests, as well as allowing configuration of common properties of
+#| many requests at construction time.
 class Cro::HTTP::Client {
     my class Pipeline {
         has Bool $.secure;
@@ -233,40 +248,78 @@ class Cro::HTTP::Client {
         }
     }
 
+    #| Headers that are added to every request by default
     has @.headers;
-    has $.cookie-jar;
-    has $.body-serializers;
-    has $.add-body-serializers;
-    has $.body-parsers;
-    has $.add-body-parsers;
-    has $.content-type;
-    has $.follow;
-    has %.auth;
-    has $.persistent;
-    has $!connection-cache = ConnectionCache.new;
-    has $.http;
-    has $.ca;
-    has Cro::Uri $.base-uri;
-    has $.push-promises = False;
 
-    method persistent() {
+    #| The cookie jar that the HTTP client uses to store cookies
+    has $.cookie-jar;
+
+    #| A replacement set of body serializers, completely overriding the defaults
+    has $.body-serializers;
+
+    #| Body serializers added to the default set, or to body-serializers
+    has $.add-body-serializers;
+
+    #| A replacement set of body parsers, completely overriding the defaults
+    has $.body-parsers;
+
+    #| Body parsers added to the default set, or to body-parsers
+    has $.add-body-parsers;
+
+    #| The default content type set on a request
+    has $.content-type;
+
+    #| The maximum number of redirects that will be followed
+    has $.follow;
+
+    #| The allowed HTTP version(s) (the string '1.1, '2.0', or a List with
+    #| both)
+    has $.http;
+
+    #| The certificate authority to use for verifying TLS certificates
+    has $.ca;
+
+    #| The base URI, which will be prepended to all URIs of requests using
+    #| URI reference rules (meaning that an absolute URL passed to a
+    #| request method with override this completely)
+    has Cro::Uri $.base-uri;
+
+    #| Whether push promises are accepted by the client
+    has $.push-promises;
+
+    #| Authorization configuration as a hash, which should either be empty,
+    #| container username and password keys for basic authentication, or
+    #| contain the bearer key for bearer authentication
+    has %.auth;
+
+    has $!persistent;
+    has $!connection-cache = ConnectionCache.new;
+
+    #| Tests if the HTTP client will use persistent connections, or make one
+    #| connection per request. On the type object, it will always return False,
+    #| since an instance of the client is required for persistent connections.
+    method persistent(--> Bool) {
         self ?? $!persistent !! False
     }
+
+    my constant $DEFAULT-MAX-REDIRECTS = 5;
 
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type, :$base-uri,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
-                    :$!follow, :%!auth, :$!http, :$!persistent = True, :$!ca,
-                    :$!push-promises) {
-        when $cookie-jar ~~ Bool {
+                    :$!follow = $DEFAULT-MAX-REDIRECTS, :%!auth, :$!http,
+                    :$!persistent = True, :$!ca, :$!push-promises = False) {
+        if $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
-        when $cookie-jar ~~ Cro::HTTP::Client::CookieJar {
+        elsif $cookie-jar ~~ Cro::HTTP::Client::CookieJar {
             $!cookie-jar = $cookie-jar;
         }
         if (%!auth<username>:exists) && (%!auth<password>:exists) {
-            my $reason = 'Both basic and bearer authentication methods cannot be used';
-            die X::Cro::HTTP::Client::InvalidAuth.new(:$reason) if %!auth<bearer>:exists;
+            if %!auth<bearer>:exists {
+                my $reason = 'Both basic and bearer authentication methods cannot be used';
+                die X::Cro::HTTP::Client::InvalidAuth.new(:$reason);
+            }
         }
         with $!http {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
@@ -283,51 +336,74 @@ class Cro::HTTP::Client {
         }
     }
 
+    #| Make a HTTP GET request to the specified URL
     multi method get($url, %options --> Promise) {
         self.request('GET', $url, %options)
     }
+
+    #| Make a HTTP GET request to the specified URL
     multi method get($url, *%options --> Promise) {
         self.request('GET', $url, %options)
     }
 
+    #| Make a HTTP HEAD request to the specified URL
     multi method head($url, %options --> Promise) {
         self.request('HEAD', $url, %options)
     }
+
+    #| Make a HTTP HEAD request to the specified URL
     multi method head($url, *%options --> Promise) {
         self.request('HEAD', $url, %options)
     }
 
+    #| Make a HTTP POST request to the specified URL
     multi method post($url, %options --> Promise) {
         self.request('POST', $url, %options)
     }
+
+    #| Make a HTTP POST request to the specified URL
     multi method post($url, *%options --> Promise) {
         self.request('POST', $url, %options)
     }
 
+    #| Make a HTTP PUT request to the specified URL
     multi method put($url, %options --> Promise) {
         self.request('PUT', $url, %options)
     }
+
+    #| Make a HTTP PUT request to the specified URL
     multi method put($url, *%options --> Promise) {
         self.request('PUT', $url, %options)
     }
 
+    #| Make a HTTP DELETE request to the specified URL
     multi method delete($url, %options --> Promise) {
         self.request('DELETE', $url, %options)
     }
+
+    #| Make a HTTP DELETE request to the specified URL
     multi method delete($url, *%options --> Promise) {
         self.request('DELETE', $url, %options)
     }
 
+    #| Make a HTTP PATCH request to the specified URL
     multi method patch($url, %options --> Promise) {
         self.request('PATCH', $url, %options)
     }
+
+    #| Make a HTTP PATCH request to the specified URL
     multi method patch($url, *%options --> Promise) {
         self.request('PATCH', $url, %options)
     }
 
+    #| Make a HTTP request, specifying the HTTP method (GET, POST, etc.),
+    #| the URL, and any further request options.
     multi method request(Str $method, $url, *%options --> Promise) {
         self.request($method, $url, %options)
     }
+
+    #| Make a HTTP request, specifying the HTTP method (GET, POST, etc.),
+    #| the URL, and any further request options.
     multi method request(Str $method, $url, %options --> Promise) {
         my $parsed-url = self && $!base-uri
             ?? $!base-uri.add($url)
@@ -376,9 +452,9 @@ class Cro::HTTP::Client {
                     if 200 <= .status < 400 || .status == 101 {
                         my $follow;
                         if self {
-                            $follow = %options<follow> // $!follow // 5;
+                            $follow = %options<follow> // $!follow // $DEFAULT-MAX-REDIRECTS;
                         } else {
-                            $follow = %options<follow> // 5;
+                            $follow = %options<follow> // $DEFAULT-MAX-REDIRECTS;
                         }
                         if .status ⊂ $redirect-codes && ($follow !=== False) {
                             my $remain = $follow === True ?? 4 !! $follow.Int - 1;
@@ -611,6 +687,9 @@ class Cro::HTTP::Client {
         }
     }
 
+    #| Returns the underlying connector used by the HTTP client in order to make
+    #| a TCP or TLS condition. Can be overridden to customize the transport used;
+    #| for example, Cro::HTTP::Test uses this to fake a connection.
     method choose-connector($secure) {
         $secure ?? Cro::TLS::Connector !! Cro::TCP::Connector
     }
