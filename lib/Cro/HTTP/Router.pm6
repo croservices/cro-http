@@ -588,6 +588,8 @@ module Cro::HTTP::Router {
         }
     }
 
+    #| Define a set of routes. Expects to receive a block, which will be evaluated
+    #| to set up the routing definition
     sub route(&route-definition) is export {
         my $*CRO-ROUTE-SET = RouteSet.new;
         route-definition();
@@ -601,34 +603,50 @@ module Cro::HTTP::Router {
         }
     }
 
+    #| Add a handler for a HTTP GET request. The signature of the handler will be
+    #| used to determine the routing.
     multi get(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('GET', &handler);
     }
 
+    #| Add a handler for a HTTP POST request. The signature of the handler will be
+    #| used to determine the routing.
     multi post(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('POST', &handler);
     }
 
+    #| Add a handler for a HTTP PUT request. The signature of the handler will be
+    #| used to determine the routing.
     multi put(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('PUT', &handler);
     }
 
+    #| Add a handler for a HTTP DELETE request. The signature of the handler will be
+    #| used to determine the routing.
     multi delete(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('DELETE', &handler);
     }
 
+    #| Add a handler for a HTTP PATCH request. The signature of the handler will be
+    #| used to determine the routing.
     multi patch(&handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler('PATCH', &handler);
     }
 
+    #| Add a body parser, which will be considered for use when parsing the body of
+    #| a request to a route within this route block.
     sub body-parser(Cro::BodyParser $parser --> Nil) is export {
         $*CRO-ROUTE-SET.add-body-parser($parser);
     }
 
+    #| Add a body serializer, which will be considered for use when serializing the body of
+    #| a response produced by a handler within this route block.
     sub body-serializer(Cro::BodySerializer $serializer --> Nil) is export {
         $*CRO-ROUTE-SET.add-body-serializer($serializer);
     }
 
+    #| Flatten the routes of another route block into this one, optionally adding a
+    #| prefix. The prefix may be specified by passing Pairs or named argument.
     sub include(*@includees, *%includees --> Nil) is export {
         for @includees {
             when RouteSet  {
@@ -670,6 +688,9 @@ module Cro::HTTP::Router {
         }
     }
 
+    #| Delegate a path to some other Cro::Transform, which must consume a HTTP
+    #| request and produce a HTTP response. The mappings of paths to transforms
+    #| are expressed by passing Pairs or named arguments.
     sub delegate(*@delegates, *%delegates --> Nil) is export {
         for flat @delegates, %delegates.pairs {
             when Pair {
@@ -703,11 +724,14 @@ module Cro::HTTP::Router {
         }
     }
 
+    #| Access the Cro::HTTP::Request object for the current request
     sub term:<request>() is export {
         $*CRO-ROUTER-REQUEST //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<request>)
     }
 
+    #| Access the Cro::HTTP::Response object for the response currently
+    #| being produced
     sub term:<response>() is export {
         $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<response>)
@@ -745,16 +769,23 @@ module Cro::HTTP::Router {
     }
 
     proto header(|) is export {*}
+
+    #| Add a header to the HTTP response produced by this handler
     multi header(Cro::HTTP::Header $header --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<header>);
         $resp.append-header($header);
     }
+
+    #| Add a header to the HTTP response produced by this handler; the string
+    #| passed must parse as a valid header
     multi header(Str $header --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<header>);
         $resp.append-header($header);
     }
+
+    #| Add a header to the HTTP response produced by this handler
     multi header(Str $name, Str(Cool) $value --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<header>);
@@ -762,6 +793,10 @@ module Cro::HTTP::Router {
     }
 
     proto content(|) is export {*}
+
+    #| Specify content to be sent as a response, passing a content type and the
+    #| body. The body will be serialized using a body serializer. If no request
+    #| status was set, it will be set to 200 OK.
     multi content(Str $content-type, $body, :$enc = $body ~~ Str ?? 'utf-8' !! Nil --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
@@ -776,18 +811,30 @@ module Cro::HTTP::Router {
     }
 
     proto created(|) is export {*}
+
+    #| Produced a HTTP 201 Created response, setting the Location header with
+    #| the provided path (specifying a Location is required when producing a
+    #| HTTP 201 response)
     multi created(Str() $location --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<created>);
         $resp.status = 201;
         $resp.append-header('Location', $location);
     }
+
+    #| Produced a HTTP 201 Created response, setting the Location header with
+    #| the provided path (specifying a Location is required when producing a
+    #| HTTP 201 response). The remaining arguments will be passed to the content
+    #| function, setting the media type, response body, and other options.
     multi created(Str() $location, $content-type, $body, *%options --> Nil) {
         created $location;
         content $content-type, $body, |%options;
     }
 
     proto redirect(|) is export {*}
+
+    #| Produce a HTTP redirect response, defaulting to a temporary redirect (HTTP 307).
+    #| The location is the address to redirect to.
     multi redirect(Str() $location, :$temporary, :$permanent, :$see-other --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<redirected>);
@@ -802,6 +849,11 @@ module Cro::HTTP::Router {
         }
         $resp.append-header('Location', $location);
     }
+
+    #| Produce a HTTP redirect response, defaulting to a temporary redirect (HTTP 307).
+    #| The location is the address to redirect to. The remaining arguments will be
+    #| passed to the content function, setting the media type, response body, and
+    #| other options.
     multi redirect(Str() $location, $content-type, $body, :$temporary,
                    :$permanent, :$see-other, *%options --> Nil) {
         redirect $location, :$permanent, :$see-other;
@@ -809,41 +861,66 @@ module Cro::HTTP::Router {
     }
 
     proto not-found(|) is export {*}
+
+    #| Produce a HTTP 404 Not Found response
     multi not-found(--> Nil) {
         set-status(404, :action<not-found>);
     }
+
+    #| Produce a HTTP 404 Not Found response. The remaining arguments will be
+    #| passed to the content function, setting the media type, response body, and
+    #| other options.
     multi not-found($content-type, $body, *%options --> Nil) {
         set-status(404, :action<not-found>);
         content $content-type, $body, |%options;
     }
 
     proto bad-request(|) is export {*}
+
+    #| Produce a HTTP 400 Bad Request response
     multi bad-request(--> Nil) {
         set-status(400, :action<bad-request>);
     }
+
+    #| Produce a HTTP 400 Bad Request response. The remaining arguments will be
+    #| passed to the content function, setting the media type, response body, and
+    #| other options.
     multi bad-request($content-type, $body, *%options --> Nil) {
         set-status(400, :action<bad-request>);
         content $content-type, $body, |%options;
     }
 
     proto forbidden(|) is export {*}
+
+    #| Produce a HTTP 403 Forbidden response
     multi forbidden(--> Nil) {
         set-status(403, :action<forbidden>);
     }
+
+    #| Produce a HTTP 403 Forbidden response. The remaining arguments will be
+    #| passed to the content function, setting the media type, response body, and
+    #| other options.
     multi forbidden($content-type, $body, *%options --> Nil) {
         set-status(403, :action<forbidden>);
         content $content-type, $body, |%options;
     }
 
     proto conflict(|) is export {*}
+
+    #| Produce a HTTP 409 Conflict response
     multi conflict(--> Nil) {
         set-status(409, :action<conflict>);
     }
+
+    #| Produce a HTTP 409 Conflict response. The remaining arguments will be
+    #| passed to the content function, setting the media type, response body, and
+    #| other options.
     multi conflict($content-type, $body, *%options --> Nil) {
         set-status(409, :action<conflict>);
         content $content-type, $body, |%options;
     }
 
+    #| Add a cookie to the response
     sub set-cookie($name, $value, *%opts) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -856,6 +933,8 @@ module Cro::HTTP::Router {
         $resp.status = $status;
     }
 
+    #| Add a push promise, specifying the path and headers. The headers may be
+    #| specified as a list of Pairs or Cro::HTTP::Header objects.
     sub push-promise(Str $path, :$headers) is export {
         with $headers {
             if $headers ~~ Hash {
@@ -919,6 +998,8 @@ module Cro::HTTP::Router {
         }
     }
 
+    #| Add request middleware, which will take place prior to any routing taking
+    #| place
     multi sub before(Cro::Transform $middleware --> Nil) is export {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Request
@@ -928,16 +1009,25 @@ module Cro::HTTP::Router {
             die "before middleware must consume and produce Cro::HTTP::Request, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
+
+    #| Run the specified block before any routing takes place. If it produces, a
+    #| response by itself, then no routing will be performed.
     multi sub before(&middleware --> Nil) is export {
         my $conditional = BeforeMiddleTransform.new(block => &middleware);
         $*CRO-ROUTE-SET.add-before($conditional.request);
         $*CRO-ROUTE-SET.add-after($conditional.response);
     }
+
+    #| Add request/response middleware specified as single object pairing the
+    #| two together
     multi sub before(Cro::HTTP::Middleware::Pair $pair --> Nil) {
         before($pair.request);
         after($pair.response);
     }
 
+    #| Add response middleware, which will take place after the router, and
+    #| regardless of any route being matched (so if no route matched, this
+    #| would get the 404 response to process)
     multi sub after(Cro::Transform $middleware --> Nil) is export {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Response
@@ -947,11 +1037,17 @@ module Cro::HTTP::Router {
             die "after middleware must consume and produce Cro::HTTP::Response, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
+
+    #| Run the specified block after all route processing is done, and
+    #| regardless of any route being matched (so if no route matched, this
+    #| would get the 404 response to process).
     multi sub after(&middleware --> Nil) is export {
         my $transformer = AfterMiddleTransform.new(block => &middleware);
         $*CRO-ROUTE-SET.add-after($transformer);
     }
 
+    #| Run the specified request middleware after a route has been matched, but
+    #| before running the route handler
     multi sub before-matched(Cro::Transform $middleware --> Nil) is export {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Request
@@ -961,16 +1057,27 @@ module Cro::HTTP::Router {
             die "before-matched middleware must consume and produce Cro::HTTP::Request, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
+
+    #| Run the specified block after a route has been matched, but
+    #| before running the route handler; if the block produces a response,
+    #| then the route handler will not be run
     multi sub before-matched(&middleware --> Nil) is export {
         my $conditional = BeforeMiddleTransform.new(block => &middleware);
         $*CRO-ROUTE-SET.add-before-matched($conditional.request);
         $*CRO-ROUTE-SET.add-after-matched($conditional.response);
     }
+
+    #| Add request/response middleware specified as single object pairing the
+    #| two together; they will only be executed if a route is matched by the
+    #| request
     multi sub before-matched(Cro::HTTP::Middleware::Pair $pair --> Nil) {
         before-matched($pair.request);
         after-matched($pair.response);
     }
 
+    #| Run the specified request middleware after a route has been matched and its
+    #| route handler has finished executing; if no route handler is matched, then
+    #| the middleware will not be run
     multi sub after-matched(Cro::Transform $middleware --> Nil) is export {
         $_ = $middleware;
         if .consumes ~~ Cro::HTTP::Response
@@ -980,23 +1087,32 @@ module Cro::HTTP::Router {
             die "after-matched middleware must consume and produce Cro::HTTP::Response, got ({.consumes.perl}) and ({.produces.perl}) instead";
         }
     }
+
+    #| Run the specified block after a route has been matched and its route
+    #| handler has finished executing; if no route handler is matched, then
+    #| the block will not run
     multi sub after-matched(&middleware --> Nil) is export {
         my $transformer = AfterMiddleTransform.new(block => &middleware);
         $*CRO-ROUTE-SET.add-after-matched($transformer);
     }
 
+    #| Add a request handler for the specified HTTP method. This is useful
+    #| when there is no shortcut function available for the HTTP method.
     sub http($method, &handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler($method, &handler);
     }
 
+    #| Set a cache control header on the response according to the provided
+    #| options. Any existing Cache-control header will be removed before the
+    #| new one is added.
     sub cache-control(:$public, :$private, :$no-cache, :$no-store,
                       Int :$max-age, Int :$s-maxage,
                       :$must-revalidate, :$proxy-revalidate,
                       :$no-transform) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
-        $resp.remove-header('Cache-Control');
         die if ($public, $private, $no-cache).grep(Bool).elems != 1;
+        $resp.remove-header('Cache-Control');
         my @headers = (:$public, :$private, :$no-cache, :$no-store,
                        :$max-age, :$s-maxage,
                        :$must-revalidate, :$proxy-revalidate,
@@ -1013,6 +1129,10 @@ module Cro::HTTP::Router {
         %mime{$ext} // %fallback{$ext} // $default;
     }
 
+    #| Serve static content. With a single argument, that file is served. Otherwise,
+    #| the first argument specifies a base path, and the remaining positional
+    #| arguments are treated as path segments. However, it is not possible to
+    #| reach a path above the base.
     sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -1054,6 +1174,7 @@ module Cro::HTTP::Router {
         }
     }
 
+    #| Serve static content from %?RESOURCES
     sub static-resource(*@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
         die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -1081,5 +1202,4 @@ module Cro::HTTP::Router {
 
         $resp.status //= 404;
     }
-
 }
