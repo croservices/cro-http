@@ -15,6 +15,7 @@ my class CookieState {
     has Bool $.http-only is rw;
 }
 
+#| A cookie jar for use with Cro::HTTP::Client
 monitor Cro::HTTP::Client::CookieJar {
     has CookieState @!cookies;
 
@@ -63,6 +64,8 @@ monitor Cro::HTTP::Client::CookieJar {
         }
     }
 
+    #| Manually add a cookie into the cookie jar, so that it will be sent with
+    #| applicable requests
     method add-cookie(Cro::HTTP::Cookie $cookie --> Nil) {
         my $state = CookieState.new(
             creation-time => DateTime.now,
@@ -74,6 +77,8 @@ monitor Cro::HTTP::Client::CookieJar {
         @!cookies.push: $state;
     }
 
+    #| Add cookies from the specified HTTP response (this is called by Cro::HTTP::Client
+    #| when it receives a response)
     method add-from-response(Cro::HTTP::Response $resp, Cro::Uri $uri) {
         my $state;
         my $domain;
@@ -112,6 +117,8 @@ monitor Cro::HTTP::Client::CookieJar {
         self!purge;
     };
 
+    #| Add the cookies in the cookie jar to the specified HTTP request (this is
+    #| called by Cro::HTTP::Client before it sends the request)
     method add-to-request(Cro::HTTP::Request $req, Cro::Uri $uri) {
         self!purge;
         my @cookie-list;
@@ -132,17 +139,27 @@ monitor Cro::HTTP::Client::CookieJar {
         @cookie-list.map({ $req.add-cookie($_.cookie) });
     };
 
+    #| Get the contents of the cookie jar
     multi method contents(--> List) { @!cookies };
+
+    #| Get the entries in the cookie jar that would be sent with a request to the
+    #| specified URI
     multi method contents(Cro::Uri $uri --> List) {
         my $condition = { $uri.host eq .domain || $uri.host.ends-with(".$_.domain"); };
         @!cookies.grep({ $condition($_.cookie) }).List;
     };
 
+    #| Remove all cookies in the cookie jar
     multi method clear() { @!cookies = () };
+
+    #| Remove all cookies in the cookie jar that would be sent to the specified URI
     multi method clear($uri) {
         my $condition = { $uri.host eq .domain || $uri.host.ends-with(".$_.domain"); };
         @!cookies .= grep({ not $condition($_.cookie) });
     };
+
+    #| Remove the cookie of the specified name from the cookie jar that would be sent
+    #| to the specified URI
     multi method clear(Cro::Uri $uri, Str $name) {
         my $condition = -> $_ {
             ($uri.host eq .domain || $uri.host.ends-with(".$_.domain"))
