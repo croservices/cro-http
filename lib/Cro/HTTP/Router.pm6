@@ -589,7 +589,7 @@ module Cro::HTTP::Router {
     }
 
     #| Define a set of routes. Expects to receive a block, which will be evaluated
-    #| to set up the routing definition
+    #| to set up the routing definition.
     sub route(&route-definition) is export {
         my $*CRO-ROUTE-SET = RouteSet.new;
         route-definition();
@@ -737,14 +737,34 @@ module Cro::HTTP::Router {
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<response>)
     }
 
+    #| Await the request body, obtaining it as a Blob, and then pass it to the
+    #| first matching handler. If the handler is a Pair, then the key will be taken as a
+    #| content type, and the handler, specified as the value of the Pair, will only
+    #| be invoked if the content type matches that of the request. Otherwise, the
+    #| handler should be a block.
     sub request-body-blob(**@handlers) is export {
         run-body-handler(@handlers, await request.body-blob)
     }
 
+    #| Await the request body, obtaining it as a Str, and then pass it to the
+    #| first matching handler. If the handler is a Pair, then the key will be taken as a
+    #| content type, and the handler, specified as the value of the Pair, will only
+    #| be invoked if the content type matches that of the request. Otherwise, the
+    #| handler should be a block.
     sub request-body-text(**@handlers) is export {
         run-body-handler(@handlers, await request.body-text)
     }
 
+    #| Await the request body, which will have been parsed using a body parser.
+    #| and then dispatch it to the the first matching handler passed to this
+    #| function. If the handler is a Pair, then the key will be taken as a
+    #| content type, and the handler, specified as the value of the Pair, will only
+    #| be invoked if the content type matches that of the request. Otherwise, the
+    #| handler should be a block. In any case, the block will be invoked only if the
+    #| signature accepts the request body (thus, destructuring may be used in order
+    #| to validate the request body). If no handler matches, a 400 Bad Request
+    #| response will be produced automatically; to override this, pass a block that
+    #| accepts any object.
     sub request-body(**@handlers) is export {
         run-body-handler(@handlers, await request.body)
     }
