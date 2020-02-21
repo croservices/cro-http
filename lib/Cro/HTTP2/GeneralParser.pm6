@@ -67,7 +67,6 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     $stream.body.emit: .data;
                     if .end-stream {
                         $stream.body.done;
-                        emit-response(.stream-identifier, $stream.message);
                     }
                 }
                 when Cro::HTTP2::Frame::Headers {
@@ -83,9 +82,11 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                             headers => Buf.new);
                         %streams{$curr-sid}.message.set-body-byte-stream($body.Supply);
                     }
-                    my $message = %streams{.stream-identifier}.message;
 
-                    # Process push promises targetting this response.
+                    my $stream = %streams{.stream-identifier};
+                    my $message = $stream.message;
+
+                    # Process push promises targeting this response.
                     if $message ~~ Cro::HTTP::Response {
                         if $!enable-push {
                             my @promises = @(
@@ -101,20 +102,22 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                         if .end-stream {
                             # Message is complete without body
                             if self!message-full($message) {
-                                %streams{.stream-identifier}.body.done;
+                                $stream.body.done;
                                 emit-response(.stream-identifier, $message);
                             } else {
                                 die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR);
                             }
                         } else {
-                            %streams{.stream-identifier}.state = data;
+                            $stream.state = data;
+                            emit-response(.stream-identifier, $stream.message);
                         }
-                    } else {
-                        %streams{.stream-identifier}.headers ~= .headers;
+                    }
+                    else {
+                        $stream.headers ~= .headers;
                         # No meaning in lock if we're locked already
                         ($breakable, $break) = (False, .stream-identifier) if $breakable;
-                        %streams{.stream-identifier}.body.done if .end-stream;
-                        %streams{.stream-identifier}.state = header-c;
+                        $stream.body.done if .end-stream;
+                        $stream.state = header-c;
                     }
                 }
                 when Cro::HTTP2::Frame::Priority {
@@ -170,6 +173,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                             }
                         } else {
                             %streams{.stream-identifier}.state = data;
+                            emit-response(.stream-identifier, $message);
                         }
                     } else {
                         %streams{.stream-identifier}.headers ~= .headers;

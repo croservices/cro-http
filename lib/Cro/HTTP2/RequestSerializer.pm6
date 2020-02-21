@@ -12,9 +12,17 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
             whenever $in -> Cro::HTTP::Request $req {
                 my $encoder = HTTP::HPACK::Encoder.new;
 
-                my @headers = $req.headers.map({ HTTP::HPACK::Header.new(
-                                                       name  => .name.lc,
-                                                       value => .value.Str) });
+                my $host;
+                my @headers = $req.headers.map: {
+                    my $name = .name.lc;
+                    if $name eq 'host' {
+                        $host = .value.Str;
+                        Empty
+                    }
+                    else {
+                        HTTP::HPACK::Header.new(name => .name.lc, value => .value.Str)
+                    }
+                }
                 @headers.unshift: HTTP::HPACK::Header.new(
                     name => ':path',
                     value => $req.target);
@@ -24,6 +32,11 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
                 @headers.unshift: HTTP::HPACK::Header.new(
                     name => ':method',
                     value => $req.method);
+                if $host {
+                    @headers.unshift: HTTP::HPACK::Header.new(
+                            name => ':authority',
+                            value => $host);
+                }
                 emit Cro::HTTP2::Frame::Headers.new(
                     flags => $req.has-body ?? 4 !! 5,
                     stream-identifier => $req.http2-stream-id,
