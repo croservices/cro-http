@@ -55,7 +55,7 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                             $data[5] +&= 0x7F; # Reset first bit
                             $sid = ($data[5] +< 24) +| ($data[6] +< 16) +| ($data[7] +< 8) +| $data[8];
                             $data .= subbuf(9); # Header is parsed;
-                            $expecting = Payload; next;
+                            $expecting = Payload;
                         }
                     }
                     when Payload {
