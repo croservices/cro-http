@@ -40,10 +40,10 @@ sub test($request, $count, $desc, *@checks, :$fail) {
 $req = Cro::HTTP::Request.new(:method<GET>,
                               :target</resource>,
                               :5http2-stream-id);
-@headers = HTTP::HPACK::Header.new(name => ':method', value => 'GET'),
+@headers = HTTP::HPACK::Header.new(name => ':authority', value => 'example.org'),
+           HTTP::HPACK::Header.new(name => ':method', value => 'GET'),
            HTTP::HPACK::Header.new(name => ':scheme', value => 'https'),
            HTTP::HPACK::Header.new(name => ':path',   value => '/resource'),
-           HTTP::HPACK::Header.new(name => 'host',    value => 'example.org'),
            HTTP::HPACK::Header.new(name => 'accept',  value => 'image/jpeg');
 $req.append-header('host' => 'example.org');
 $req.append-header('accept' => 'image/jpeg');
@@ -58,10 +58,10 @@ $req = Cro::HTTP::Request.new(:method<POST>,
                               :target</resource>,
                               :5http2-stream-id);
 $encoder = HTTP::HPACK::Encoder.new;
-@headers = HTTP::HPACK::Header.new(name => ':method',        value => 'POST'),
+@headers = HTTP::HPACK::Header.new(name => ':authority',     value => 'example.org'),
+           HTTP::HPACK::Header.new(name => ':method',        value => 'POST'),
            HTTP::HPACK::Header.new(name => ':scheme',        value => 'https'),
            HTTP::HPACK::Header.new(name => ':path',          value => '/resource'),
-           HTTP::HPACK::Header.new(name => 'host',           value => 'example.org'),
            HTTP::HPACK::Header.new(name => 'content-type',   value => 'image/jpeg'),
            HTTP::HPACK::Header.new(name => 'content-length', value => '123');
 
@@ -89,10 +89,10 @@ $req = Cro::HTTP::Request.new(:method<POST>,
                               :target</resource>,
                               :5http2-stream-id);
 $encoder = HTTP::HPACK::Encoder.new;
-@headers = HTTP::HPACK::Header.new(name => ':method',        value => 'POST'),
+@headers = HTTP::HPACK::Header.new(name => ':authority',     value => 'example.org'),
+           HTTP::HPACK::Header.new(name => ':method',        value => 'POST'),
            HTTP::HPACK::Header.new(name => ':scheme',        value => 'https'),
            HTTP::HPACK::Header.new(name => ':path',          value => '/resource'),
-           HTTP::HPACK::Header.new(name => 'host',           value => 'example.org'),
            HTTP::HPACK::Header.new(name => 'content-type',   value => 'image/jpeg');
 
 $body = Supplier::Preserving.new;
