@@ -14,17 +14,24 @@ sub test(@frames, $count, $desc, @checks, :$fail) {
     my $counter = 0;
     my $connection-state = Cro::HTTP2::ConnectionState.new;
     $parser.transformer($fake-in.Supply, :$connection-state).tap:
-    -> $response {
-        for @checks[$counter].kv -> $i, $check {
-            ok $check($response), "check {$i + 1}";
-        }
-        $counter++;
-        $test-completed.keep if $counter == $count;
-    },
-    quit => {
-        note $_;
-        $test-completed.break;
-    }
+            -> $response {
+                start {
+                    for @checks[$counter].kv -> $i, $check {
+                        ok $check($response), "check {$i + 1}";
+                    }
+                    $counter++;
+                    $test-completed.keep if $counter == $count;
+                    CATCH {
+                        default {
+                            $test-completed.break($_);
+                        }
+                    }
+                }
+            },
+            quit => {
+                note $_;
+                $test-completed.break;
+            }
     start {
         for @frames {
             $fake-in.emit($_)

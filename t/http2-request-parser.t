@@ -22,16 +22,23 @@ sub test(@frames, $count, $desc, @checks, :$fail, :$test-supplies) {
     my $fake-in = Supplier.new;
     my $counter = 0;
     $parser.transformer($fake-in.Supply, :$connection-state).tap:
-    -> $request {
-        for @checks[$counter].kv -> $i, $check {
-            ok $check($request), "check {$i + 1}";
-        }
-        $counter++;
-        $test-completed.keep if $counter == $count;
-    },
-    quit => {
-        $test-completed.break;
-    }
+            -> $request {
+                my $current-counter = $counter++;
+                start {
+                    for @checks[$current-counter].kv -> $i, $check {
+                        ok $check($request), "check {$i + 1}";
+                    }
+                    $test-completed.keep if $current-counter + 1 == $count;
+                    CATCH {
+                        default {
+                            $test-completed.break($_);
+                        }
+                    }
+                }
+            },
+            quit => {
+                $test-completed.break;
+            }
     start {
         for @frames {
             $fake-in.emit($_)
@@ -176,12 +183,13 @@ test (Cro::HTTP2::Frame::Headers.new(
           data => $payload)),
      2, 'Header1 + Header2 + Data1',
      [[(*.method eq 'POST'),
+     (*.http-version eq '2.0'),
+     (*.target eq '/resource'),
+     (*.body-blob.result eq $payload)],
+     [(*.method eq 'POST'),
        (*.http-version eq '2.0'),
        (*.target eq '/resource')],
-      [(*.method eq 'POST'),
-       (*.http-version eq '2.0'),
-       (*.target eq '/resource'),
-       (*.body-blob.result eq $payload)]];
+      ];
 
 $encoder = HTTP::HPACK::Encoder.new;
 test (Cro::HTTP2::Frame::Headers.new(
@@ -230,12 +238,13 @@ test (Cro::HTTP2::Frame::Headers.new(
           data => $payload)),
      2, 'Header1 + Continuation1 + Header2 + Data1',
      [[(*.method eq 'POST'),
+     (*.http-version eq '2.0'),
+     (*.target eq '/resource'),
+     (*.body-blob.result eq $payload)],
+     [(*.method eq 'POST'),
        (*.http-version eq '2.0'),
        (*.target eq '/resource')],
-      [(*.method eq 'POST'),
-       (*.http-version eq '2.0'),
-       (*.target eq '/resource'),
-       (*.body-blob.result eq $payload)]];
+      ];
 
 $encoder = HTTP::HPACK::Encoder.new;
 throws-like {
