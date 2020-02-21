@@ -173,12 +173,13 @@ class Cro::HTTP::Client {
             }.tap
         }
 
-        method send-request($request --> Promise) {
+        method send-request(Cro::HTTP::Request $request --> Promise) {
             my $p = Promise.new;
             $!lock.protect: {
                 my $stream-id = $!next-stream-id;
                 $!next-stream-id += 2;
                 $request.http2-stream-id = $stream-id;
+                $request.http-version = '2.0';
                 %!outstanding-stream-responses{$stream-id} = $p.vow;
             }
             $!in.emit($request);
