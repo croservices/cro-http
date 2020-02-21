@@ -33,17 +33,17 @@ constant %tls := {
     certificate-file => 't/certs-and-keys/server-crt.pem'
 };
 
-my Cro::Service $http2-service = Cro::HTTP::Server.new(
-    :http<2>, :host<localhost>, :port(8000), :%tls,
-    :application(MyServer)
-);
+my constant TEST_PORT = 31325;
+my Cro::Service $http2-service = Cro::HTTP::Server.new:
+        :http<2>, :host<localhost>, :port(TEST_PORT), :%tls,
+        :application(MyServer);
 
 $http2-service.start;
 END try $http2-service.stop;
 
 my $client = Cro::HTTP::Client.new(:http<2>);
 
-given $client.get("https://localhost:8000", :%ca) -> $resp {
+given $client.get("https://localhost:{TEST_PORT}", :%ca) -> $resp {
     my $res = await $resp;
     is (await $res.body), 'Response', 'HTTP/2 response is get';
 }
@@ -53,7 +53,7 @@ my $p = Promise.new;
 my $counter = 0;
 for ^3 {
     start {
-        given $client.get("https://localhost:8000", :%ca) -> $resp {
+        given $client.get("https://localhost:{TEST_PORT}", :%ca) -> $resp {
             my $res = await $resp;
             my $body = await $res.body-text;
             $lock.protect({ $counter++; $p.keep if $counter == 3; });
