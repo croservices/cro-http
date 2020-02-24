@@ -28,7 +28,7 @@ role Cro::HTTP::Auth::WebToken does Cro::HTTP::Middleware::Request {
             return JSON::JWT.decode($token, :alg('RS256'), :pem($!public-key));
         }
         orwith $!secret {
-            return JSON::JWT.decode($token, :alg('HS256'), :secret($!secret));
+            return JSON::JWT.decode($token, :alg('HS256'), :$!secret);
         }
         CATCH {
             default {
