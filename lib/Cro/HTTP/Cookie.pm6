@@ -97,6 +97,9 @@ class Cro::HTTP::Cookie::CookieBuilder {
     method cookie-av:sym<extension> ($/) {}
 }
 
+#| Represents a HTTP cookie from the server-side perspective, including the
+#| details of its expiration and the constraints on when it should be sent
+#| back by the client
 class Cro::HTTP::Cookie {
     has CookieName $.name is required;
     has CookieValue $.value is required;
@@ -134,7 +137,8 @@ class Cro::HTTP::Cookie {
                     :$!secure=False, :$!http-only=False,
                     :$!same-site=Nil) {};
 
-    method to-set-cookie() {
+    #| Turns the cookie information into a value to used in a Set-cookie header
+    method to-set-cookie(--> Str) {
         my $base = "$!name=$!value";
         $base ~= "; Expires={rfc1123-formatter($!expires)}" if $!expires;
         $base ~= "; Max-Age=$!max-age" if $!max-age;
@@ -146,8 +150,12 @@ class Cro::HTTP::Cookie {
         $base;
     }
 
-    method to-cookie() { "$!name=$!value" }
-    method from-set-cookie(Str $str) {
+    #| Turns the cookie into a name=value string, for sending to a server
+    method to-cookie(--> Str) { "$!name=$!value" }
+
+    #| Parses the value part of a Set-cookie header into a Cro::HTTP::Cookie
+    #| instance
+    method from-set-cookie(Str $str --> Cro::HTTP::Cookie) {
         my $cookie = Cro::HTTP::Cookie::CookieString.parse($str, :actions(Cro::HTTP::Cookie::CookieBuilder.new));
         die X::Cro::HTTP::Cookie::Unrecognized.new(what => $str) unless $cookie;
         $cookie.made;

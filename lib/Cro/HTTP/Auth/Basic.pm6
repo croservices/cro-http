@@ -2,6 +2,15 @@ use Base64;
 use Cro::HTTP::Middleware;
 use Cro::HTTP::Auth;
 
+#| A role to assist with implementing HTTP Basic Authentication middleware.
+#| It expects to be parameterized on the type of the session as well as the
+#| name of a property on that session object that should hold the username.
+#| The consuming class should implement the authenticate method in order to
+#| check the username and password, returning True if they are valid. If
+#| they are valid, then the auth property of the request will either be set
+#| to a new TSession instance with the username property passed to the
+#| constructor if it is defined, or just have the username property set
+#| otherwise.
 role Cro::HTTP::Auth::Basic[::TSession, Str $username-prop] does Cro::HTTP::Auth does Cro::HTTP::Middleware::Request {
     method process(Supply $requests --> Supply) {
         supply whenever $requests -> $req {
