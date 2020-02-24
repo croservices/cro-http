@@ -15,12 +15,13 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
                 my $host;
                 my @headers = $req.headers.map: {
                     my $name = .name.lc;
+                    my $value = .value.Str;
                     if $name eq 'host' {
-                        $host = .value.Str;
+                        $host = $value;
                         Empty
                     }
                     else {
-                        HTTP::HPACK::Header.new(name => .name.lc, value => .value.Str)
+                        HTTP::HPACK::Header.new(:$name, :$value)
                     }
                 }
                 @headers.unshift: HTTP::HPACK::Header.new(
