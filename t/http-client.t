@@ -122,6 +122,11 @@ constant %key-cert := {
         get -> 'auth-echo', {
             response.status = 401;
         }
+
+        # Query string handling section
+        get -> 'query-string', :$x, :$y {
+            content 'text/plain', "x = $x, y = $y";
+        }
     }
 
     my $http-server = Cro::HTTP::Server.new(
@@ -471,6 +476,18 @@ constant %key-cert := {
                                    bearer => 'secret',
                                    if-asked => True}) -> $resp {
         is await($resp.body), "Bearer secret", 'if-asked works properly';
+    }
+
+    given await($client.get("$base/query-string", query => { x => 42, y => 'foo' })) -> $resp {
+        is await($resp.body), "x = 42, y = foo", 'query works properly with hash';
+    }
+
+    given await($client.get("$base/query-string", query => [x => 42, y => 'foo' ])) -> $resp {
+        is await($resp.body), "x = 42, y = foo", 'query works properly with list of pairs';
+    }
+
+    given await($client.get("$base/query-string?x=42", query => [y => 'foo'])) -> $resp {
+        is await($resp.body), "x = 42, y = foo", 'query adds to existing query string';
     }
 }
 

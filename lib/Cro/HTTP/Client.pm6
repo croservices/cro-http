@@ -332,7 +332,7 @@ class Cro::HTTP::Client {
                 $!base-uri = $_;
             }
             default {
-                $!base-uri = Cro::Uri.parse(~$_);
+                $!base-uri = Cro::Uri::HTTP.parse(~$_);
             }
         }
     }
@@ -408,7 +408,7 @@ class Cro::HTTP::Client {
     multi method request(Str $method, $url, %options --> Promise) {
         my $parsed-url = self && $!base-uri
             ?? $!base-uri.add($url)
-            !! Cro::Uri.parse($url);
+            !! Cro::Uri::HTTP.parse($url);
         my $http = self ?? $!http // %options<http> !! %options<http>;
         with $http {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
@@ -608,13 +608,28 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !assemble-request(Str $method, Cro::Uri $url, %options --> Cro::HTTP::Request) {
+    method !assemble-request(Str $method, Cro::Uri $base-url, %options --> Cro::HTTP::Request) {
+        # Add any query string parameters.
+        my $url;
+        with %options<query> -> $query {
+            my Cro::Uri::HTTP $http-uri = $base-url ~~ Cro::Uri::HTTP
+                ?? $base-url
+                !! Cro::Uri::HTTP.parse($base-url.Str);
+            $url = $http-uri.add-query($query.list);
+        }
+        else {
+            $url = $base-url;
+        }
+
+        # Form target and request object.
         my $target = $url.path || '/';
         $target ~= "?{$url.query}" if $url.query;
         my $request = Cro::HTTP::Request.new(:$method, :$target, :request-uri($url));
         my $port = $url.port;
         $request.append-header('Host', $url.host ~
             ($port && $port != 80 | 443 ?? ":$port" !! ""));
+
+        # Add defaults from the instance, if we have one.
         if self {
             $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);
@@ -623,6 +638,8 @@ class Cro::HTTP::Client {
                 self!form-authentication($request, %!auth, %options<if-asked>:exists);
             }
         }
+
+        # Process options.
         my Bool $body-set = False;
         for %options.kv -> $_, $value {
             when 'body' {
