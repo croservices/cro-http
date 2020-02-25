@@ -44,4 +44,32 @@ parses-request-target 'A single /foo/bar.html request target',
     *.path-segments eqv <foo bar.html>,
     !*.query.defined;
 
+subtest 'Basic query string additions as pair arguemnts' => {
+    given Cro::Uri::HTTP.parse('http://foo.com/foo/bar').add-query('foo' => 42, 'bar' => 'baz') {
+        is .path, '/foo/bar', 'Path was retained correctly';
+        is .query, 'foo=42&bar=baz', 'Query string correctly appended';
+    }
+}
+
+subtest 'Basic query string additions as named arguments' => {
+    given Cro::Uri::HTTP.parse('http://foo.com/foo/bar').add-query(foo => 42, bar => 'baz') {
+        is .path, '/foo/bar', 'Path was retained correctly';
+        ok .query eq 'foo=42&bar=baz' | 'bar=baz&foo=42', 'Query string correctly appended';
+    }
+}
+
+subtest 'Basic query string additions retain what was originally there' => {
+    given Cro::Uri::HTTP.parse('http://foo.com/foo/bar?x=99').add-query('foo' => 42, 'bar' => 'baz') {
+        is .path, '/foo/bar', 'Path was retained correctly';
+        is .query, 'x=99&foo=42&bar=baz', 'Existing query string values were retained';
+    }
+}
+
+subtest 'Query string keys and values are encoded' => {
+    given Cro::Uri::HTTP.parse('http://foo.com/foo/bar').add-query('a$?b!/3\45:6' => 'přiběh') {
+        is .path, '/foo/bar', 'Path was retained correctly';
+        is .query, 'a%24%3Fb%21%2F3%5C45%3A6=p%C5%99ib%C4%9Bh', 'Correct encoding';
+    }
+}
+
 done-testing;

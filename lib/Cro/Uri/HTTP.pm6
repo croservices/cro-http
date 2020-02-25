@@ -1,4 +1,4 @@
-use Cro::Uri :decode-percents;
+use Cro::Uri :decode-percents, :encode-percents;
 use Cro::HTTP::MultiValue;
 
 class Cro::Uri::HTTP is Cro::Uri {
@@ -77,5 +77,18 @@ class Cro::Uri::HTTP is Cro::Uri {
             %!cached-query-hash := %query-hash;
         }
         %!cached-query-hash
+    }
+
+    #| Encodes the specified query string parameters and returns a new URI that incorporates
+    #| them. Any existing query string parameters will be retained.
+    method add-query(*@pairs, *%named-paris) {
+        my @parts;
+        if self.query -> $existing {
+            @parts.push($existing);
+        }
+        for flat @pairs, %named-paris.pairs {
+            @parts.push(encode-percents(.key.Str) ~ '=' ~ encode-percents(.value.Str));
+        }
+        self.add('?' ~ @parts.join("&"))
     }
 }
