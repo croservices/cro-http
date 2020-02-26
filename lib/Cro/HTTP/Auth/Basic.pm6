@@ -36,7 +36,7 @@ role Cro::HTTP::Auth::Basic[::TSession, Str $username-prop] does Cro::HTTP::Midd
         my ($user, $pass) = decode-base64($auth, :bin).decode.split(':');
         if self.authenticate($user, $pass) {
             with $req.auth {
-                $req.auth.^attributes.grep(*.name eq $username-prop)[0].set-value($user);
+                .^attributes.grep(*.name eq $username-prop)[0].set_value($_, $user);
             } else {
                 my %args = $username-prop => $user;
                 $req.auth = TSession.new(|%args);
