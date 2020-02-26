@@ -11,8 +11,10 @@ use Cro::HTTP::Auth;
 #| to a new TSession instance with the username property passed to the
 #| constructor if it is defined, or just have the username property set
 #| otherwise.
-role Cro::HTTP::Auth::Basic[::TSession, Str $username-prop] does Cro::HTTP::Auth does Cro::HTTP::Middleware::Request {
-    method process(Supply $requests --> Supply) {
+role Cro::HTTP::Auth::Basic[::TSession, Str $username-prop] does Cro::HTTP::Middleware::RequestResponse {
+    has Str $.realm = 'Login Required';
+
+    method process-requests(Supply $requests --> Supply) {
         supply whenever $requests -> $req {
             with $req.header('Authorization') {
                 my $part = $_.split(' ')[1];
@@ -41,6 +43,15 @@ role Cro::HTTP::Auth::Basic[::TSession, Str $username-prop] does Cro::HTTP::Auth
             }
         } else {
             $req.auth = Nil;
+        }
+    }
+
+    method process-responses(Supply $responses --> Supply) {
+        $responses.do: -> Cro::HTTP::Response $response {
+            if $response.status == 401 {
+                $response.append-header('WWW-Authenticate',
+                        'Basic realm="' ~ $!realm ~ '"');
+            }
         }
     }
 

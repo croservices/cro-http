@@ -52,9 +52,24 @@ throws-like
         '401 when wrong credentials are passed';
 
 throws-like
+        {
+            await Cro::HTTP::Client.new.get: "$url/",
+                    auth => { username => 'clouds', password => 'california'}
+        },
+        X::Cro::HTTP::Error::Client,
+        response => { .header('WWW-Authenticate').starts-with('Basic') },
+        'WWW-Authenticate header when wrong credentials are passed';
+
+throws-like
         { await Cro::HTTP::Client.new.get("$url/") },
         X::Cro::HTTP::Error::Client,
         response => { .status == 401 },
         'Request without credentials returns 401';
+
+throws-like
+        { await Cro::HTTP::Client.new.get("$url/") },
+        X::Cro::HTTP::Error::Client,
+        response => { .header('WWW-Authenticate').starts-with('Basic') },
+        'Request without credentials has WWW-Authenticate header';
 
 done-testing;
