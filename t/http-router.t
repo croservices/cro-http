@@ -33,6 +33,8 @@ throws-like { redirect 'foo' }, X::Cro::HTTP::Router::OnlyInHandler, what => 're
     'Can only use redirect term inside of a handler';
 throws-like { conflict }, X::Cro::HTTP::Router::OnlyInHandler, what => 'conflict',
     'Can only use conflict term inside of a handler';
+throws-like { i'm-a-teapot }, X::Cro::HTTP::Router::OnlyInHandler, what => "i'm-a-teapot",
+    "Can only use i'm-a-teapot term inside of a handler";
 throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-request',
     'Can only use bad-request term inside of a handler';
 
@@ -939,6 +941,25 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
                 conflict 'text/plain', '409 conflict!';
             }
         }
+
+        get -> "im-a-teapot-1", $id {
+            if $id == 1 {
+                content 'text/plain', 'request timely';
+            }
+            else {
+                i'm-a-teapot;
+                i'm-a-teapot 'text/plain', "418 i'm-a-teapot";
+            }
+        }
+
+        get -> "im-a-teapot-2", $id {
+            if $id == 1 {
+                content 'text/plain', 'request timely!';
+            }
+            else {
+                i'm-a-teapot 'text/plain', "418 i'm-a-teapot!";
+            }
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -959,7 +980,11 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         '/conflict-1/1', 200, 'request timely', 'conflict sanity (1)',
         '/conflict-1/6', 409, '409 conflict', 'conflict (1)',
         '/conflict-2/1', 200, 'request timely!', 'conflict sanity (2)',
-        '/conflict-2/6', 409, '409 conflict!', 'conflict (2)';
+        '/conflict-2/6', 409, '409 conflict!', 'conflict (2)',
+        "/im-a-teapot-1/1", 200, "request timely", "i'm-a-teapot sanity (1)",
+        "/im-a-teapot-1/6", 418, "418 i'm-a-teapot", "i'm-a-teapot (1)",
+        "/im-a-teapot-2/1", 200, "request timely!", "i'm-a-teapot sanity (2)",
+        "/im-a-teapot-2/6", 418, "418 i'm-a-teapot!", "i'm-a-teapot (2)";
     for @cases -> $target, $status, $body, $desc {
         my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
