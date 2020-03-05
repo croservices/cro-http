@@ -940,6 +940,17 @@ module Cro::HTTP::Router {
         content $content-type, $body, |%options;
     }
 
+    proto i'm-a-teapot(|) is export {*}
+
+    multi i'm-a-teapot(--> Nil) {
+        set-status(418, :action<i'm-a-teapot>);
+    }
+
+    multi i'm-a-teapot($content-type, $body, *%options --> Nil) {
+        set-status(418, :action<i'm-a-teapot>);
+        content $content-type, $body, |%options;
+    }
+
     #| Add a cookie to the response
     sub set-cookie($name, $value, *%opts) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
