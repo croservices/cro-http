@@ -288,6 +288,9 @@ class Cro::HTTP::Client {
     #| Whether push promises are accepted by the client
     has $.push-promises;
 
+    #| User agent header value
+    has $.user-agent;
+
     #| Authorization configuration as a hash, which should either be empty,
     #| container username and password keys for basic authentication, or
     #| contain the bearer key for bearer authentication
@@ -309,7 +312,8 @@ class Cro::HTTP::Client {
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
                     :$!follow = $DEFAULT-MAX-REDIRECTS, :%!auth, :$!http,
-                    :$!persistent = True, :$!ca, :$!push-promises = False) {
+                    :$!persistent = True, :$!ca, :$!push-promises = False,
+                    :$!user-agent = 'Cro') {
         if $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -631,8 +635,11 @@ class Cro::HTTP::Client {
 
         # Add defaults from the instance, if we have one.
         if self {
-            $request.append-header('content-type', $.content-type) if $.content-type;
             self!set-headers($request, @.headers.List);
+            unless $request.has-header('user-agent') {
+                $request.append-header('User-agent', $.user-agent) if $.user-agent && (%options<user-agent>:!exists);
+            }
+            $request.append-header('content-type', $.content-type) if $.content-type;
             $.cookie-jar.add-to-request($request, $url) if $.cookie-jar;
             if %!auth && !(%options<auth>:exists) {
                 self!form-authentication($request, %!auth, %options<if-asked>:exists);
@@ -681,6 +688,22 @@ class Cro::HTTP::Client {
                 }
             }
         }
+
+        # Set User-agent, check if wasn't set already for us
+        unless $request.has-header('User-agent') {
+            # These checks are required to skip header setting
+            # if it is set to Nil or empty string by the user
+            if %options<user-agent>:exists {
+                with %options<user-agent> {
+                    $request.append-header('User-agent', $_) if $_;
+                }
+            } elsif self && $!user-agent {
+                $request.append-header('User-agent', $!user-agent);
+            } else {
+                $request.append-header('User-agent', 'Cro');
+            }
+        }
+
         return $request;
     }
 
