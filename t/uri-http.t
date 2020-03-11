@@ -72,4 +72,8 @@ subtest 'Query string keys and values are encoded' => {
     }
 }
 
+is Cro::Uri::HTTP.parse-ref('/search?q=aws+%7C%7C+ansible').query-hash<q>,
+        'aws || ansible',
+        '+ signs in query string decoded correctly';
+
 done-testing;

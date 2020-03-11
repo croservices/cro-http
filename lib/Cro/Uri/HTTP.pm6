@@ -44,7 +44,9 @@ class Cro::Uri::HTTP is Cro::Uri {
             with self.query {
                 @!cached-query-list := list eager .split('&').map: -> $kv {
                     my @kv := $kv.split('=', 2).list;
-                    Pair.new(key => decode-percents(@kv[0]), value => decode-percents(@kv[1] // ''))
+                    Pair.new:
+                            key => decode-query-string-part(@kv[0]),
+                            value => decode-query-string-part(@kv[1] // '')
                 }
             }
         }
@@ -59,8 +61,8 @@ class Cro::Uri::HTTP is Cro::Uri {
             with self.query {
                 for .split('&') -> $kv {
                     my @kv := $kv.split('=', 2).list;
-                    my $key = decode-percents(@kv[0]);
-                    my $value = decode-percents(@kv[1] // '');
+                    my $key = decode-query-string-part(@kv[0]);
+                    my $value = decode-query-string-part(@kv[1] // '');
                     with %query-hash{$key} -> $existing {
                         %query-hash{$key} = Cro::HTTP::MultiValue.new(
                             $existing ~~ Cro::HTTP::MultiValue
@@ -91,4 +93,11 @@ class Cro::Uri::HTTP is Cro::Uri {
         }
         self.add('?' ~ @parts.join("&"))
     }
+}
+
+#| Decodes a query string part. This involves replacing any +
+#| characters with spaces, followed by the standard URI decoding
+#| algorithm.
+sub decode-query-string-part(Str $part --> Str) is export(:decode-query-string-part) {
+    decode-percents $part.subst('+', ' ', :g)
 }
