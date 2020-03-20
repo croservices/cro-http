@@ -12,11 +12,20 @@ class Cro::HTTP::RawBodyParserSelector::Default does Cro::HTTP::RawBodyParserSel
             if $enc eq 'chunked' {
                 Cro::HTTP::RawBodyParser::Chunked
             }
+            elsif $enc eq 'identity' {
+                from-headers($message);
+            }
             else {
                 die "Unimplemented transfer encoding '$enc'";
             }
         }
-        elsif $message.has-header('content-length') {
+        else {
+            from-headers($message);
+        }
+    }
+
+    sub from-headers(Cro::HTTP::Message $message --> Cro::HTTP::RawBodyParser ) {
+        if $message.has-header('content-length') {
             Cro::HTTP::RawBodyParser::ContentLength
         }
         else {
