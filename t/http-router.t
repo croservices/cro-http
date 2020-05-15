@@ -2014,4 +2014,59 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     }
 }
 
+{
+    my $app = route {
+        around {
+            my $*EXCEPTION = X::AdHoc.new;
+            $_();
+            CATCH {
+                when X::AdHoc {
+                    content 'text/plain', "Rescued!";
+                }
+            }
+        }
+
+        get -> {
+            $*EXCEPTION.throw
+        }
+    };
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { 'Rescued!' }, 'Around block was called';
+        is $r.status, 200, 'Around block can send response';
+    }
+}
+
+{
+    my $mark = "";
+    my $app = route {
+        around {
+            $mark ~= "1";
+            $_();
+            $mark ~= "5";
+        }
+        around {
+            $mark ~= "2";
+            $_();
+            $mark ~= "4";
+        }
+
+        get -> {
+            $mark ~= "3";
+            content 'text/plain', "Rescued!";
+        }
+    };
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { 'Rescued!' }, 'Handler works normally with around block(s)';
+        is $r.status, 200, 'Handler works normally with around block(s)';
+        is $mark, '12345', 'The around blocks are called in top-to-bottom order';
+    }
+}
 done-testing;
