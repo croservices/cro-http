@@ -51,6 +51,7 @@ module Cro::HTTP::Router {
             has @.body-serializers;
             has @.before-matched;
             has @.after-matched;
+            has @.around;
 
             method copy-adding() { ... }
             method signature() { ... }
@@ -107,14 +108,15 @@ module Cro::HTTP::Router {
             has Str $.method;
             has &.implementation;
 
-            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!) {
                 self.bless:
                     :$!method, :&!implementation,
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
                     :before-matched[flat @before-matched, @!before-matched],
-                    :after-matched[flat @!after-matched, @after-matched]
+                    :after-matched[flat @!after-matched, @after-matched],
+                    :around[flat @!around, @around]
             }
 
             method signature() {
@@ -129,9 +131,13 @@ module Cro::HTTP::Router {
                 start {
                     {
                         my $log-timeline-task = $request.annotations<log-timeline>;
-                        Cro::HTTP::LogTimeline::Handle.log: $log-timeline-task, -> {
+                        my $callback = -> {
                             &!implementation(|$args);
                         }
+                        for @!around.reverse -> $around {
+                            $callback = -> $fn { -> { $around($fn) } }($callback);
+                        }
+                        Cro::HTTP::LogTimeline::Handle.log: $log-timeline-task, $callback;
                         CATCH {
                             when X::Cro::HTTP::Router::NoRequestBodyMatch {
                                 $response.status = 400;
@@ -173,14 +179,15 @@ module Cro::HTTP::Router {
             has Cro::Transform $.transform;
             has Bool $.wildcard;
 
-            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!) {
                 self.bless:
                     :$!transform,
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
                     before-matched => @before-matched.append(@!before-matched),
-                    after-matched => @!after-matched.append(@after-matched)
+                    after-matched => @!after-matched.append(@after-matched),
+                    around => @!around.append(@around)
             }
 
             method signature() {
@@ -208,6 +215,7 @@ module Cro::HTTP::Router {
         has @.after;
         has @.before-matched;
         has @.after-matched;
+        has @.around;
         has $!path-matcher;
         has @!handlers-to-add;  # Closures to defer adding, so they get all the middleware
 
@@ -273,7 +281,7 @@ module Cro::HTTP::Router {
 
         method add-handler(Str $method, &implementation --> Nil) {
             @!handlers-to-add.push: {
-                @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched));
+                @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched, :@!around));
             }
         }
 
@@ -303,6 +311,10 @@ module Cro::HTTP::Router {
             @!after-matched.push($middleware);
         }
 
+        method add-around($cb) {
+            @!around.push($cb);
+        }
+
         method add-delegate(@prefix, Cro::Transform $transform) {
             my $wildcard = @prefix[*-1] eq '*';
             my @new-prefix = @prefix;
@@ -310,7 +322,7 @@ module Cro::HTTP::Router {
             @!handlers-to-add.push: {
                 @!handlers.push: DelegateHandler.new:
                    prefix => @new-prefix,
-                   :$transform, :$wildcard, before-matched => @!before-matched, after-matched => @!after-matched;
+                   :$transform, :$wildcard, :@!before-matched, :@!after-matched, :@!around;
            }
         }
 
@@ -325,7 +337,7 @@ module Cro::HTTP::Router {
             for @!includes -> (:@prefix, :$includee) {
                 for $includee.handlers() {
                     @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
-                        :@!before-matched, :@!after-matched);
+                        :@!before-matched, :@!after-matched, :@!around);
                 }
             }
             self!generate-route-matcher();
@@ -1125,6 +1137,10 @@ module Cro::HTTP::Router {
     multi sub after-matched(&middleware --> Nil) is export {
         my $transformer = AfterMiddleTransform.new(block => &middleware);
         $*CRO-ROUTE-SET.add-after-matched($transformer);
+    }
+
+    sub around(&cb --> Nil) is export {
+        $*CRO-ROUTE-SET.add-around(&cb);
     }
 
     #| Add a request handler for the specified HTTP method. This is useful
