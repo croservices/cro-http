@@ -193,6 +193,8 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                 $message.method = .value unless $message.method;
             } elsif .name eq ':path' && $message ~~ Cro::HTTP::Request {
                 $message.target = .value unless $message.target;
+            } elsif .name eq ':authority' && $message ~~ Cro::HTTP::Request {
+                $message.append-header('Host' => .value);
             }
         }
         my @real-headers = @headers.grep({ not .name eq any (@$!pseudo-headers) });
