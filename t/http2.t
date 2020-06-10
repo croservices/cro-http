@@ -3,7 +3,7 @@ use Cro::HTTP::Server;
 use Cro::TLS;
 use Test;
 
-plan 2;
+plan 6;
 
 unless supports-alpn() {
     skip-rest "ALPN is not supported";
@@ -17,6 +17,10 @@ class MyServer does Cro::Transform {
     method transformer($request-stream) {
         supply {
             whenever $request-stream -> $request {
+                subtest {
+                    ok $request.header('Host').defined;
+                    ok $request.uri.host eq 'localhost';
+                }, 'HTTP/2 pseudo-headers are propagated correctly';
                 given Cro::HTTP::Response.new(:200status, :$request) {
                     .append-header('content-type', 'text/html');
                     .set-body("Response");
