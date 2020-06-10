@@ -636,9 +636,6 @@ class Cro::HTTP::Client {
         # Add defaults from the instance, if we have one.
         if self {
             self!set-headers($request, @.headers.List);
-            unless $request.has-header('user-agent') {
-                $request.append-header('User-agent', $.user-agent) if $.user-agent && (%options<user-agent>:!exists);
-            }
             $request.append-header('content-type', $.content-type) if $.content-type;
             $.cookie-jar.add-to-request($request, $url) if $.cookie-jar;
             if %!auth && !(%options<auth>:exists) {
