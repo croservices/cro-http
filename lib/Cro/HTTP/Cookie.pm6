@@ -27,10 +27,17 @@ my subset Domain of Str is export where /^ <domain> $/;
 my regex path { <[\x1F..\xFF] - [;]>+ }
 my subset Path of Str is export where /^ <path> $/;
 
-enum Cro::HTTP::Cookie::SameSite <Strict Lax None>;
+enum Cro::HTTP::Cookie::SameSite ( |do {
+    # Make key and value the same so that it is straight-forward to map back to enum
+    <
+        Strict
+        Lax
+        None
+    >.map: { $_ => $_ }
+});
 
 grammar Cro::HTTP::Cookie::CookieString {
-    my @same-site-opts = Cro::HTTP::Cookie::SameSite.enums.map(*.key);
+    my @same-site-opts = Cro::HTTP::Cookie::SameSite.enums.values;
 
     token TOP          { <cookie-pair> [';' ' '? <cookie-av> ]* }
     token cookie-pair  { <cookie-name> '=' <cookie-value> }
@@ -89,10 +96,7 @@ class Cro::HTTP::Cookie::CookieBuilder {
         make ('http-only', True);
     }
     method cookie-av:sym<samesite> ($/) {
-        my %ss = Cro::HTTP::Cookie::SameSite.enums.map({
-            .key => Cro::HTTP::Cookie::SameSite(.value)
-        });
-        make ('same-site', %ss{$/.split('=')[1].tclc});
+        make ('same-site', Cro::HTTP::Cookie::SameSite($/.split('=')[1].tclc));
     }
     method cookie-av:sym<extension> ($/) {}
 }
