@@ -1196,14 +1196,14 @@ module Cro::HTTP::Router {
                     for @indexes {
                         my $index = $path.add($_);
                         if $index.e {
-                            content get-mime-or-default($index.extension, %fallback), slurp($index, :bin);
+                            content get-mime-or-default($index.extension, %fallback), $index.IO.open(:bin).Supply(:size<1_000_000>);
                             return;
                         }
                     }
                     $resp.status = 404;
                     return;
                 } else {
-                    content get-mime-or-default($path.extension, %fallback), slurp($path, :bin);
+                    content get-mime-or-default($path.extension, %fallback), $path.IO.open(:bin).Supply(:size<1_000_000>);
                 }
             } else {
                 $resp.status = 404;
@@ -1234,13 +1234,13 @@ module Cro::HTTP::Router {
         }
 
         if $path && (my $resource = %?RESOURCES{$path}) && $resource.IO !~~ Slip && $resource.IO.e && !$resource.IO.d {
-            content get-mime-or-default(get-extension($path), %fallback), slurp($resource, :bin);
+            content get-mime-or-default(get-extension($path), %fallback), $resource.IO.open(:bin).Supply(:size<1_000_000>);
         } else {
             for @indexes {
                 my $index = ($path, $_).grep(*.so).join: '/';
                 with %?RESOURCES{$index} {
                     if .IO !~~ Slip && .IO.e {
-                        content get-mime-or-default(get-extension($index), %fallback), slurp($_, :bin);
+                        content get-mime-or-default(get-extension($index), %fallback), $_.IO.open(:bin).Supply(:size<1_000_000>);
                         last;
                     }
                 }
