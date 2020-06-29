@@ -1910,6 +1910,9 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
                 'html' => 'text/html'
             }
         }
+        get -> 'chunks' {
+            static 't/samples/', :indexes(['index.xhtml']) , :3chunk_size;
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -1918,6 +1921,7 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         like body-text($r), rx{ '<HTML>Extended</HTML>' \n }, 'Get value from index';
         is $r.status, 200, 'Static sets correct status code';
+        is $r.header('Content-length'), 22, 'Content-length for static served files';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/index-plain');
@@ -1945,6 +1949,13 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         is $r.status, 200, 'Indexes with mime-types returns good status';
         is $r.header('Content-Type'), 'text/html', 'Indexes with mime-types returns proper content-type';
+    }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/chunks');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx{ '<HTML>Extended</HTML>' \n }, 'Get index.xhtml as chunks';
+        is $r.header('Content-length'), 22, 'Content-length for as chunks served files';
     }
 }
 

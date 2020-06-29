@@ -829,7 +829,7 @@ module Cro::HTTP::Router {
     #| Specify content to be sent as a response, passing a content type and the
     #| body. The body will be serialized using a body serializer. If no request
     #| status was set, it will be set to 200 OK.
-    multi content(Str $content-type, $body, :$enc = $body ~~ Str ?? 'utf-8' !! Nil --> Nil) {
+    multi content(Str $content-type, $body, :$enc = $body ~~ Str ?? 'utf-8' !! Nil, :$content_length --> Nil) {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
         $resp.status //= 200;
@@ -839,6 +839,9 @@ module Cro::HTTP::Router {
         else {
             $resp.append-header('Content-type', $content-type);
         }
+
+        $resp.append-header('content-length', $content_length) if $content_length;
+
         $resp.set-body($body);
     }
 
@@ -1180,7 +1183,7 @@ module Cro::HTTP::Router {
     #| the first argument specifies a base path, and the remaining positional
     #| arguments are treated as path segments. However, it is not possible to
     #| reach a path above the base.
-    sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
+    sub static(IO() $base, *@path, :$mime-types, :@indexes, Int :$chunk_size) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
 
@@ -1196,14 +1199,24 @@ module Cro::HTTP::Router {
                     for @indexes {
                         my $index = $path.add($_);
                         if $index.e {
-                            content get-mime-or-default($index.extension, %fallback), $index.IO.open(:bin).Supply(:size<1_000_000>);
-                            return;
+                            if $chunk_size.defined {
+                                content get-mime-or-default($index.extension, %fallback), $index.IO.open(:bin).Supply(size => $chunk_size), content_length => $index.IO.s;
+                                return;
+                            } else {
+                                content get-mime-or-default($index.extension, %fallback), slurp($index, :bin);
+                                return;
+                            }
                         }
                     }
                     $resp.status = 404;
                     return;
                 } else {
-                    content get-mime-or-default($path.extension, %fallback), $path.IO.open(:bin).Supply(:size<1_000_000>);
+                    if $chunk_size.defined {
+                        content get-mime-or-default($path.extension, %fallback), $path.IO.open(:bin).Supply(size => $chunk_size), content_length => $path.IO.s;
+                    } else {
+                        content get-mime-or-default($path.extension, %fallback), slurp($path, :bin);
+                    }
+
                 }
             } else {
                 $resp.status = 404;
