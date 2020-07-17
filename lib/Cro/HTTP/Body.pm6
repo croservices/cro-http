@@ -18,8 +18,24 @@ class WWWFormUrlEncoded does Associative {
         Seq.new(@!pairs.iterator)
     }
 
+    method keys() {
+        self.pairs.map(*.key)
+    }
+
+    method values() {
+        self.pairs.map(*.value)
+    }
+
     method list() {
         self.pairs.list
+    }
+
+    method gist() {
+        self.^name ~ '(' ~ self.list.map({.key ~ '=｢' ~ .value ~ '｣'}).join(',') ~ ')'
+    }
+
+    method perl() {
+        self.^name ~ '(:pairs[' ~ self.list.perl ~ '])'
     }
 
     method hash() {
