@@ -8,11 +8,39 @@ use Test;
 
 constant HTTP_TEST_PORT = 31316;
 constant HTTPS_TEST_PORT = 31317;
+constant PROXY_TEST_PORT = 31318;
 constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
 constant %key-cert := {
     private-key-file => 't/certs-and-keys/server-key.pem',
     certificate-file => 't/certs-and-keys/server-crt.pem'
 };
+
+# Proxy server
+{
+    use Cro::Transform;
+    use Cro::TCP;
+
+    class Proxy does Cro::Transform {
+        method consumes() { Cro::TCP::Message }
+        method produces() { Cro::TCP::Message }
+
+        method transformer(Supply $source) {
+            supply {
+                whenever $source -> $message {
+                    my $data = ("HTTP/1.1 200 OK\r\nContent-Length: {$message.data.elems}\r\n\r\n" ~ $message.data.decode).encode('ascii');
+                    emit Cro::TCP::Message.new(:$data, :connection($message.connection));
+                }
+            }
+        }
+    }
+
+    my Cro::Service $proxy-server = Cro.compose(
+        Cro::TCP::Listener.new(port => PROXY_TEST_PORT),
+        Proxy,
+    );
+    $proxy-server.start();
+    END $proxy-server.stop();
+}
 
 # Test application.
 {
@@ -143,6 +171,43 @@ constant %key-cert := {
     );
     $https-server.start();
     END $https-server.stop();
+}
+
+{
+    {
+        (temp %*ENV)<HTTP_PROXY HTTPS_PROXY> = "http://localhost:{PROXY_TEST_PORT}" xx 2;
+        # HTTP case
+        given await Cro::HTTP::Client.get("http://localhost:{HTTP_TEST_PORT}/") -> $resp {
+            my @lines = (await $resp.body).decode.lines[^2];
+            is @lines[0], "GET http://localhost:31316/ HTTP/1.1";
+            is @lines[1], "Host: localhost:31316";
+        }
+
+        # HTTPS case
+        given await Cro::HTTP::Client.get("https://localhost:{HTTP_TEST_PORT}/") -> $resp {
+            my @lines = (await $resp.body).decode.lines[^2];
+            is @lines[0], "GET https://localhost:31316/ HTTP/1.1";
+            is @lines[1], "Host: localhost:31316";
+        }
+    }
+
+    {
+        my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT}", http-proxy => "http://localhost:{PROXY_TEST_PORT}");
+        given await $c.get('/') -> $resp {
+            my @lines = (await $resp.body).decode.lines[^2];
+            is @lines[0], "GET http://localhost:31316/ HTTP/1.1";
+            is @lines[1], "Host: localhost:31316";
+        }
+    }
+
+    {
+        my $c = Cro::HTTP::Client.new(base-uri => "https://localhost:{HTTP_TEST_PORT}", https-proxy => "http://localhost:{PROXY_TEST_PORT}");
+        given await $c.get('/', :secure) -> $resp {
+            my @lines = (await $resp.body).decode.lines[^2];
+            is @lines[0], "GET https://localhost:31316/ HTTP/1.1";
+            is @lines[1], "Host: localhost:31316";
+        }
+    }
 }
 
 {

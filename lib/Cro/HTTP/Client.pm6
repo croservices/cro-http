@@ -296,6 +296,12 @@ class Cro::HTTP::Client {
     #| contain the bearer key for bearer authentication
     has %.auth;
 
+    #| The Proxy URL for a HTTP request.
+    has Cro::Uri $.http-proxy;
+
+    #| The Proxy URL for a HTTPS request.
+    has Cro::Uri $.https-proxy;
+
     has $!persistent;
     has $!connection-cache = ConnectionCache.new;
 
@@ -311,6 +317,7 @@ class Cro::HTTP::Client {
     submethod BUILD(:$cookie-jar, :@!headers, :$!content-type, :$base-uri,
                     :$!body-serializers, :$!add-body-serializers,
                     :$!body-parsers, :$!add-body-parsers,
+                    :$http-proxy, :$https-proxy,
                     :$!follow = $DEFAULT-MAX-REDIRECTS, :%!auth, :$!http,
                     :$!persistent = True, :$!ca, :$!push-promises = False,
                     :$!user-agent = 'Cro') {
@@ -331,14 +338,15 @@ class Cro::HTTP::Client {
                 die X::Cro::HTTP::Client::InvalidVersion.new;
             }
         }
-        with $base-uri {
-            when Cro::Uri {
-                $!base-uri = $_;
-            }
-            default {
-                $!base-uri = Cro::Uri::HTTP.parse(~$_);
+        my sub wrap-uri($uri) {
+            with $uri {
+                when Cro::Uri { $uri }
+                default { Cro::Uri::HTTP.parse(~$uri); }
             }
         }
+        $!base-uri = wrap-uri($_) with $base-uri;
+        $!http-proxy = wrap-uri($_) with $http-proxy;
+        $!https-proxy = wrap-uri($_) with $https-proxy;
     }
 
     #| Make a HTTP GET request to the specified URL
@@ -422,18 +430,18 @@ class Cro::HTTP::Client {
         else {
             $http = '';
         }
-        my $request-object = self!assemble-request($method, $parsed-url, %options);
+        my Cro::Uri $proxy-url = self!get-proxy-url($parsed-url);
+        my $request-object = self!assemble-request($method, $parsed-url, $proxy-url, %options);
 
         my constant $redirect-codes = set(301, 302, 303, 307, 308);
         sub construct-url($path) {
             my $pos = $parsed-url.Str.index('/', 8);
             $parsed-url.Str.comb[0..$pos-1].join ~ $path;
         }
-
         my $enable-push = self ?? $!push-promises // %options<push-promises> !! %options<push-promises>;
 
         Promise(supply {
-            whenever self!get-pipeline($parsed-url, $http, ca => %options<ca>, :$enable-push) -> $pipeline {
+            whenever self!get-pipeline($proxy-url // $parsed-url, $http, ca => %options<ca>, :$enable-push) -> $pipeline {
                 if $pipeline !~~ Pipeline2 {
                     unless self.persistent || $request-object.has-header('connection') {
                         $request-object.append-header('Connection', 'close');
@@ -504,6 +512,18 @@ class Cro::HTTP::Client {
                 }
             }
         })
+    }
+
+    method !get-proxy-url($parsed-url) {
+        if $parsed-url.scheme eq 'http' {
+            if self { return $_ with $!http-proxy }
+            return Cro::Uri::HTTP.parse($_) with %*ENV<HTTP_PROXY>;
+        }
+        elsif $parsed-url.scheme eq 'https' {
+            if self { return $_ with $!https-proxy }
+            return Cro::Uri::HTTP.parse($_) with %*ENV<HTTPS_PROXY>;
+        }
+        Nil
     }
 
     method !get-pipeline(Cro::Uri $url, $http, :$ca, :$enable-push) {
@@ -612,7 +632,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !assemble-request(Str $method, Cro::Uri $base-url, %options --> Cro::HTTP::Request) {
+    method !assemble-request(Str $method, Cro::Uri $base-url, Cro::Uri $proxy-url, %options --> Cro::HTTP::Request) {
         # Add any query string parameters.
         my $url;
         with %options<query> -> $query {
@@ -626,9 +646,11 @@ class Cro::HTTP::Client {
         }
 
         # Form target and request object.
-        my $target = $url.path || '/';
+        # If we have a proxy URL, include the host along with the path.
+        my $target = ($proxy-url ?? ~$url !! $url.path) || '/';
         $target ~= "?{$url.query}" if $url.query;
-        my $request = Cro::HTTP::Request.new(:$method, :$target, :request-uri($url));
+        my $request-uri = $proxy-url // $url;
+        my $request = Cro::HTTP::Request.new(:$method, :$target, :$request-uri);
         my $port = $url.port;
         $request.append-header('Host', $url.host ~
             ($port && $port != 80 | 443 ?? ":$port" !! ""));
