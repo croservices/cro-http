@@ -15,7 +15,7 @@ class Cro::HTTP::BodySerializerSelector::RequestDefault does Cro::BodySerializer
         for @defaults {
             .return if .is-applicable($message, $body);
         }
-        die X::Cro::BodySerializerSelector::NoneApplicable.new;
+        die X::Cro::BodySerializerSelector::NoneApplicable.new(:$message, :response-body($body));
     }
 }
 
@@ -31,6 +31,6 @@ class Cro::HTTP::BodySerializerSelector::ResponseDefault does Cro::BodySerialize
         for @defaults {
             .return if .is-applicable($message, $body);
         }
-        die X::Cro::BodySerializerSelector::NoneApplicable.new;
+        die X::Cro::BodySerializerSelector::NoneApplicable.new(:$message, :response-body($body));
     }
 }

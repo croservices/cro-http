@@ -125,4 +125,8 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     method close-push-promises() {
         $!push-promises.done;
     }
+
+    method error-hint() {
+        "Request: $!request.method() $!request.uri()"
+    }
 }
