@@ -91,6 +91,12 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         ok $r ~~ Cro::HTTP::Response, 'No matching route gets a HTTP response';
         is $r.status, '404', 'Status code when no matching route is 404';
     }
+
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target<example[1].jpg>));
+    given $responses.receive -> $r {
+        ok $r ~~ Cro::HTTP::Response, 'No matching route gets a HTTP response';
+        is $r.status, '500', 'Status code uri is invalid is 500';
+    }
 }
 
 {

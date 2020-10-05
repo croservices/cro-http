@@ -231,6 +231,12 @@ module Cro::HTTP::Router {
                     my @*BIND-FAILS;
                     my $log-timeline-task = $request.annotations<log-timeline>;
                     my $routing-outcome = Cro::HTTP::LogTimeline::Route.log: $log-timeline-task, -> {
+                        CATCH {
+                            when X::Cro::Uri::ParseError {
+                                  emit Cro::HTTP::Response.new(:500status, :$request);
+                                  next;
+                            }
+                        }
                         $request.path ~~ $!path-matcher
                     }
                     with $routing-outcome {
