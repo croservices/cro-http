@@ -78,7 +78,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                 sub maybe-connection-close() {
                     $log-timeline-task.end();
                     with $response.request {
-                        done if .http-version eq '1.0';
+                        done if .http-version eq '1.0' || $response.has-header('upgrade');
                         with .header('connection') {
                             done if .lc.trim eq 'close';
                         }
