@@ -107,6 +107,9 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                 LAST {
                     $raw-body-byte-stream.?done;
                 }
+                QUIT {
+                    $raw-body-byte-stream.?done;
+                }
             }
         }
     }
