@@ -35,7 +35,7 @@ class WWWFormUrlEncoded does Associative {
     }
 
     method perl() {
-        self.^name ~ '(:pairs[' ~ self.list.perl ~ '])'
+        self.^name ~ '.new(:pairs[' ~ self.list.perl ~ '])'
     }
 
     method hash() {

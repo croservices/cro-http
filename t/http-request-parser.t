@@ -676,7 +676,7 @@ parses 'Can pick default encoding for application/x-www-form-urlencoded',
         is-deeply $body.list, (x => "ÀÁ", "ÕÖ" => '1'),
             '%-encoded values handled correctly when default set to latin-1';
         is $body.gist, 'Cro::HTTP::Body::WWWFormUrlEncoded(x=｢ÀÁ｣,ÕÖ=｢1｣)';
-        is $body.perl, 'Cro::HTTP::Body::WWWFormUrlEncoded(:pairs[(:x("ÀÁ"), :ÕÖ("1"))])';
+        is $body.perl, 'Cro::HTTP::Body::WWWFormUrlEncoded.new(:pairs[(:x("ÀÁ"), :ÕÖ("1"))])';
     };
 
 parses 'Respects encoding set by _charset_ in application/x-www-form-urlencoded',
