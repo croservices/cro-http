@@ -175,7 +175,7 @@ constant %key-cert := {
 
 {
     {
-        (temp %*ENV)<HTTP_PROXY HTTPS_PROXY> = "http://localhost:{PROXY_TEST_PORT}" xx 2;
+        (temp %*ENV)<HTTP_PROXY HTTPS_PROXY NO_PROXY> = flat "http://localhost:{PROXY_TEST_PORT}" xx 2, '';
         # HTTP case
         given await Cro::HTTP::Client.get("http://localhost:{HTTP_TEST_PORT}/") -> $resp {
             my @lines = (await $resp.body).decode.lines[^2];

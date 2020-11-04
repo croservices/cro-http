@@ -517,13 +517,25 @@ class Cro::HTTP::Client {
     method !get-proxy-url($parsed-url) {
         if $parsed-url.scheme eq 'http' {
             if self { return $_ with $!http-proxy }
+            return Nil if self!no-proxy($parsed-url);
             return Cro::Uri::HTTP.parse($_) with %*ENV<HTTP_PROXY>;
         }
         elsif $parsed-url.scheme eq 'https' {
             if self { return $_ with $!https-proxy }
+            return Nil if self!no-proxy($parsed-url);
             return Cro::Uri::HTTP.parse($_) with %*ENV<HTTPS_PROXY>;
         }
         Nil
+    }
+
+    method !no-proxy($parsed-url) {
+        if %*ENV<NO_PROXY> -> $no-proxy {
+            my $check-host = $parsed-url.host;
+            for $no-proxy.split(',') -> $matcher {
+                return True if $matcher eq '*' || $check-host.ends-with($matcher);
+            }
+        }
+        return False;
     }
 
     method !get-pipeline(Cro::Uri $url, $http, :$ca, :$enable-push) {
