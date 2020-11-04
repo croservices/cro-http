@@ -10,6 +10,7 @@ use Cro::HTTP::MimeTypes;
 use Cro::HTTP::PushPromise;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
+use Cro::UnhandledErrorReporter;
 use IO::Path::ChildSecure;
 
 class X::Cro::HTTP::Router::OnlyInHandler is Exception {
@@ -146,7 +147,7 @@ module Cro::HTTP::Router {
                                 $response.status = 400;
                             }
                             default {
-                                .note;
+                                report-unhandled-error($_);
                                 $response.status = 500;
                             }
                         }
@@ -240,7 +241,7 @@ module Cro::HTTP::Router {
                             emit $response;
                             QUIT {
                                 default {
-                                    .note;
+                                    report-unhandled-error($_);
                                     emit Cro::HTTP::Response.new(:500status, :$request);
                                 }
                             }
