@@ -1,7 +1,6 @@
-use Cro::HTTP::Response;
-use Cro::Transform;
+use Cro::HTTP::Middleware;
 
-class Cro::HTTP::Log::File does Cro::Transform {
+class Cro::HTTP::Log::File does Cro::HTTP::Middleware::Response {
     has IO::Handle $.logs;
     has IO::Handle $.errors;
     has Bool $.flush;
@@ -17,10 +16,7 @@ class Cro::HTTP::Log::File does Cro::Transform {
         }
     }
 
-    method consumes() { Cro::HTTP::Response }
-    method produces() { Cro::HTTP::Response }
-
-    method transformer(Supply $pipeline --> Supply) {
+    method process(Supply $pipeline --> Supply) {
         supply {
             whenever $pipeline -> $resp {
                 if $resp.status < 400 {
