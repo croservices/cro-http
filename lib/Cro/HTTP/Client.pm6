@@ -436,7 +436,7 @@ class Cro::HTTP::Client {
         my constant $redirect-codes = set(301, 302, 303, 307, 308);
         sub construct-url($path) {
             my $pos = $parsed-url.Str.index('/', 8);
-            $parsed-url.Str.comb[0..$pos-1].join ~ $path;
+            $parsed-url.Str.comb[^$pos].join ~ $path;
         }
         my $enable-push = self ?? $!push-promises // %options<push-promises> !! %options<push-promises>;
 
