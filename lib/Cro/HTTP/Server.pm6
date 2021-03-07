@@ -139,6 +139,7 @@ class Cro::HTTP::Server does Cro::Service {
                 return pack2(:!http2-only);
             } elsif $http-val eqv <1.1>|() {
                 my $listener = Cro::TLS::Listener.new(
+                    :nodelay,
                     |(:$host with $host),
                     |(:$port with $port),
                     |%tls);
@@ -150,6 +151,7 @@ class Cro::HTTP::Server does Cro::Service {
         else {
             if so $http-val == <1.1>|() {
                 my $listener = Cro::TCP::Listener.new(
+                    :nodelay,
                     |(:$host with $host),
                     |(:$port with $port));
                 return pack1($listener);
