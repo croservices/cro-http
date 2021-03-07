@@ -233,7 +233,7 @@ module Cro::HTTP::Router {
                     my $routing-outcome = Cro::HTTP::LogTimeline::Route.log: $log-timeline-task, -> {
                         CATCH {
                             when X::Cro::Uri::ParseError {
-                                  emit Cro::HTTP::Response.new(:500status, :$request);
+                                  emit Cro::HTTP::Response.new(:400status, :$request);
                                   next;
                             }
                         }
