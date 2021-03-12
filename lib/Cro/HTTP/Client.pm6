@@ -666,10 +666,10 @@ class Cro::HTTP::Client {
         my $in = Supplier::Preserving.new;
         my %ca = self ?? (self.ca // $ca // {}) !! $ca // {};
         my $out = $version-decision
-            ?? establish($connector, $in.Supply, $log-connection, :$host, :$port, |{%tls-config, %ca})
+            ?? establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, |{%tls-config, %ca})
             !! do {
                 my $s = Supplier::Preserving.new;
-                establish($connector, $in.Supply, $log-connection, :$host, :$port, |{%tls-config, %ca}).tap:
+                establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, |{%tls-config, %ca}).tap:
                     { $s.emit($_) },
                     done => { $s.done },
                     quit => {
