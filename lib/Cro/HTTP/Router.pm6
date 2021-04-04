@@ -33,6 +33,18 @@ class X::Cro::HTTP::Router::NoRequestBodyMatch is Exception {
     }
 }
 
+class X::Cro::HTTP::Router::ConfusedCapture is Exception {
+    has $.body;
+    has $.content-type;
+    has $.signature;
+
+    method message() {
+        "The message body was parsed into '$!body.raku()' of type ($!body.^name()), " ~
+        "but a Block's signature '$!signature.raku()' { $!content-type ?? "for '$!content-type' " !! ' ' }" ~
+        "could not unpack it, check if the signature fits the body?"
+    }
+}
+
 module Cro::HTTP::Router {
     role Query {}
     multi trait_mod:<is>(Parameter:D $param, :$query! --> Nil) is export {
@@ -197,6 +209,13 @@ module Cro::HTTP::Router {
                                 $response.status = 400;
                             }
                             when X::Cro::BodyParserSelector::NoneApplicable {
+                                $response.status = 400;
+                            }
+                            when X::Cro::HTTP::Router::ConfusedCapture {
+                                # This is likely a server-side error, but we should not
+                                # leak this to our clients, so just return 400 for anyone
+                                # who passes bad data and report a failure for the developer
+                                report-unhandled-error($_);
                                 $response.status = 400;
                             }
                             default {
@@ -850,19 +869,35 @@ module Cro::HTTP::Router {
     }
 
     sub run-body-handler(@handlers, \body) {
-        for @handlers {
-            when Block {
-                return .(body) if .signature.ACCEPTS(\(body));
+        for @handlers -> $handler {
+            when $handler ~~ Block {
+                CATCH {
+                    when X::Cannot::Capture {
+                        die X::Cro::HTTP::Router::ConfusedCapture.new(
+                            :body(body),
+                            :content-type(request.content-type),
+                            :signature($handler.signature)) if @handlers.elems == 1;
+                    }
+                }
+                return $handler.(body) if $handler.signature.ACCEPTS(\(body));
             }
-            when Pair {
+            when $handler ~~ Pair {
                 with request.content-type -> $content-type {
-                    if .key eq $content-type.type-and-subtype {
-                        return .value()(body) if .value.signature.ACCEPTS(\(body));
+                    if $handler.key eq $content-type.type-and-subtype {
+                        CATCH {
+                            when X::Cannot::Capture {
+                                die X::Cro::HTTP::Router::ConfusedCapture.new(
+                                    :body(body),
+                                    :$content-type,
+                                    :signature($handler.value.signature));
+                            }
+                        }
+                        return $handler.value()(body) if $handler.value.signature.ACCEPTS(\(body));
                     }
                 }
             }
             default {
-                die "request-body handlers can only be a Block or a Pair, not a $_.^name()";
+                die "request-body handlers can only be a Block or a Pair, not a $handler.^name()";
             }
         }
         die X::Cro::HTTP::Router::NoRequestBodyMatch.new;
