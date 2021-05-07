@@ -9,6 +9,7 @@ use Test;
 constant HTTP_TEST_PORT = 31316;
 constant HTTPS_TEST_PORT = 31317;
 constant PROXY_TEST_PORT = 31318;
+constant ROOT_REDIRECT_TEST_PORT = 31330;
 constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
 constant %key-cert := {
     private-key-file => 't/certs-and-keys/server-key.pem',
@@ -171,6 +172,25 @@ constant %key-cert := {
     );
     $https-server.start();
     END $https-server.stop();
+}
+
+{
+    use Cro::HTTP::Router;
+    use Cro::HTTP::Server;
+
+    my $app = route {
+        get -> {
+            redirect '/ok';
+        }
+        get -> 'ok' {
+            content 'text/plain', 'ok';
+        }
+    }
+    my $http-server = Cro::HTTP::Server.new:
+            port => ROOT_REDIRECT_TEST_PORT,
+            application => $app;
+    $http-server.start();
+    END $http-server.stop();
 }
 
 {
@@ -533,6 +553,11 @@ constant %key-cert := {
 
     given await $client.post("$base/post-307-relative", body => 'Heights') -> $resp {
         is await($resp.body), 'Heights - 7', '307 relative redirect carries request body';
+    }
+
+    # Covers a bug where a redirect failed if the initial request had to / in the URI
+    given await $client.get("http://localhost:{ROOT_REDIRECT_TEST_PORT}") -> $resp {
+        is await($resp.body), 'ok', 'Redirect works when initial request URI has no path part';
     }
 
     throws-like { my $client = Cro::HTTP::Client.new(auth =>

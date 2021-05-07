@@ -441,10 +441,6 @@ class Cro::HTTP::Client {
         my $request-object = self!assemble-request($method, $parsed-url, $proxy-url, %options);
 
         my constant $redirect-codes = set(301, 302, 303, 307, 308);
-        sub construct-url($path) {
-            my $pos = $parsed-url.Str.index('/', 8);
-            $parsed-url.Str.comb[^$pos].join ~ $path;
-        }
         my $enable-push = self ?? $!push-promises // %options<push-promises> !! %options<push-promises>;
 
         Promise(supply {
@@ -492,10 +488,7 @@ class Cro::HTTP::Client {
                                 %new-opts<content-type>:delete;
                                 %new-opts<content-length>:delete;
                             }
-                            my $new-url;
-                            $new-url = .header('location').starts-with('/')
-                                       ?? construct-url($_.header('location'))
-                                       !! .header('location');
+                            my $new-url = $parsed-url.add(Cro::Uri::HTTP.parse-ref(.header('location')));
                             %new-opts<PARENT-REQUEST-LOG> = $request-log;
                             Cro::HTTP::LogTimeline::Redirected.log($request-log, :status(.status), :url($new-url));
                             my $req = self.request($new-method, $new-url, %new-opts);
