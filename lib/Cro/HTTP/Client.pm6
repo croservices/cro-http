@@ -350,74 +350,162 @@ class Cro::HTTP::Client {
         $!https-proxy = wrap-uri($_) with $https-proxy;
     }
 
-    #| Make a HTTP GET request to the specified URL
+    #| Make a HTTP GET request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method get($url, %options --> Promise) {
         self.request('GET', $url, %options)
     }
 
-    #| Make a HTTP GET request to the specified URL
+    #| Make a HTTP GET request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method get($url, *%options --> Promise) {
         self.request('GET', $url, %options)
     }
 
-    #| Make a HTTP HEAD request to the specified URL
+    #| Make a HTTP GET request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method get-body($url, %options --> Promise) {
+        self.request-body('GET', $url, %options)
+    }
+
+    #| Make a HTTP GET request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method get-body($url, *%options --> Promise) {
+        self.request-body('GET', $url, %options)
+    }
+
+    #| Make a HTTP HEAD request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method head($url, %options --> Promise) {
         self.request('HEAD', $url, %options)
     }
 
-    #| Make a HTTP HEAD request to the specified URL
+    #| Make a HTTP HEAD request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method head($url, *%options --> Promise) {
         self.request('HEAD', $url, %options)
     }
 
-    #| Make a HTTP POST request to the specified URL
+    #| Make a HTTP POST request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method post($url, %options --> Promise) {
         self.request('POST', $url, %options)
     }
 
-    #| Make a HTTP POST request to the specified URL
+    #| Make a HTTP POST request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method post($url, *%options --> Promise) {
         self.request('POST', $url, %options)
     }
 
-    #| Make a HTTP PUT request to the specified URL
+    #| Make a HTTP POST request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method post-body($url, %options --> Promise) {
+        self.request-body('POST', $url, %options)
+    }
+
+    #| Make a HTTP POST request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method post-body($url, *%options --> Promise) {
+        self.request-body('POST', $url, %options)
+    }
+
+    #| Make a HTTP PUT request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method put($url, %options --> Promise) {
         self.request('PUT', $url, %options)
     }
 
-    #| Make a HTTP PUT request to the specified URL
+    #| Make a HTTP PUT request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method put($url, *%options --> Promise) {
         self.request('PUT', $url, %options)
     }
 
-    #| Make a HTTP DELETE request to the specified URL
+    #| Make a HTTP PUT request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method put-body($url, %options --> Promise) {
+        self.request-body('PUT', $url, %options)
+    }
+
+    #| Make a HTTP PUT request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method put-body($url, *%options --> Promise) {
+        self.request-body('PUT', $url, %options)
+    }
+
+    #| Make a HTTP DELETE request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method delete($url, %options --> Promise) {
         self.request('DELETE', $url, %options)
     }
 
-    #| Make a HTTP DELETE request to the specified URL
+    #| Make a HTTP DELETE request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method delete($url, *%options --> Promise) {
         self.request('DELETE', $url, %options)
     }
 
-    #| Make a HTTP PATCH request to the specified URL
+    #| Make a HTTP DELETE request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method delete-body($url, %options --> Promise) {
+        self.request-body('DELETE', $url, %options)
+    }
+
+    #| Make a HTTP DELETE request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method delete-body($url, *%options --> Promise) {
+        self.request-body('DELETE', $url, %options)
+    }
+
+    #| Make a HTTP PATCH request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method patch($url, %options --> Promise) {
         self.request('PATCH', $url, %options)
     }
 
-    #| Make a HTTP PATCH request to the specified URL
+    #| Make a HTTP PATCH request to the specified URL. Returns a C<Promise>
+    #| that will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method patch($url, *%options --> Promise) {
         self.request('PATCH', $url, %options)
     }
 
+    #| Make a HTTP PATCH request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method patch-body($url, %options --> Promise) {
+        self.request-body('PATCH', $url, %options)
+    }
+
+    #| Make a HTTP PATCH request to the specified URL. Returns a C<Promise>
+    #| that will be kept with the response body if the request is successful.
+    multi method patch-body($url, *%options --> Promise) {
+        self.request-body('PATCH', $url, %options)
+    }
+
     #| Make a HTTP request, specifying the HTTP method (GET, POST, etc.),
-    #| the URL, and any further request options.
+    #| the URL, and any further request options. Returns a C<Promise> that
+    #| will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method request(Str $method, $url, *%options --> Promise) {
         self.request($method, $url, %options)
     }
 
     #| Make a HTTP request, specifying the HTTP method (GET, POST, etc.),
-    #| the URL, and any further request options.
+    #| the URL, and any further request options. Returns a C<Promise> that
+    #| will be kept with a C<Cro::HTTP::Response> if the request is
+    #| successful.
     multi method request(Str $method, $url, %options --> Promise) {
         my $parent = %options<PARENT-REQUEST-LOG>;
         my $request-log = $parent
@@ -536,6 +624,24 @@ class Cro::HTTP::Client {
                 }
             }
         })
+    }
+
+    #| Make a HTTP request, specifying the HTTP method (GET, POST, etc.),
+    #| the URL, and any further request options. Returns a C<Promise> that
+    #| will be kept with the response body if the request is successful.
+    multi method request-body(Str $method, $url, *%options --> Promise) {
+        self.request-body($method, $url, %options)
+    }
+
+    #| Make a HTTP request, specifying the HTTP method (GET, POST, etc.),
+    #| the URL, and any further request options. Returns a C<Promise> that
+    #| will be kept with the response body if the request is successful.
+    multi method request-body(Str $method, $url, %options --> Promise) {
+        # Take care to return the original Promise if it is broken, so we don't
+        # add an extra layer of exception wrapping.
+        my $response = self.request($method, $url, %options);
+        await Promise.anyof($response);
+        $response.status == Kept ?? $response.result.body !! $response
     }
 
     method !get-proxy-url($parsed-url) {

@@ -256,11 +256,21 @@ constant %key-cert := {
         is await($resp.body-text), 'Home', 'Body text is correct';
     }
 
+    given await Cro::HTTP::Client.get-body("$base/") -> $resp {
+        ok $resp ~~ Str, 'Got a string body back from GET /';
+        is $resp, 'Home', 'Body has correct value';
+    }
+
     given await Cro::HTTP::Client.post("$base/") -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from POST /';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Updated', 'Body text is correct';
+    }
+
+    given await Cro::HTTP::Client.post-body("$base/") -> $resp {
+        ok $resp ~~ Str, 'Got a string body back from POST /';
+        is $resp, 'Updated', 'Body has correct value';
     }
 
     given await Cro::HTTP::Client.put("$base/") -> $resp {
@@ -270,6 +280,11 @@ constant %key-cert := {
         is await($resp.body-text), 'Saved', 'Body text is correct';
     }
 
+    given await Cro::HTTP::Client.put-body("$base/") -> $resp {
+        ok $resp ~~ Str, 'Got a string body back from PUT /';
+        is $resp, 'Saved', 'Body has correct value';
+    }
+
     given await Cro::HTTP::Client.delete("$base/") -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from DELETE /';
         is $resp.status, 200, 'Status is 200';
@@ -277,11 +292,21 @@ constant %key-cert := {
         is await($resp.body-text), 'Gone', 'Body text is correct';
     }
 
+    given await Cro::HTTP::Client.delete-body("$base/") -> $resp {
+        ok $resp ~~ Str, 'Got a string body back from DELETE /';
+        is $resp, 'Gone', 'Body has correct value';
+    }
+
     given await Cro::HTTP::Client.patch("$base/") -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from PATCH /';
         is $resp.status, 200, 'Status is 200';
         like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
         is await($resp.body-text), 'Patched', 'Body text is correct';
+    }
+
+    given await Cro::HTTP::Client.patch-body("$base/") -> $resp {
+        ok $resp ~~ Str, 'Got a string body back from PATCH /';
+        is $resp, 'Patched', 'Body has correct value';
     }
 
     given await Cro::HTTP::Client.get("$base/") -> $resp {
@@ -509,6 +534,11 @@ constant %key-cert := {
     given await $client.get("$base/get-json", content-type => 'text/plain',
                             body => "Calling the Rain") -> $resp {
         is await($resp.body), {:42truth}, 'Additional response parser works'
+    }
+
+    given await $client.get-body("$base/get-json", content-type => 'text/plain',
+            body => "Calling the Rain") -> $resp {
+        is-deeply $resp, {:42truth}, 'get-body respects body parsers'
     }
 
     $client = Cro::HTTP::Client.new(:!follow);
