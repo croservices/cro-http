@@ -55,7 +55,8 @@ class Cro::HTTP::BodySerializer::SupplyFallback does Cro::HTTP::BodySerializer {
         $body ~~ Supply
     }
 
-    method serialize(Cro::HTTP::Message $message, $body --> Supply) {
+    method serialize(Cro::HTTP::Message $message, $body, Int :$content_length  --> Supply) {
+        self!set-content-length($message, $content_length) if $content_length;
         supply {
             whenever $body -> $chunk {
                 unless $chunk ~~ Blob {
