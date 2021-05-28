@@ -8,17 +8,17 @@ class Cro::HTTP::Header {
             || { die "Malformed header '$/.orig()'" }
         }
         token field-name {
-            <token> { make $<token>.ast }
+            <.token> { make ~$/ }
         }
         token field-value {
             # Deliberately omitted obs-fold, per RFC 7230 3.2.4.
-            <field-content> { make ~$<field-content> }
+            <.field-content> { make ~$/ }
         }
         token field-content {
             [<[\x21..\xFF]>+ [<[\t\ ]>+ <[\x21..\xFF]>+]*]?
         }
         token token {
-            <[A..Z a..z 0..9 ! # $ % & ' * + . ^ _ ` | ~ -]>+ { make ~$/ }
+            <[A..Z a..z 0..9 ! # $ % & ' * + . ^ _ ` | ~ -]>+
         }
         token OWS {
             <[\ \t]>*
