@@ -73,20 +73,23 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                         # Validate.
                         not-implemented('Unsupported method ' ~ @parts[0])
                             unless %!allowed-methods{@parts[0]}:exists;
-                        if @parts[2].match(/^'HTTP/'(\d)'.'(\d)$/) -> $ver {
-                            unless $ver[0] eq '1' {
-                                not-implemented('Unsupported HTTP version ' ~ ~$ver);
+                        my $version-part := @parts[2];
+                        if $version-part ne 'HTTP/1.1' && $version-part ne 'HTTP/1.0' {
+                            if @parts[2].match(/^'HTTP/'(\d)'.'(\d)$/) -> $ver {
+                                unless $ver[0] eq '1' {
+                                    not-implemented('Unsupported HTTP version ' ~ ~$ver);
+                                }
                             }
-                        }
-                        else {
-                            bad-request('Malformed HTTP version');
+                            else {
+                                bad-request('Malformed HTTP version');
+                            }
                         }
 
                         # Populate the request object.
                         $request.connection = $packet.connection;
                         $request.method = @parts[0];
                         $request.target = @parts[1];
-                        $request.http-version = @parts[2].substr(5);
+                        $request.http-version = $version-part.substr(5);
                         $request.annotations<log-timeline> = Cro::HTTP::LogTimeline::Serve.start:
                                 :method($request.method), :target($request.target);
 
