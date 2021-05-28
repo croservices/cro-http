@@ -32,8 +32,10 @@ class Cro::HTTP::RequestParser does Cro::Transform {
         supply {
             my enum Expecting <RequestLine Header Body>;
 
-            my $header-decoder = Encoding::Registry.find('iso-8859-1').decoder();
-            $header-decoder.set-line-separators(["\r\n", "\n"]); # XXX Hack; toss \n
+            my constant ENCODING = Encoding::Registry.find('iso-8859-1');
+            my constant SEPARATORS = ["\r\n", "\n"]; # XXX Hack; toss \n
+            my $header-decoder = ENCODING.decoder();
+            $header-decoder.set-line-separators(SEPARATORS);
 
             my $expecting;
             my $request;
@@ -124,8 +126,7 @@ class Cro::HTTP::RequestParser does Cro::Transform {
                             }
                         }
                         else {
-                            my $header = Cro::HTTP::Header.parse($header-line);
-                            $request.append-header($header);
+                            $request.append-header(Cro::HTTP::Header.parse($header-line));
                             CATCH {
                                 default {
                                     bad-request('Malformed header');
