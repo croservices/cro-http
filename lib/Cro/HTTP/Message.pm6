@@ -9,7 +9,10 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
     #| If this is a HTTP/2.0 request, the stream ID
     has Int $.http2-stream-id is rw;
 
+    #| The headers associated with this message.
     has Cro::HTTP::Header @!headers;
+
+    has Cro::MediaType $!cached-content-type;
 
     #| Get a list of headers, as Cro::HTTP::Header objects
     method headers() {
@@ -19,23 +22,27 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
     #| Append a header to the HTTP message
     multi method append-header(Cro::HTTP::Header $header --> Nil) {
         @!headers.push($header);
+        $!cached-content-type = Nil;
     }
 
     #| Append a header to the HTTP message (the string must parse as a valid
     #| HTTP header, such as 'Content-type: text/html')
     multi method append-header(Str $header --> Nil) {
         @!headers.push(Cro::HTTP::Header.parse($header));
+        $!cached-content-type = Nil;
     }
 
     #| Append a header to the HTTP message by specifying its name and value
     multi method append-header(Str $name, Str(Cool) $value --> Nil) {
         @!headers.push(Cro::HTTP::Header.new(:$name, :$value));
+        $!cached-content-type = Nil;
     }
 
     #| Append a header to the HTTP message using a Pair, where the key is the
     #| header name and the value is the header value
     multi method append-header(Pair $header --> Nil) {
         @!headers.push(Cro::HTTP::Header.new(name => $header.key, value => $header.value));
+        $!cached-content-type = Nil;
     }
 
     #| Remove all headers with the specified name; returns the number of
@@ -44,6 +51,7 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
         my $folded = $name.fc;
         my $removed = 0;
         @!headers .= grep({ not .name.fc eq $folded && ++$removed });
+        $!cached-content-type = Nil;
         $removed
     }
 
@@ -52,6 +60,7 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
     multi method remove-header(&predicate --> Int) {
         my $removed = 0;
         @!headers .= grep({ not predicate($_) && ++$removed });
+        $!cached-content-type = Nil;
         $removed
     }
 
@@ -61,6 +70,7 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
     multi method remove-header(Cro::HTTP::Header $header --> Int) {
         my $removed = 0;
         @!headers .= grep({ not $_ === $header && ++$removed });
+        $!cached-content-type = Nil;
         $removed
     }
 
@@ -97,8 +107,11 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
     #| Gets a Cro::MediaType object representing the Content-type header of
     #| the message, and returning Nil if there is no such header
     method content-type() {
-        with self.header('content-type') {
-            Cro::MediaType.parse($_)
+        with $!cached-content-type {
+            $_
+        }
+        orwith self.header('content-type') {
+            $!cached-content-type = Cro::MediaType.parse($_)
         }
         else {
             Nil
