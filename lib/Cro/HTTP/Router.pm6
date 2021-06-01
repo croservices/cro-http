@@ -1385,4 +1385,17 @@ module Cro::HTTP::Router {
     sub get-extension(Str $path --> Str) {
         with $path.rindex('/') { $path.substr($_ + 1) } else { '' }
     }
+
+    #| Resolve a resource in the resources associated with the enclosing route block or the current
+    #| route handler. Exposed for the sake of other plugins that wish to access resources also.
+    sub resolve-route-resource(Str $path, Str :$error-sub = 'resolve-resource' --> IO) is export(:resource-plugin) {
+        my @resource-hashes := router-plugin-get-configs($resources-plugin, :$error-sub);
+        for @resource-hashes {
+            my $io = .{$path}.IO;
+            if $io !~~ Slip && $io.e && $io.f {
+                return $io;
+            }
+        }
+        Nil
+    }
 }

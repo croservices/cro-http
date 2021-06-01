@@ -1,4 +1,9 @@
 use Cro::HTTP::Router;
+use Cro::HTTP::Router :resource-plugin;
+
+sub test-plugin(Str $path) {
+    content 'text/html', resolve-route-resource($path).slurp.lc;
+}
 
 sub resourcey-routes() is export {
     route {
@@ -21,6 +26,10 @@ sub resourcey-routes() is export {
         }
         get -> 'root-indexes2' {
             resource :indexes(['index.html']);
+        }
+
+        get -> 'test-plugin' {
+            test-plugin 'index.html';
         }
     }
 }

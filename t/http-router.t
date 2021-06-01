@@ -1995,6 +1995,12 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         like body-text($r), rx{ '<HTML></HTML>' \n }, 'indexes in root of resources, 2';
         is $r.status, 200, 'Good status';
     }
+
+    $req = Cro::HTTP::Request.new(method => 'GET', target => '/test-plugin');
+    $source.emit($req);
+    given $responses.receive -> $r {
+        like body-text($r), rx { '<html></html>' \n }, 'The extension point for other plugins wanting to use resources works';
+    }
 }
 
 {
