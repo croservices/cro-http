@@ -1240,10 +1240,10 @@ module Cro::HTTP::Router {
         %mime{$ext} // %fallback{$ext} // $default;
     }
 
-    #| Serve static content. With a single argument, that file is served. Otherwise,
-    #| the first argument specifies a base path, and the remaining positional
-    #| arguments are treated as path segments. However, it is not possible to
-    #| reach a path above the base.
+    #| Serve static content from a file. With a single argument, that file is
+    #| served. Otherwise, the first argument specifies a base path, and the
+    #| remaining positional arguments are treated as path segments. However,
+    #| it is not possible to reach a path above the base.
     sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -1283,35 +1283,6 @@ module Cro::HTTP::Router {
                 $resp.status = 403;
             }
         }
-    }
-
-    #| Serve static content from %?RESOURCES
-    sub static-resource(*@path, :$mime-types, :@indexes) is export {
-        my $resp = $*CRO-ROUTER-RESPONSE //
-        die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
-
-        my $path = @path.grep(*.so).join: '/';
-        my %fallback = $mime-types // {};
-
-        sub get-extension($path) {
-            return ($path ~~ m/ '.' ( <-[ \. ]>+ ) $ / )[0].Str;
-        }
-
-        if $path && (my $resource = %?RESOURCES{$path}) && $resource.IO !~~ Slip && $resource.IO.e && !$resource.IO.d {
-            content get-mime-or-default(get-extension($path), %fallback), slurp($resource, :bin);
-        } else {
-            for @indexes {
-                my $index = ($path, $_).grep(*.so).join: '/';
-                with %?RESOURCES{$index} {
-                    if .IO !~~ Slip && .IO.e {
-                        content get-mime-or-default(get-extension($index), %fallback), slurp($_, :bin);
-                        last;
-                    }
-                }
-            }
-        }
-
-        $resp.status //= 404;
     }
 
     #| Register a router plugin. The provided ID is for debugging purposes.
@@ -1361,5 +1332,57 @@ module Cro::HTTP::Router {
         else {
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what($error-sub));
         }
+    }
+
+    my $resources-plugin = router-plugin-register('resource');
+
+    #| Specify the resources hash that calls to the C<resource> sub will use.
+    #| Typically this will be called as C<use-resources %?RESOURCES;>.
+    sub resources-from(%resources --> Nil) is export {
+        router-plugin-add-config($resources-plugin, %resources, error-sub => 'use-resources');
+    }
+
+    #| Provide the response from a resource. Before using this, the C<resources-from>
+    #| sub should be used in the C<route> block in order to associate the correct
+    #| resources hash with the routes. The path parts will be joined with `/`s, and
+    #| a lookup done in the resources hash.
+    sub resource(*@path, :$mime-types, :@indexes --> Nil) is export {
+        # Make sure that we have some resource hash associated with the route block.
+        my @resource-hashes := router-plugin-get-configs($resources-plugin);
+        unless @resource-hashes {
+            die "No resources have been associated with the route block; please add `resources-from %?RESOURCES`";
+        }
+
+        # Look through the resource hashes.
+        my $path = @path.grep(*.so).join: '/';
+        my %fallback = $mime-types // {};
+        for @resource-hashes {
+            # First for the path.
+            with .{$path} -> $resource {
+                my $io = $resource.IO;
+                if $io !~~ Slip && $io.e && $io.f {
+                    content get-mime-or-default(get-extension($path), %fallback), $resource.slurp(:bin);
+                    return;
+                }
+            }
+
+            # Failing that, we may want an index file.
+            for @indexes -> $index {
+                my $index-path = $path ?? "$path/$index" !! $index;
+                with .{$index-path} -> $resource {
+                    my $io = $resource.IO;
+                    if $io !~~ Slip && $io.e && $io.f {
+                        content get-mime-or-default(get-extension($index-path), %fallback), $resource.slurp(:bin);
+                        return;
+                    }
+                }
+            }
+        }
+
+        not-found;
+    }
+
+    sub get-extension(Str $path --> Str) {
+        with $path.rindex('/') { $path.substr($_ + 1) } else { '' }
     }
 }

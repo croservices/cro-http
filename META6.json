@@ -70,10 +70,6 @@
     "Cro::HTTP::VersionSelector": "lib/Cro/HTTP/VersionSelector.pm6",
     "Cro::Uri::HTTP": "lib/Cro/Uri/HTTP.pm6"
   },
-  "resources": [
-    "index.html",
-    "folder/test.txt"
-  ],
   "license": "Artistic-2.0",
   "tags": [
     "HTTP",
