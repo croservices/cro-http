@@ -13,8 +13,14 @@ use Cro::HTTP::Response;
 use Cro::UnhandledErrorReporter;
 use IO::Path::ChildSecure;
 
+class X::Cro::HTTP::Router::OnlyInRouteBlock is Exception {
+    has Str $.what is required;
+    method message() {
+        "Can only use '$!what' inside of a route block"
+    }
+}
 class X::Cro::HTTP::Router::OnlyInHandler is Exception {
-    has $.what;
+    has Str $.what is required;
     method message() {
         "Can only use '$!what' inside of a request handler"
     }
@@ -45,6 +51,17 @@ module Cro::HTTP::Router {
         $param does Auth;
     }
 
+    #| Router plugins register themselves using the C<router-plugin-register>
+    #| function, receiving in response a plugin key object. This is used to
+    #| identify the plugin in further interactions with the plugin API.
+    class PluginKey {
+       has Str $.id is required;
+    }
+
+    #| A C<Cro::Transform> that consumes HTTP requests and produces HTTP
+    #| responses by routing them according to the routing specification set
+    #| up using the C<route> subroutine other routines. This class itself is
+    #| considered an implementation detail.
     class RouteSet does Cro::Transform {
         role Handler {
             has @.prefix;
@@ -108,8 +125,11 @@ module Cro::HTTP::Router {
         my class RouteHandler does Handler {
             has Str $.method;
             has &.implementation;
+            has Hash[Array, Cro::HTTP::Router::PluginKey] $.plugin-config;
+            has Hash[Array, Cro::HTTP::Router::PluginKey] $.flattened-plugin-config;
 
-            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!) {
+            method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!,
+                               Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config) {
                 self.bless:
                     :$!method, :&!implementation,
                     :prefix[flat @prefix, @!prefix],
@@ -117,16 +137,49 @@ module Cro::HTTP::Router {
                     :body-serializers[flat @!body-serializers, @body-serializers],
                     :before-matched[flat @before-matched, @!before-matched],
                     :after-matched[flat @!after-matched, @after-matched],
-                    :around[flat @!around, @around]
+                    :around[flat @!around, @around],
+                    :$!plugin-config,
+                    :flattened-plugin-config(merge-plugin-config($plugin-config, $!flattened-plugin-config // $!plugin-config))
+            }
+
+            sub merge-plugin-config($outer, $inner) {
+                if $outer && $inner {
+                    # Actually need to merge them.
+                    my Array %merged{Cro::HTTP::Router::PluginKey};
+                    for $inner.kv -> Cro::HTTP::Router::PluginKey $key, @configs {
+                        %merged{$key}.append(@configs);
+                    }
+                    for $outer.kv -> Cro::HTTP::Router::PluginKey $key, @configs {
+                        %merged{$key}.append(@configs);
+                    }
+                    %merged
+                }
+                elsif $inner {
+                    # Nothing new from the outer, so just use inner
+                    $inner
+                }
+                else {
+                    # Only things from the outer
+                    $outer
+                }
             }
 
             method signature() {
                 &!implementation.signature
             }
 
+            method get-innermost-plugin-configs(Cro::HTTP::Router::PluginKey $key --> List) {
+                $!plugin-config{$key}.List // ()
+            }
+
+            method get-plugin-configs(Cro::HTTP::Router::PluginKey $key --> List) {
+                ($!flattened-plugin-config // $!plugin-config){$key}.List // ()
+            }
+
             method !invoke-internal(Cro::HTTP::Request $request, Capture $args --> Promise) {
-                my $*CRO-ROUTER-REQUEST = $request;
-                my $response = my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(:$request);
+                my $*CRO-ROUTER-REQUEST := $request;
+                my $response := my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(:$request);
+                my $*CRO-ROUTER-ROUTE-HANDLER := self;
                 self!add-body-parsers($request);
                 self!add-body-serializers($response);
                 start {
@@ -219,6 +272,7 @@ module Cro::HTTP::Router {
         has @.around;
         has $!path-matcher;
         has @!handlers-to-add;  # Closures to defer adding, so they get all the middleware
+        has Array %!plugin-config{Cro::HTTP::Router::PluginKey};
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -282,7 +336,8 @@ module Cro::HTTP::Router {
 
         method add-handler(Str $method, &implementation --> Nil) {
             @!handlers-to-add.push: {
-                @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched, :@!around));
+                @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched,
+                        :@!around, :%!plugin-config));
             }
         }
 
@@ -327,6 +382,14 @@ module Cro::HTTP::Router {
            }
         }
 
+        method add-plugin-config(Cro::HTTP::Router::PluginKey $key, Any $config --> Nil) {
+            %!plugin-config{$key}.push($config);
+        }
+
+        method get-plugin-configs(Cro::HTTP::Router::PluginKey $key --> List) {
+            (%!plugin-config{$key} // ()).List
+        }
+
         method definition-complete(--> Nil) {
             while @!handlers-to-add.shift -> &add {
                 add();
@@ -338,7 +401,7 @@ module Cro::HTTP::Router {
             for @!includes -> (:@prefix, :$includee) {
                 for $includee.handlers() {
                     @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
-                        :@!before-matched, :@!after-matched, :@!around);
+                        :@!before-matched, :@!after-matched, :@!around, :%!plugin-config);
                 }
             }
             self!generate-route-matcher();
@@ -1177,10 +1240,10 @@ module Cro::HTTP::Router {
         %mime{$ext} // %fallback{$ext} // $default;
     }
 
-    #| Serve static content. With a single argument, that file is served. Otherwise,
-    #| the first argument specifies a base path, and the remaining positional
-    #| arguments are treated as path segments. However, it is not possible to
-    #| reach a path above the base.
+    #| Serve static content from a file. With a single argument, that file is
+    #| served. Otherwise, the first argument specifies a base path, and the
+    #| remaining positional arguments are treated as path segments. However,
+    #| it is not possible to reach a path above the base.
     sub static(IO() $base, *@path, :$mime-types, :@indexes) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
@@ -1222,32 +1285,117 @@ module Cro::HTTP::Router {
         }
     }
 
-    #| Serve static content from %?RESOURCES
-    sub static-resource(*@path, :$mime-types, :@indexes) is export {
-        my $resp = $*CRO-ROUTER-RESPONSE //
-        die X::Cro::HTTP::Router::OnlyInHandler.new(:what<route>);
+    #| Register a router plugin. The provided ID is for debugging purposes.
+    #| Returns a plugin key object which can be used for further interactions
+    #| with the router plugin infrastructure.
+    sub router-plugin-register(Str $id --> Cro::HTTP::Router::PluginKey) is export(:plugin) {
+        Cro::HTTP::Router::PluginKey.new(:$id)
+    }
 
-        my $path = @path.grep(*.so).join: '/';
-        my %fallback = $mime-types // {};
+    #| Adds an item of configuration to the current `route` block for the
+    #| specified key. This will typically be called by a `sub` implementing
+    #| the router plugin, and attaches configuration for the specified key
+    #| to the object representing the current `route` block. The optional
+    #| C<error-sub> named argument can be used to provide the name of the
+    #| DSL sub called for reporting purposes; it will default to the plugin
+    #| key ID.
+    sub router-plugin-add-config(Cro::HTTP::Router::PluginKey $key, $config, Str :$error-sub = $key.id) is export(:plugin) {
+        with $*CRO-ROUTE-SET {
+            .add-plugin-config($key, $config);
+        }
+        else {
+            die X::Cro::HTTP::Router::OnlyInRouteBlock.new(:what($error-sub));
+        }
+    }
 
-        sub get-extension($path) {
-            return ($path ~~ m/ '.' ( <-[ \. ]>+ ) $ / )[0].Str;
+    #| Get the plugin configuration added for the current route block. This may be
+    #| called both during route setup time and inside of a route handler processing
+    #| a request.
+    sub router-plugin-get-innermost-configs(Cro::HTTP::Router::PluginKey $key, Str :$error-sub = $key.id --> List) is export(:plugin) {
+        with $*CRO-ROUTER-ROUTE-HANDLER {
+            .get-innermost-plugin-configs($key)
+        }
+        orwith $*CRO-ROUTE-SET {
+            .get-plugin-configs($key)
+        }
+        else {
+            die X::Cro::HTTP::Router::OnlyInRouteBlock.new(:what($error-sub));
+        }
+    }
+
+    #| Get the configuration data added for the current route block as well as those
+    #| has been included into. This can only be called in a request handler.
+    sub router-plugin-get-configs(Cro::HTTP::Router::PluginKey $key, Str :$error-sub = $key.id --> List) is export(:plugin) {
+        with $*CRO-ROUTER-ROUTE-HANDLER {
+            .get-plugin-configs($key)
+        }
+        else {
+            die X::Cro::HTTP::Router::OnlyInHandler.new(:what($error-sub));
+        }
+    }
+
+    my $resources-plugin = router-plugin-register('resource');
+
+    #| Specify the resources hash that calls to the C<resource> sub will use.
+    #| Typically this will be called as C<use-resources %?RESOURCES;>.
+    sub resources-from(%resources --> Nil) is export {
+        router-plugin-add-config($resources-plugin, %resources, error-sub => 'use-resources');
+    }
+
+    #| Provide the response from a resource. Before using this, the C<resources-from>
+    #| sub should be used in the C<route> block in order to associate the correct
+    #| resources hash with the routes. The path parts will be joined with `/`s, and
+    #| a lookup done in the resources hash.
+    sub resource(*@path, :$mime-types, :@indexes --> Nil) is export {
+        # Make sure that we have some resource hash associated with the route block.
+        my @resource-hashes := router-plugin-get-configs($resources-plugin);
+        unless @resource-hashes {
+            die "No resources have been associated with the route block; please add `resources-from %?RESOURCES`";
         }
 
-        if $path && (my $resource = %?RESOURCES{$path}) && $resource.IO !~~ Slip && $resource.IO.e && !$resource.IO.d {
-            content get-mime-or-default(get-extension($path), %fallback), slurp($resource, :bin);
-        } else {
-            for @indexes {
-                my $index = ($path, $_).grep(*.so).join: '/';
-                with %?RESOURCES{$index} {
-                    if .IO !~~ Slip && .IO.e {
-                        content get-mime-or-default(get-extension($index), %fallback), slurp($_, :bin);
-                        last;
+        # Look through the resource hashes.
+        my $path = @path.grep(*.so).join: '/';
+        my %fallback = $mime-types // {};
+        for @resource-hashes {
+            # First for the path.
+            with .{$path} -> $resource {
+                my $io = $resource.IO;
+                if $io !~~ Slip && $io.e && $io.f {
+                    content get-mime-or-default(get-extension($path), %fallback), $resource.slurp(:bin);
+                    return;
+                }
+            }
+
+            # Failing that, we may want an index file.
+            for @indexes -> $index {
+                my $index-path = $path ?? "$path/$index" !! $index;
+                with .{$index-path} -> $resource {
+                    my $io = $resource.IO;
+                    if $io !~~ Slip && $io.e && $io.f {
+                        content get-mime-or-default(get-extension($index-path), %fallback), $resource.slurp(:bin);
+                        return;
                     }
                 }
             }
         }
 
-        $resp.status //= 404;
+        not-found;
+    }
+
+    sub get-extension(Str $path --> Str) {
+        with $path.rindex('/') { $path.substr($_ + 1) } else { '' }
+    }
+
+    #| Resolve a resource in the resources associated with the enclosing route block or the current
+    #| route handler. Exposed for the sake of other plugins that wish to access resources also.
+    sub resolve-route-resource(Str $path, Str :$error-sub = 'resolve-resource' --> IO) is export(:resource-plugin) {
+        my @resource-hashes := router-plugin-get-configs($resources-plugin, :$error-sub);
+        for @resource-hashes {
+            my $io = .{$path}.IO;
+            if $io !~~ Slip && $io.e && $io.f {
+                return $io;
+            }
+        }
+        Nil
     }
 }

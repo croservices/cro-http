@@ -1,0 +1,16 @@
+{
+  "name": "TestModule",
+  "version": "4.2",
+  "perl": "6.*",
+  "authors": [
+    "Jonathan Worthington <jnthn@jnthn.net>"
+  ],
+  "provides": {
+    "TestModule": "lib/TestModule.pm6"
+  },
+  "resources": [
+    "index.html",
+    "folder/test.txt"
+  ],
+  "source-url": "https://github.com/croservices/cro-http.git"
+}
