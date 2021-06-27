@@ -155,6 +155,15 @@ use Test;
 
 {
     my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
+    $req.append-header('Accept-Language', 'en;q=0.7');
+    $req.append-header('Accept-Language', 'mi;q=0.8');
+    $req.append-header('Accept-Language', 'cs');
+    $req.append-header('Accept-Language', 'fr');
+    is-deeply $req.quality-header('Accept-Language'), ('cs' => 1, 'fr' => 1, 'mi' => 0.8, 'en' => 0.7);
+}
+
+{
+    my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
     $req.append-header('Content-type', 'text/html; charset=UTF-8');
     ok $req.content-type ~~ Cro::MediaType,
         'content-type method returns a Cro::MediaType when there is a content-type header';
