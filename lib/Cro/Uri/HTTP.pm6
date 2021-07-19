@@ -1,42 +1,9 @@
 use Cro::Uri :decode-percents, :encode-percents;
 use Cro::HTTP::MultiValue;
 
-class Cro::Uri::HTTP is Cro::Uri {
+role Cro::Uri::HTTPHelpers {
     has @!cached-query-list;
     has %!cached-query-hash;
-
-    grammar Parser is Cro::Uri::GenericParser {
-        proto token request-target { * }
-        token request-target:sym<origin-form> {
-            <absolute-path> [ "?" <query> ]?
-        }
-
-        token absolute-path {
-            [ "/" <segment> ]+
-        }
-    }
-
-    grammar Actions is Cro::Uri::GenericActions {
-        method request-target:sym<origin-form>($/) {
-            make Cro::Uri::HTTP.bless(
-                path => $<absolute-path>.ast,
-                |(query => .ast with $<query>)
-            );
-        }
-
-        method absolute-path($/) {
-            make ~$/;
-        }
-    }
-
-    method parse-request-target(Str() $target) {
-        with Parser.parse($target, :actions(Actions), :rule('request-target')) {
-            .ast
-        }
-        else {
-            die X::Cro::Uri::ParseError.new(uri-string => $target)
-        }
-    }
 
     method query-list() {
         # Race to compute this. The bind makes it thread-safe to put in place.
@@ -92,6 +59,41 @@ class Cro::Uri::HTTP is Cro::Uri {
             @parts.push(encode-percents(.key.Str) ~ '=' ~ encode-percents(.value.Str));
         }
         self.add('?' ~ @parts.join("&"))
+    }
+}
+
+class Cro::Uri::HTTP is Cro::Uri does Cro::Uri::HTTPHelpers {
+    grammar Parser is Cro::Uri::GenericParser {
+        proto token request-target { * }
+        token request-target:sym<origin-form> {
+            <absolute-path> [ "?" <query> ]?
+        }
+
+        token absolute-path {
+            [ "/" <segment> ]+
+        }
+    }
+
+    grammar Actions is Cro::Uri::GenericActions {
+        method request-target:sym<origin-form>($/) {
+            make Cro::Uri::HTTP.bless(
+                path => $<absolute-path>.ast,
+                |(query => .ast with $<query>)
+            );
+        }
+
+        method absolute-path($/) {
+            make ~$/;
+        }
+    }
+
+    method parse-request-target(Str() $target) {
+        with Parser.parse($target, :actions(Actions), :rule('request-target')) {
+            .ast
+        }
+        else {
+            die X::Cro::Uri::ParseError.new(uri-string => $target)
+        }
     }
 }
 

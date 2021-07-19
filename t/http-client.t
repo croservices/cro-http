@@ -321,6 +321,13 @@ constant %key-cert := {
         is await($resp.body-text), 'TEST', 'Body text is correct';
     }
 
+    given await Cro::HTTP::Client.get("$base/query?value=تست") -> $resp {
+        ok $resp ~~ Cro::HTTP::Response, 'Accepts an IRI';
+        is $resp.status, 200, 'Status is 200';
+        like $resp.header('Content-type'), /text\/plain/, 'Correct content type';
+        is await($resp.body-text), 'تست', 'Body text is correct';
+    }
+
     given await Cro::HTTP::Client.get("$base/query") -> $resp {
         ok $resp ~~ Cro::HTTP::Response, 'Got a response back from GET /query';
         is $resp.status, 200, 'Status is 200';

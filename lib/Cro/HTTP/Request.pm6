@@ -5,7 +5,7 @@ use Cro::HTTP::BodyParserSelectors;
 use Cro::HTTP::BodySerializerSelectors;
 use Cro::HTTP::Message;
 use Cro::TLS;
-use Cro::Uri::HTTP;
+use Cro::Iri::HTTP;
 
 class X::Cro::HTTP::Request::Incomplete is Exception {
     has $.missing;
@@ -110,13 +110,13 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
 
     #| The path portion of the request URI, derived from the original target
     method original-path() {
-        Cro::Uri::HTTP.parse-request-target(self.original-target())
+        Cro::Iri::HTTP.parse-request-target(self.original-target())
     }
 
     #| A list of path segments of the request URI, derived from the original
     #| target
     method original-path-segments() {
-        Cro::Uri::HTTP.parse-request-target(self.original-target()).path-segments
+        Cro::Iri::HTTP.parse-request-target(self.original-target()).path-segments
     }
 
     #| A copy of this request object, but with the first n path segments removed
@@ -129,7 +129,7 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
 
     method !ensure-cached-uri(--> Nil) {
         if $!cached-uri-target ne $!target {
-            $!cached-uri = Cro::Uri::HTTP.parse-request-target($!target);
+            $!cached-uri = Cro::Iri::HTTP.parse-request-target($!target).to-uri-http;
             $!cached-uri-target = $!target;
         }
     }
