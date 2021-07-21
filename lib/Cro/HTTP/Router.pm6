@@ -662,6 +662,10 @@ module Cro::HTTP::Router {
             extract($param.constraints);
             return @constraints;
         }
+
+        method sink() is hidden-from-backtrace {
+            warn "Useless use of a Cro `route` block in sink context. Did you forget to `include` or `delegate`?";
+        }
     }
 
     #| Define a set of routes. Expects to receive a block, which will be evaluated
