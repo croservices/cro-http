@@ -102,7 +102,7 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
             my @values = do for .split(',').map(*.trim) {
                 if .contains(';q=') {
                     my ($value, $q) = .split(';q=');
-                    if $q ~~ /^\d+[.\d{1..3}]$/ && 0 < $q < 1 {
+                    if $q ~~ /^\d+[.\d{1..3}]?$/ && 0 <= $q < 1 {
                         Pair.new($value, +$q);
                     } else {
                         Pair.new($value, 1); # or $_?

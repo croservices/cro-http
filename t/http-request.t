@@ -155,11 +155,11 @@ use Test;
 
 {
     my $req = Cro::HTTP::Request.new(method => 'GET', target => '/');
-    $req.append-header('Accept-Language', 'en;q=0.7');
+    $req.append-header('Accept-Language', 'en;q=0.7,jp;q=1,kr;q=0');
     $req.append-header('Accept-Language', 'mi;q=0.8');
     $req.append-header('Accept-Language', 'cs');
     $req.append-header('Accept-Language', 'fr');
-    is-deeply $req.quality-header('Accept-Language'), ('cs' => 1, 'fr' => 1, 'mi' => 0.8, 'en' => 0.7);
+    is-deeply $req.quality-header('Accept-Language'), (jp => 1, cs => 1, fr => 1, mi => 0.8, en => 0.7, kr => 0);
 }
 
 {
