@@ -93,6 +93,28 @@ role Cro::HTTP::Message does Cro::MessageWithBody {
                 !! @matching.map(*.value).join(',')
     }
 
+    #| Get the quality-parsed header (usually Accept* headers),
+    #| as a pair key => quality value (weight), and sorted by their weight.
+    #| Any failure to parse the weight as a three-decimal number from 0 to 1 will
+    #| default to a weight of 1.
+    method quality-header(Str $header-name) {
+        with self.header($header-name) {
+            my @values = do for .split(',').map(*.trim) {
+                if .contains(';q=') {
+                    my ($value, $q) = .split(';q=');
+                    if $q ~~ /^\d+[.\d{1..3}]?$/ && 0 <= $q < 1 {
+                        Pair.new($value, +$q);
+                    } else {
+                        Pair.new($value, 1); # or $_?
+                    }
+                } else {
+                    Pair.new($_, 1);
+                }
+            }
+            return @values.sort(-*.value)
+        }
+    }
+
     #| Get the value(s) of the header(s) with the specified name as a
     #| List; if there is no header with such a name, the list will be empty
     method header-list(Str $header-name) {
