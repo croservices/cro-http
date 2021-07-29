@@ -12,6 +12,7 @@ use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 use Cro::UnhandledErrorReporter;
 use IO::Path::ChildSecure;
+use Cro::HTTP::RouteSignatureToSub;
 
 class X::Cro::HTTP::Router::OnlyInRouteBlock is Exception {
     has Str $.what is required;
@@ -30,6 +31,12 @@ class X::Cro::HTTP::Router::NoRequestBodyMatch is Exception {
         "None of the request-body matches could handle the body (this exception " ~
         "type is typically caught and handled by Cro to produce a 400 Bad Request " ~
         "error; if you're seeing it, you may have an over-general error handling)"
+    }
+}
+class X::Cro::HTTP::Router::DuplicateLinkName is Exception {
+    has Str $.key is required;
+    method message() {
+        "Conflicting link name: $.key"
     }
 }
 
@@ -124,14 +131,15 @@ module Cro::HTTP::Router {
 
         my class RouteHandler does Handler {
             has Str $.method;
+            has Str $.name;
             has &.implementation;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.plugin-config;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.flattened-plugin-config;
 
             method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!,
-                               Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config) {
+                               Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config, :$name-prefix) {
                 self.bless:
-                    :$!method, :&!implementation,
+                    :$!method, :&!implementation, |(name => ($name-prefix // '') ~ $!name with $!name),
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
@@ -261,6 +269,7 @@ module Cro::HTTP::Router {
             }
         }
 
+        has Str $.name;
         has Handler @.handlers;
         has Cro::BodyParser @.body-parsers;
         has Cro::BodySerializer @.body-serializers;
@@ -273,6 +282,7 @@ module Cro::HTTP::Router {
         has $!path-matcher;
         has @!handlers-to-add;  # Closures to defer adding, so they get all the middleware
         has Array %!plugin-config{Cro::HTTP::Router::PluginKey};
+        has %.urls;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -334,10 +344,10 @@ module Cro::HTTP::Router {
             }
         }
 
-        method add-handler(Str $method, &implementation --> Nil) {
+        method add-handler(Str $method, &implementation, Str :$name --> Nil) {
             @!handlers-to-add.push: {
                 @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched,
-                        :@!around, :%!plugin-config));
+                        :@!around, :%!plugin-config, :$name));
             }
         }
 
@@ -349,8 +359,8 @@ module Cro::HTTP::Router {
             @!body-serializers.push($serializer);
         }
 
-        method add-include(@prefix, RouteSet $includee) {
-            @!includes.push({ :@prefix, :$includee });
+        method add-include(@prefix, RouteSet $includee, Str :$name-prefix) {
+            @!includes.push({ :@prefix, :$includee, :$name-prefix });
         }
 
         method add-before($middleware) {
@@ -398,13 +408,27 @@ module Cro::HTTP::Router {
                 .body-parsers = @!body-parsers;
                 .body-serializers = @!body-serializers;
             }
-            for @!includes -> (:@prefix, :$includee) {
+            for @!includes -> (:@prefix, :$includee, :$name-prefix) {
                 for $includee.handlers() {
                     @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
-                        :@!before-matched, :@!after-matched, :@!around, :%!plugin-config);
+                        :@!before-matched, :@!after-matched, :@!around, :%!plugin-config, :$name-prefix);
                 }
             }
             self!generate-route-matcher();
+            self!generate-urls();
+        }
+
+        method !generate-urls() {
+            my %urls;
+            my $prefix = $.name // "";
+            for @.handlers -> $handler {
+                if $handler ~~ RouteHandler && $handler.name.defined {
+                    my $key = $prefix ~ $handler.name;
+                    die X::Cro::HTTP::Router::DuplicateLinkName.new(:$key) if %urls{$key}:exists;
+                    %urls{$key} = route-signature-to-sub($handler.signature);
+                }
+            }
+            %.urls = %urls
         }
 
         method !generate-route-matcher(--> Nil) {
@@ -670,14 +694,16 @@ module Cro::HTTP::Router {
 
     #| Define a set of routes. Expects to receive a block, which will be evaluated
     #| to set up the routing definition.
-    sub route(&route-definition) is export {
-        my $*CRO-ROUTE-SET = RouteSet.new;
+    multi route(&route-definition, Str :$name) is export {
+        my $*CRO-ROUTE-SET = RouteSet.new(:$name);
         route-definition();
         $*CRO-ROUTE-SET.definition-complete();
         my @before = $*CRO-ROUTE-SET.before;
         my @after = $*CRO-ROUTE-SET.after;
         if @before || @after {
-            return Cro.compose(|@before, $*CRO-ROUTE-SET, |@after, :for-connection);
+            return Cro.compose(|@before, $*CRO-ROUTE-SET, |@after, :for-connection) but role {
+                method route-prefix { $name }
+            };
         } else {
             $*CRO-ROUTE-SET;
         }
@@ -685,14 +711,14 @@ module Cro::HTTP::Router {
 
     #| Add a handler for a HTTP GET request. The signature of the handler will be
     #| used to determine the routing.
-    multi get(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('GET', &handler);
+    multi sub get(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('GET', &handler, :$name);
     }
 
     #| Add a handler for a HTTP POST request. The signature of the handler will be
     #| used to determine the routing.
-    multi post(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('POST', &handler);
+    multi post(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('POST', &handler, :$name);
     }
 
     #| Add a handler for a HTTP PUT request. The signature of the handler will be
@@ -1213,7 +1239,13 @@ module Cro::HTTP::Router {
 
     #| Add a request handler for the specified HTTP method. This is useful
     #| when there is no shortcut function available for the HTTP method.
-    sub http($method, &handler --> Nil) is export {
+    multi http($name, $method, &handler --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler($method, &handler, :$name);
+    }
+
+    #| Add a request handler for the specified HTTP method. This is useful
+    #| when there is no shortcut function available for the HTTP method.
+    multi http($method, &handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler($method, &handler);
     }
 
