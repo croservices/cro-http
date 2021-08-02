@@ -15,6 +15,8 @@ use Cro::HTTP2::ResponseParser;
 use Cro::TCP;
 use Cro::TLS;
 use Cro::Uri;
+use Cro::Iri;
+use Cro::Iri::HTTP;
 use Cro;
 
 my class ResponseParserExtension is ParserExtension {
@@ -342,7 +344,7 @@ class Cro::HTTP::Client {
         my sub wrap-uri($uri) {
             with $uri {
                 when Cro::Uri { $uri }
-                default { Cro::Uri::HTTP.parse(~$uri); }
+                default { Cro::Iri::HTTP.parse(~$uri).to-uri; }
             }
         }
         $!base-uri = wrap-uri($_) with $base-uri;
@@ -515,7 +517,7 @@ class Cro::HTTP::Client {
 
         my $parsed-url = self && $!base-uri
             ?? $!base-uri.add($url)
-            !! Cro::Uri::HTTP.parse($url);
+            !! Cro::Iri::HTTP.parse($url).to-uri;
         my $http = self ?? $!http // %options<http> !! %options<http>;
         with $http {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
