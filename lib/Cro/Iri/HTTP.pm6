@@ -29,15 +29,6 @@ class Cro::Iri::HTTP is Cro::Iri does Cro::ResourceIdentifier::HTTP {
         }
     }
 
-    method parse-request-target(Str() $target) {
-        with Parser.parse($target, :actions(Actions), :rule('request-target')) {
-            .ast
-        }
-        else {
-            die X::Cro::Iri::ParseError.new(iri-string => $target)
-        }
-    }
-
     method to-uri-http(--> Cro::Uri::HTTP) {
         Cro::Uri::HTTP.new(:$.path, :$.query)
     }
