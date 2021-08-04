@@ -15,6 +15,8 @@ use Cro::HTTP2::ResponseParser;
 use Cro::TCP;
 use Cro::TLS;
 use Cro::Uri;
+use Cro::Iri;
+use Cro::Iri::HTTP;
 use Cro;
 
 my class ResponseParserExtension is ParserExtension {
@@ -339,15 +341,18 @@ class Cro::HTTP::Client {
                 die X::Cro::HTTP::Client::InvalidVersion.new;
             }
         }
-        my sub wrap-uri($uri) {
-            with $uri {
-                when Cro::Uri { $uri }
-                default { Cro::Uri::HTTP.parse(~$uri); }
-            }
+
+        $!base-uri = self!wrap-uri($_) with $base-uri;
+        $!http-proxy = self!wrap-uri($_) with $http-proxy;
+        $!https-proxy = self!wrap-uri($_) with $https-proxy;
+    }
+
+    method !wrap-uri($uri) {
+        with $uri {
+            when Cro::Uri { $uri; }
+            when Cro::Iri { $uri.to-uri; }
+            default { Cro::Iri::HTTP.parse(~$uri).to-uri; }
         }
-        $!base-uri = wrap-uri($_) with $base-uri;
-        $!http-proxy = wrap-uri($_) with $http-proxy;
-        $!https-proxy = wrap-uri($_) with $https-proxy;
     }
 
     #| Make a HTTP GET request to the specified URL. Returns a C<Promise>
@@ -515,7 +520,7 @@ class Cro::HTTP::Client {
 
         my $parsed-url = self && $!base-uri
             ?? $!base-uri.add($url)
-            !! Cro::Uri::HTTP.parse($url);
+            !! self!wrap-uri($url);
         my $http = self ?? $!http // %options<http> !! %options<http>;
         with $http {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
