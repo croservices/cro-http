@@ -63,6 +63,7 @@
     "Cro::HTTP::ResponseParser": "lib/Cro/HTTP/ResponseParser.pm6",
     "Cro::HTTP::ResponseSerializer": "lib/Cro/HTTP/ResponseSerializer.pm6",
     "Cro::HTTP::ReverseProxy": "lib/Cro/HTTP/ReverseProxy.pm6",
+    "Cro::HTTP::RouteSignatureToSub": "lib/Cro/HTTP/RouteSignatureToSub.pm6",
     "Cro::HTTP::Router": "lib/Cro/HTTP/Router.pm6",
     "Cro::HTTP::Server": "lib/Cro/HTTP/Server.pm6",
     "Cro::HTTP::Session::IdGenerator": "lib/Cro/HTTP/Session/IdGenerator.pm6",
