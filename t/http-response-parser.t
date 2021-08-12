@@ -126,11 +126,6 @@ parses 'Minor version other than 1 OK (2)', q:to/RESPONSE/,
     *.http-version eq '1.2',
     *.status == 204;
 
-refuses 'Invalid major version (1)', q:to/RESPONSE/;
-    HTTP/2.1 204 No content
-
-    RESPONSE
-
 refuses 'Invalid major version (2)', q:to/RESPONSE/;
     HTTP/0.1 204 No content
 
