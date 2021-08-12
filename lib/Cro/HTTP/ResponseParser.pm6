@@ -51,7 +51,7 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
 
                         # Validate version.
                         my $version = $parsed[0].Str;
-                        unless $version.starts-with('1') {
+                        unless $version.starts-with('1'|'2') {
                             die "Unsupported HTTP version $version";
                         }
 
