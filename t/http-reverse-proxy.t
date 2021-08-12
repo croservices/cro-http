@@ -6,13 +6,13 @@ use Test;
 
 plan *;
 
-constant HTTP_TEST_PORT_PROXY = 31323;
-constant HTTPS_TEST_PORT_PROXY = 31325;
+constant HTTP_TEST_PORT_PROXY = 31423;
+constant HTTPS_TEST_PORT_PROXY = 31425;
 
-constant HTTP_TEST_PORT_A = 31319;
-constant HTTPS_TEST_PORT_A = 31320;
-constant HTTP_TEST_PORT_B = 31321;
-constant HTTPS_TEST_PORT_B = 31322;
+constant HTTP_TEST_PORT_A = 31419;
+constant HTTPS_TEST_PORT_A = 31420;
+constant HTTP_TEST_PORT_B = 31421;
+constant HTTPS_TEST_PORT_B = 31422;
 constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
 constant %key-cert := {
     private-key-file => 't/certs-and-keys/server-key.pem',
