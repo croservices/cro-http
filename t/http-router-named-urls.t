@@ -30,11 +30,11 @@ use Test;
 }
 
 {
-    my $app = route :name<main->, {
+    my $app = route :name<main>, {
         get :name<home>, -> {};
     }
-    is-deeply $app.urls.keys, ('main-home',), "A named url with a prefix";
-    is $app.urls<main-home>(), '/';
+    is-deeply $app.urls.keys, ('main.home',), "A named url with a prefix";
+    is $app.urls<main.home>(), '/';
 }
 
 throws-like {
@@ -45,20 +45,34 @@ throws-like {
 }, X::Cro::HTTP::Router::DuplicateLinkName, message => "Conflicting link name: home";
 
 throws-like {
-    route :name<main->, {
+    route :name<main>, {
         get :name<home>, -> {};
         get :name<home>, -> {};
     }
-}, X::Cro::HTTP::Router::DuplicateLinkName, message => "Conflicting link name: main-home";
+}, X::Cro::HTTP::Router::DuplicateLinkName, message => "Conflicting link name: main.home";
 
-{
-    my $app = route :name<main->, {
-        include route {
-            get :name<home>, -> {};
-        }
-    }
-    is-deeply $app.urls.keys, ('main-home',), "A named url in an include with a prefix";
-}
+# XXX the test intention is bogus?
+# We basically have two sorts of cases:
+# * A route is not from include for sure, so we append its possible name to possible names of routes
+# * A route is from include, so we entrust it to settle the name for itself (because the addressing happens from each individual route bottom-top way
+# For the code below, it assumes we should squash the hierarchy when the include is anonymous, but this is forbidden because we explicitly allow:
+#         my $app = route {
+#            include route {
+#                get :name<home>, -> {}
+#            }
+#            include route {
+#                get :name<home>, -> {}
+#            }
+#        }
+# to exist, implying we do not peek into "anonymous" includes
+#{
+#    my $app = route :name<main>, {
+#        include route {
+#            get :name<home>, -> {};
+#        }
+#    }
+#    is-deeply $app.urls.keys, ('main.home',), "A named url in an include with a prefix";
+#}
 
 {
     my $app = route {
@@ -111,7 +125,57 @@ throws-like {
     is $app.urls<css>('x', 'y', 'z', :a(1), :b(2), :où('Ÿ')), '/x/y/z?a=1&b=2&o%C3%B9=%C5%B8', 'Splat with both types of args';
 }
 
-# TODO before/after
-# TODO include should not trigger name conflicts
+{
+    lives-ok {
+        my $app = route {
+            include route {
+                get :name<home>, -> {};
+            }
+            include route {
+                get :name<home>, -> {};
+            }
+        }
+    }, 'Conflict check is per-route block 1';
+}
+
+{
+    lives-ok {
+        my $app = route {
+            get :name<simple>, -> {};
+            include route {
+                get :name<home>, -> {};
+                get :name<homeA>, -> {};
+            }
+            include route :name<secondRoute>, {
+                get :name<home>, -> {};
+                get :name<homeB>, -> {};
+            }
+        }
+    }, 'Conflict check is per-route block 2';
+}
+
+{
+    lives-ok {
+        my $app = route {
+            include route :name<foo>, {
+                get :name<home>, -> {};
+            }
+            include route :name<bar>, {
+                get :name<home>, -> {};
+            }
+        }
+    }, 'Conflict check is by route name';
+}
+
+throws-like {
+    my $app = route {
+        include route :name<foo>, {
+            get :name<home>, -> {};
+        }
+        include route :name<foo>, {
+            get :name<home>, -> {};
+        }
+    }
+}, X::Cro::HTTP::Router::DuplicateLinkName, message => "Conflicting link name: foo.home";
 
 done-testing;

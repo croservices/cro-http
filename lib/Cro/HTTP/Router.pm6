@@ -147,11 +147,12 @@ module Cro::HTTP::Router {
             has &.implementation;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.plugin-config;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.flattened-plugin-config;
+            has Bool $.from-include;
 
             method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!,
-                               Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config, :$name-prefix) {
+                               Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config, :$name-prefix, :$from-include!) {
                 self.bless:
-                    :$!method, :&!implementation, |(name => ($name-prefix // '') ~ $!name with $!name),
+                    :$!method, :&!implementation, |(name => ($name-prefix ?? "$name-prefix." !! '') ~ $!name with $!name),
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
@@ -159,7 +160,8 @@ module Cro::HTTP::Router {
                     :after-matched[flat @!after-matched, @after-matched],
                     :around[flat @!around, @around],
                     :$!plugin-config,
-                    :flattened-plugin-config(merge-plugin-config($plugin-config, $!flattened-plugin-config // $!plugin-config))
+                    :flattened-plugin-config(merge-plugin-config($plugin-config, $!flattened-plugin-config // $!plugin-config)),
+                    :$from-include
             }
 
             sub merge-plugin-config($outer, $inner) {
@@ -320,6 +322,7 @@ module Cro::HTTP::Router {
                     with $routing-outcome {
                         my ($handler-idx, $args) = .ast;
                         my $handler := @!handlers[$handler-idx];
+                        my %*URLS = %!urls;
                         whenever $handler.invoke($request, $args) -> $response {
                             emit $response;
                             QUIT {
@@ -366,7 +369,7 @@ module Cro::HTTP::Router {
         method add-handler(Str $method, &implementation, Str :$name --> Nil) {
             @!handlers-to-add.push: {
                 @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched,
-                        :@!around, :%!plugin-config, :$name));
+                        :@!around, :%!plugin-config, :$name, :!from-include));
             }
         }
 
@@ -430,7 +433,7 @@ module Cro::HTTP::Router {
             for @!includes -> (:@prefix, :$includee, :$name-prefix) {
                 for $includee.handlers() {
                     @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
-                        :@!before-matched, :@!after-matched, :@!around, :%!plugin-config, :$name-prefix);
+                        :@!before-matched, :@!after-matched, :@!around, :%!plugin-config, :$name-prefix, :from-include);
                 }
             }
             self!generate-route-matcher();
@@ -440,9 +443,11 @@ module Cro::HTTP::Router {
         method !generate-urls() {
             my %urls;
             my $prefix = $.name // "";
+            $prefix ~= '.' if $prefix;
             for @.handlers -> $handler {
                 if $handler ~~ RouteHandler && $handler.name.defined {
-                    my $key = $prefix ~ $handler.name;
+                    my $key = $handler.from-include ?? $handler.name !! $prefix ~ $handler.name;
+                    next if $handler.from-include and not $key.contains('.');
                     die X::Cro::HTTP::Router::DuplicateLinkName.new(:$key) if %urls{$key}:exists;
                     %urls{$key} = route-signature-to-sub($handler.signature);
                 }
@@ -595,7 +600,7 @@ module Cro::HTTP::Router {
 
             # Turned nameds into unpacks.
             for @named -> $param {
-                my $target-name = $param.named_names[0];
+                my $target-name = $param.slurpy ?? $param.name !! $param.named_names[0];
                 my ($exists, $lookup) = do given $param {
                     when Cookie {
                         '$req.has-cookie(Q[' ~ $target-name ~ '])',
@@ -775,17 +780,17 @@ module Cro::HTTP::Router {
     sub include(*@includees, *%includees --> Nil) is export {
         for @includees {
             when RouteSet  {
-                $*CRO-ROUTE-SET.add-include([], $_);
+                $*CRO-ROUTE-SET.add-include([], $_, name-prefix => $_.name);
             }
             when Pair {
                 my ($prefix, $routes) = .kv;
                 if $routes ~~ RouteSet {
                     given $prefix {
                         when Str {
-                            $*CRO-ROUTE-SET.add-include([$prefix], $routes);
+                            $*CRO-ROUTE-SET.add-include([$prefix], $routes, name-prefix => $routes.name);
                         }
                         when Iterable {
-                            $*CRO-ROUTE-SET.add-include($prefix, $routes);
+                            $*CRO-ROUTE-SET.add-include($prefix, $routes, name-prefix => $routes.name);
                         }
                         default {
                             die "An 'include' prefix may be a Str or Iterable, but not " ~ .^name;
@@ -1354,6 +1359,16 @@ module Cro::HTTP::Router {
             } else {
                 $resp.status = 403;
             }
+        }
+    }
+
+    sub make-link($route-name, *@args, *%args) is export {
+        my $maker = %*URLS{$route-name} // Nil;
+        with $maker {
+            return $_(|@args, |%args);
+        } else {
+            warn "Called the make-link subroutine with $route-name but no such route defined";
+            "";
         }
     }
 
