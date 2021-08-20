@@ -182,6 +182,7 @@ role Cro::HTTP::Middleware::RequestResponse does Cro::HTTP::Middleware::Pair {
                 }
                 whenever wrap-response-logging($!middleware, $pipeline, { $!middleware.process-responses($_) }) -> $response {
                     emit $response;
+                    LAST $connection-state.early-responses.done;
                 }
             }
         }
