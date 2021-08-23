@@ -447,6 +447,7 @@ module Cro::HTTP::Router {
                         $link-config[0]<url-storage> =
                                 %( |$link-config[0]<url-storage>,
                                    $outer-handler.name => route-signature-to-sub($_.url-prefix, $_.signature));
+                        $link-config[0]<url-storage>{$_.name}:delete unless $_.name eq $outer-handler.name;
                     }
                     @!handlers.push: $outer-handler;
                 }
