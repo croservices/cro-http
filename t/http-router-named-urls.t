@@ -3,38 +3,43 @@ use Cro::HTTP::Request;
 use Cro::HTTP::Router;
 use Test;
 
-{
-    my $app = route {
-        get -> {};
-    }
-    is-deeply $app.urls, %(), "No named urls";
+sub test-route-urls($app) {
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</>));
+    $responses.receive;
 }
 
-{
-    my $app = route :name<main->, {
-        get -> {};
-    }
-    is-deeply $app.urls, %(), "No named urls with a prefix";
+test-route-urls route {
+    get -> {
+        is-deeply %*URLS<url-storage>, %(), "No named urls";
+    };
+}
+
+test-route-urls route :name<main->, {
+    get -> {
+        is-deeply %*URLS<url-storage>, %(), "No named urls with a prefix";
+    };
 }
 
 {
     my $*CRO-ROOT-URL = 'https://foobar.com';
-    my $app = route {
-        get :name<home>, -> {};
+    test-route-urls route {
+        get :name<home>, -> {
+            is-deeply %*URLS<url-storage>.keys, ('home',), "A named url with no prefix";
+            is %*URLS<url-storage><home>(), '/';
+            is %*URLS<url-storage><home>.relative, '';
+            is %*URLS<url-storage><home>.absolute, '/';
+            is %*URLS<url-storage><home>.url, 'https://foobar.com/';
+        };
     }
-    is-deeply $app.urls.keys, ('home',), "A named url with no prefix";
-    is $app.urls<home>(), '/';
-    is $app.urls<home>.relative, '';
-    is $app.urls<home>.absolute, '/';
-    is $app.urls<home>.url, 'https://foobar.com/';
 }
 
-{
-    my $app = route :name<main>, {
-        get :name<home>, -> {};
-    }
-    is-deeply $app.urls.keys, ('main.home',), "A named url with a prefix";
-    is $app.urls<main.home>(), '/';
+test-route-urls route :name<main>, {
+    get :name<home>, -> {
+        is-deeply %*URLS<url-storage>.keys, ('main.home',), "A named url with a prefix";
+        is %*URLS<url-storage><main.home>(), '/';
+    };
 }
 
 throws-like {
@@ -74,55 +79,58 @@ throws-like {
 #    is-deeply $app.urls.keys, ('main.home',), "A named url in an include with a prefix";
 #}
 
-{
-    my $app = route {
-        get :name<hello>, -> 'hello', $name { };
+test-route-urls route {
+    get -> {
+        is %*URLS<url-storage><hello>('world'), '/hello/world';
+        throws-like { %*URLS<url-storage><hello>() }, Exception, message => "Not enough arguments";
+        throws-like { %*URLS<url-storage><hello>('a', 'b') }, Exception, message => "Extraneous arguments";
     }
-    is $app.urls<hello>('world'), '/hello/world';
-    throws-like { $app.urls<hello>() }, Exception, message => "Not enough arguments";
-    throws-like { $app.urls<hello>('a', 'b') }, Exception, message => "Extraneous arguments";
+
+    get :name<hello>, -> 'hello', $name {};
 }
 
-{
-    my $app = route {
-        get :name<hello>, -> :$a, :$b { };
-    }
-    is $app.urls<hello>(:a(1), :b(2)), '/?a=1&b=2';
-    is $app.urls<hello>(:a(1)), '/?a=1';
-    is $app.urls<hello>(:b(2)), '/?b=2';
-    throws-like { $app.urls<hello>(1) }, Exception, message => "Extraneous arguments";
-    throws-like { $app.urls<hello>(:c(3)) }, Exception, message => "Extraneous named arguments: c.";
-    throws-like { $app.urls<hello>(:a(1), :c(3)) }, Exception, message => "Extraneous named arguments: c.";
+test-route-urls route {
+    get :name<hello>, -> :$a, :$b {
+        is %*URLS<url-storage><hello>(:a(1), :b(2)), '/?a=1&b=2';
+        is %*URLS<url-storage><hello>(:a(1)), '/?a=1';
+        is %*URLS<url-storage><hello>(:b(2)), '/?b=2';
+        throws-like { %*URLS<url-storage><hello>(1) }, Exception, message => "Extraneous arguments";
+        throws-like { %*URLS<url-storage><hello>(:c(3)) }, Exception, message => "Extraneous named arguments: c.";
+        throws-like { %*URLS<url-storage><hello>(:a(1), :c(3)) }, Exception, message => "Extraneous named arguments: c.";
+    };
 }
 
-{
-    my $app = route {
-        get :name<hello>, -> :$a!, :$b! { };
+test-route-urls route {
+    get -> {
+        is %*URLS<url-storage><hello>(:a(1), :b(2)), '/?a=1&b=2';
+        throws-like { %*URLS<url-storage><hello>(:a(1)) }, Exception, message => "Missing named arguments: b.";
+        throws-like { %*URLS<url-storage><hello>(:b(2)) }, Exception, message => "Missing named arguments: a.";
+        throws-like { %*URLS<url-storage><hello>(1) }, Exception, message => "Extraneous arguments";
+        throws-like { %*URLS<url-storage><hello>(:c(3)) }, Exception, message => "Missing named arguments: a, b. Extraneous named arguments: c.";
+        throws-like { %*URLS<url-storage><hello>(:a(1), :c(3)) }, Exception, message => "Missing named arguments: b. Extraneous named arguments: c.";
     }
-    is $app.urls<hello>(:a(1), :b(2)), '/?a=1&b=2';
-    throws-like { $app.urls<hello>(:a(1)) }, Exception, message => "Missing named arguments: b.";
-    throws-like { $app.urls<hello>(:b(2)) }, Exception, message => "Missing named arguments: a.";
-    throws-like { $app.urls<hello>(1) }, Exception, message => "Extraneous arguments";
-    throws-like { $app.urls<hello>(:c(3)) }, Exception, message => "Missing named arguments: a, b. Extraneous named arguments: c.";
-    throws-like { $app.urls<hello>(:a(1), :c(3)) }, Exception, message => "Missing named arguments: b. Extraneous named arguments: c.";
+
+    get :name<hello>, -> :$a!, :$b! {};
 }
 
-{
-    my $app = route {
-        get :name<css>, -> 'css', +a { };
+test-route-urls route {
+    get -> {
+        is %*URLS<url-storage><css>(), '/css';
+        is %*URLS<url-storage><css>('x', 'y', 'z'), '/css/x/y/z';
     }
-    is $app.urls<css>(), '/css';
-    is $app.urls<css>('x', 'y', 'z'), '/css/x/y/z';
+
+    get :name<css>, -> 'css', +a { };
 }
 
-{
-    my $app = route {
-        get :name<css>, -> *@a, *%b { };
+test-route-urls route {
+    get -> {
+        is %*URLS<url-storage><css>(), '/', 'Splat with no args at all';
+        is %*URLS<url-storage><css>('x', 'y', 'z'), '/x/y/z', 'Splat with no named args';
+        is %*URLS<url-storage><css>(:a(1), :b(2), :c(3)), '/?a=1&b=2&c=3', 'Splat with no pos args';
+        is %*URLS<url-storage><css>('x', 'y', 'z', :a(1), :b(2), :où('Ÿ')), '/x/y/z?a=1&b=2&o%C3%B9=%C5%B8', 'Splat with both types of args';
     }
-    is $app.urls<css>(), '/', 'Splat with no args at all';
-    is $app.urls<css>('x', 'y', 'z'), '/x/y/z', 'Splat with no named args';
-    is $app.urls<css>(:a(1), :b(2), :c(3)), '/?a=1&b=2&c=3', 'Splat with no pos args';
-    is $app.urls<css>('x', 'y', 'z', :a(1), :b(2), :où('Ÿ')), '/x/y/z?a=1&b=2&o%C3%B9=%C5%B8', 'Splat with both types of args';
+
+    get :name<css>, -> *@a, *%b { };
 }
 
 {
@@ -177,5 +185,25 @@ throws-like {
         }
     }
 }, X::Cro::HTTP::Router::DuplicateLinkName, message => "Conflicting link name: foo.home";
+
+{
+    test-route-urls route {
+        get -> {
+            is-deeply %*URLS<url-storage>.keys.sort, <home baz.home baz.foo>.sort,
+                    'Named include names are recognized properly';
+            is %*URLS<url-storage><baz.foo>(42), '/included/bar/42';
+        }
+
+        get :name<home>, -> 'bar', Int $foo {}
+
+        include route :name<baz>, {
+            get :name<home>, -> 'bar', Int $foo {}
+        }
+
+        include included => route :name<baz>, {
+            get :name<foo>, -> 'bar', Int $foo {}
+        }
+    }
+}
 
 done-testing;

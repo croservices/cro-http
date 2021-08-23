@@ -3,18 +3,19 @@ use Cro::Uri :encode-percents;
 
 class RouteSignatureURLHolder {
     has Callable $.fn is required;
+    has Str $.prefix;
 
     method CALL-ME(|c) { self.absolute(|c) }
     method relative(|c) { $!fn(|c) }
-    method absolute(|c) { '/' ~ $!fn(|c) }
+    method absolute(|c) { '/' ~ ($!prefix ?? $!prefix ~ '/' !! '') ~ $!fn(|c) }
     method url(|c) {
         my $root-url = $*CRO-ROOT-URL or die 'No CRO-ROOT-URL configured';
-        $root-url ~ ($root-url.ends-with('/') ?? '' !! '/') ~ $!fn(|c)
+        $root-url ~ ($root-url.ends-with('/') ?? '' !! '/') ~ ($!prefix ?? "$!prefix/" !! '') ~ $!fn(|c)
     }
 }
 
-sub route-signature-to-sub(Signature $s) is export {
-    RouteSignatureURLHolder.new(fn => signature-to-sub($s))
+sub route-signature-to-sub(Str $prefix, Signature $s) is export {
+    RouteSignatureURLHolder.new(:$prefix, fn => signature-to-sub($s))
 }
 
 sub signature-to-sub(Signature $s) {
