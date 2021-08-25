@@ -1,5 +1,7 @@
 use Cro;
 use Cro::HTTP::Request;
+use Cro::HTTP::Router :link;
+use Cro::HTTP::Router :plugin;
 use Cro::HTTP::Router;
 use Test;
 
@@ -12,13 +14,13 @@ sub test-route-urls($app) {
 
 test-route-urls route {
     get -> {
-        is-deeply %*URLS<url-storage>, %(), "No named urls";
+        is-deeply router-plugin-get-innermost-configs($link-plugin)[0].link-generators, %(), "No named urls";
     };
 }
 
 test-route-urls route :name<main->, {
     get -> {
-        is-deeply %*URLS<url-storage>, %(), "No named urls with a prefix";
+        is-deeply router-plugin-get-innermost-configs($link-plugin)[0].link-generators, %(), "No named urls with a prefix";
     };
 }
 
@@ -26,19 +28,17 @@ test-route-urls route :name<main->, {
     my $*CRO-ROOT-URL = 'https://foobar.com';
     test-route-urls route {
         get :name<home>, -> {
-            is-deeply %*URLS<url-storage>.keys, ('home',), "A named url with no prefix";
-            is %*URLS<url-storage><home>(), '/';
-            is %*URLS<url-storage><home>.relative, '';
-            is %*URLS<url-storage><home>.absolute, '/';
-            is %*URLS<url-storage><home>.url, 'https://foobar.com/';
+            is make-link('home'), '/', 'Basic call of a generator is correct';
+            is make-link('home').relative, '', 'Relative URL is correct';
+            is make-link('home').absolute, '/', 'Absolute URL is correct';
+            is make-link('home').url, 'https://foobar.com/', 'CRO-ROOT-URL was used';
         };
     }
 }
 
 test-route-urls route :name<main>, {
     get :name<home>, -> {
-        is-deeply %*URLS<url-storage>.keys, ('main.home',), "A named url with a prefix";
-        is %*URLS<url-storage><main.home>(), '/';
+        is make-link('main.home'), '/', 'Basic call of a generator by a short name is correct';
     };
 }
 
@@ -81,9 +81,10 @@ throws-like {
 
 test-route-urls route {
     get -> {
-        is %*URLS<url-storage><hello>('world'), '/hello/world';
-        throws-like { %*URLS<url-storage><hello>() }, Exception, message => "Not enough arguments";
-        throws-like { %*URLS<url-storage><hello>('a', 'b') }, Exception, message => "Extraneous arguments";
+        say make-link('hello', 'world');
+        is make-link('hello', 'world'), '/hello/world', 'URL is generated correctly';
+        throws-like { make-link('hello') }, Exception, message => "Not enough arguments";
+        throws-like { make-link('hello', 'a', 'b') }, Exception, message => "Extraneous arguments";
     }
 
     get :name<hello>, -> 'hello', $name {};
@@ -91,23 +92,23 @@ test-route-urls route {
 
 test-route-urls route {
     get :name<hello>, -> :$a, :$b {
-        is %*URLS<url-storage><hello>(:a(1), :b(2)), '/?a=1&b=2';
-        is %*URLS<url-storage><hello>(:a(1)), '/?a=1';
-        is %*URLS<url-storage><hello>(:b(2)), '/?b=2';
-        throws-like { %*URLS<url-storage><hello>(1) }, Exception, message => "Extraneous arguments";
-        throws-like { %*URLS<url-storage><hello>(:c(3)) }, Exception, message => "Extraneous named arguments: c.";
-        throws-like { %*URLS<url-storage><hello>(:a(1), :c(3)) }, Exception, message => "Extraneous named arguments: c.";
+        is make-link('hello', :a(1), :b(2)), '/?a=1&b=2';
+        is make-link('hello', :a(1)), '/?a=1';
+        is make-link('hello', :b(2)), '/?b=2';
+        throws-like { make-link('hello', 1) }, Exception, message => "Extraneous arguments";
+        throws-like { make-link('hello', :c(3)) }, Exception, message => "Extraneous named arguments: c.";
+        throws-like { make-link('hello', :a(1), :c(3)) }, Exception, message => "Extraneous named arguments: c.";
     };
 }
 
 test-route-urls route {
     get -> {
-        is %*URLS<url-storage><hello>(:a(1), :b(2)), '/?a=1&b=2';
-        throws-like { %*URLS<url-storage><hello>(:a(1)) }, Exception, message => "Missing named arguments: b.";
-        throws-like { %*URLS<url-storage><hello>(:b(2)) }, Exception, message => "Missing named arguments: a.";
-        throws-like { %*URLS<url-storage><hello>(1) }, Exception, message => "Extraneous arguments";
-        throws-like { %*URLS<url-storage><hello>(:c(3)) }, Exception, message => "Missing named arguments: a, b. Extraneous named arguments: c.";
-        throws-like { %*URLS<url-storage><hello>(:a(1), :c(3)) }, Exception, message => "Missing named arguments: b. Extraneous named arguments: c.";
+        is make-link('hello', :a(1), :b(2)), '/?a=1&b=2';
+        throws-like { make-link('hello', :a(1)) }, Exception, message => "Missing named arguments: b.";
+        throws-like { make-link('hello', :b(2)) }, Exception, message => "Missing named arguments: a.";
+        throws-like { make-link('hello', 1) }, Exception, message => "Extraneous arguments";
+        throws-like { make-link('hello', :c(3)) }, Exception, message => "Missing named arguments: a, b. Extraneous named arguments: c.";
+        throws-like { make-link('hello', :a(1), :c(3)) }, Exception, message => "Missing named arguments: b. Extraneous named arguments: c.";
     }
 
     get :name<hello>, -> :$a!, :$b! {};
@@ -115,8 +116,8 @@ test-route-urls route {
 
 test-route-urls route {
     get -> {
-        is %*URLS<url-storage><css>(), '/css';
-        is %*URLS<url-storage><css>('x', 'y', 'z'), '/css/x/y/z';
+        is make-link('css'), '/css';
+        is make-link('css', 'x', 'y', 'z'), '/css/x/y/z';
     }
 
     get :name<css>, -> 'css', +a { };
@@ -124,10 +125,10 @@ test-route-urls route {
 
 test-route-urls route {
     get -> {
-        is %*URLS<url-storage><css>(), '/', 'Splat with no args at all';
-        is %*URLS<url-storage><css>('x', 'y', 'z'), '/x/y/z', 'Splat with no named args';
-        is %*URLS<url-storage><css>(:a(1), :b(2), :c(3)), '/?a=1&b=2&c=3', 'Splat with no pos args';
-        is %*URLS<url-storage><css>('x', 'y', 'z', :a(1), :b(2), :où('Ÿ')), '/x/y/z?a=1&b=2&o%C3%B9=%C5%B8', 'Splat with both types of args';
+        is make-link('css'), '/', 'Splat with no args at all';
+        is make-link('css', 'x', 'y', 'z'), '/x/y/z', 'Splat with no named args';
+        is make-link('css', :a(1), :b(2), :c(3)), '/?a=1&b=2&c=3', 'Splat with no pos args';
+        is make-link('css', 'x', 'y', 'z', :a(1), :b(2), :où('Ÿ')), '/x/y/z?a=1&b=2&o%C3%B9=%C5%B8', 'Splat with both types of args';
     }
 
     get :name<css>, -> *@a, *%b { };
@@ -185,25 +186,5 @@ throws-like {
         }
     }
 }, X::Cro::HTTP::Router::DuplicateLinkName, message => "Conflicting link name: foo.home";
-
-{
-    test-route-urls route {
-        get -> {
-            is-deeply %*URLS<url-storage>.keys.sort, <home baz.home baz.foo>.sort,
-                    'Named include names are recognized properly';
-            is %*URLS<url-storage><baz.foo>(42), '/included/bar/42';
-        }
-
-        get :name<home>, -> 'bar', Int $foo {}
-
-        include route :name<baz>, {
-            get :name<home>, -> 'bar', Int $foo {}
-        }
-
-        include included => route :name<baz>, {
-            get :name<foo>, -> 'bar', Int $foo {}
-        }
-    }
-}
 
 done-testing;

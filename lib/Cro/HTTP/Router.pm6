@@ -77,7 +77,11 @@ module Cro::HTTP::Router {
        has Str $.id is required;
     }
 
-    my $link-plugin = router-plugin-register('link');
+    our $link-plugin is export(:link) = router-plugin-register('link');
+
+    class RouteBlockLinks {
+        has %.link-generators;
+    }
 
     #| A C<Cro::Transform> that consumes HTTP requests and produces HTTP
     #| responses by routing them according to the routing specification set
@@ -142,6 +146,8 @@ module Cro::HTTP::Router {
                 $current
             }
         }
+
+
 
         my class RouteHandler does Handler {
             has Str $.method;
@@ -310,8 +316,6 @@ module Cro::HTTP::Router {
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
 
-        method urls() { router-plugin-get-innermost-configs($link-plugin) }
-
         method transformer(Supply:D $requests) {
             supply {
                 whenever $requests -> $request {
@@ -326,8 +330,8 @@ module Cro::HTTP::Router {
                     with $routing-outcome {
                         my ($handler-idx, $args) = .ast;
                         my $handler := @!handlers[$handler-idx];
-                        my $*CRO-ROUTER-ROUTE-HANDLER = $handler;
-                        my %*URLS = $handler ~~ DelegateHandler ?? %() !! router-plugin-get-configs($link-plugin);
+                        # my $*CRO-ROUTER-ROUTE-HANDLER = $handler;
+                        # my %*URLS = $handler ~~ DelegateHandler ?? %() !! router-plugin-get-configs($link-plugin);
                         whenever $handler.invoke($request, $args) -> $response {
                             emit $response;
                             QUIT {
@@ -435,25 +439,32 @@ module Cro::HTTP::Router {
                 .body-parsers = @!body-parsers;
                 .body-serializers = @!body-serializers;
             }
+            self!generate-urls();
+            my %urls;
             for @!includes -> (:@prefix, :$includee, :$name-prefix) {
                 for $includee.handlers() {
+                    my $key = ($name-prefix ?? $name-prefix ~ '.' !! '') ~ ($_.name // '');
+                    if $name-prefix && $key && (%urls{$key}:exists) {
+                        die X::Cro::HTTP::Router::DuplicateLinkName.new(:$key);
+                    }
+                    %urls{$key} = True;
                     $_.url-prefix = @prefix.join('/') ~ ($_.url-prefix ?? '/' ~ $_.url-prefix !! '');
                     my $outer-handler = .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
                         :@!before-matched, :@!after-matched, :@!around, :%!plugin-config, :$name-prefix, :from-include);
                     if $outer-handler.name {
-                        my $link-config = $outer-handler.get-innermost-plugin-configs($link-plugin);
+                        my $link-config = $outer-handler.get-innermost-plugin-configs($link-plugin)[0];
                         # Url of included route can have a prefix which we did not know about
                         # at the generation stage, so overwrite it now when we have all the data we need
-                        $link-config[0]<url-storage> =
-                                %( |$link-config[0]<url-storage>,
-                                   $outer-handler.name => route-signature-to-sub($_.url-prefix, $_.signature));
-                        $link-config[0]<url-storage>{$_.name}:delete unless $_.name eq $outer-handler.name;
+                        $link-config.link-generators =
+                                %( |$link-config.link-generators,
+                                   $outer-handler.name => route-signature-to-sub($_.url-prefix, $_.signature),
+                                   $_.name => route-signature-to-sub($_.url-prefix, $_.signature)
+                                 );
                     }
                     @!handlers.push: $outer-handler;
                 }
             }
             self!generate-route-matcher();
-            self!generate-urls();
         }
 
         method !generate-urls() {
@@ -469,7 +480,7 @@ module Cro::HTTP::Router {
                     %urls{$key} = route-signature-to-sub($url-prefix, $handler.signature);
                 }
             }
-            router-plugin-add-config($link-plugin, (url-storage => %urls));
+            router-plugin-add-config($link-plugin, RouteBlockLinks.new(link-generators => %urls));
         }
 
         method !generate-route-matcher(--> Nil) {
@@ -1380,13 +1391,16 @@ module Cro::HTTP::Router {
     }
 
     sub make-link($route-name, *@args, *%args) is export {
-        my $maker = %*URLS<url-storage>{$route-name} // Nil;
-        with $maker {
-            return $_(|@args, |%args);
-        } else {
-            warn "Called the make-link subroutine with $route-name but no such route defined";
-            "";
+        my $maker = router-plugin-get-configs($link-plugin);
+        my @options;
+        for @$maker -> $links {
+            with $links.link-generators{$route-name} {
+                return $_(|@args, |%args);
+            }
+            @options.push: |$links.link-generators.keys;
         }
+        warn "Called the make-link subroutine with $route-name but no such route defined, options are: @options.join('/')";
+        "";
     }
 
     #| Register a router plugin. The provided ID is for debugging purposes.
