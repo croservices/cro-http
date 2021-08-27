@@ -1390,17 +1390,31 @@ module Cro::HTTP::Router {
         }
     }
 
-    sub make-link($route-name, *@args, *%args) is export {
+    sub rel-link($route-name, *@params, *%params) is export {
+        with get-link($route-name, 'rel-link') {
+            return $_.relative(|@params, |%params);
+        }
+        "";
+    }
+
+    sub abs-link($route-name, *@params, *%params) is export {
+        with get-link($route-name, 'abs-link') {
+            return $_.absolute(|@params, |%params);
+        }
+        "";
+    }
+
+    my sub get-link($route-name, $sub-name) {
         my $maker = router-plugin-get-configs($link-plugin);
         my @options;
         for @$maker -> $links {
             with $links.link-generators{$route-name} {
-                return $_(|@args, |%args);
+                return $_;
             }
             @options.push: |$links.link-generators.keys;
         }
-        warn "Called the make-link subroutine with $route-name but no such route defined, options are: @options.join('/')";
-        "";
+        warn "Called the $sub-name subroutine with $route-name but no such route defined, options are: @options.join('/')";
+        Nil;
     }
 
     #| Register a router plugin. The provided ID is for debugging purposes.

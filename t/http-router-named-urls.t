@@ -24,21 +24,9 @@ test-route-urls route :name<main->, {
     };
 }
 
-{
-    my $*CRO-ROOT-URL = 'https://foobar.com';
-    test-route-urls route {
-        get :name<home>, -> {
-            is make-link('home'), '/', 'Basic call of a generator is correct';
-            is make-link('home').relative, '', 'Relative URL is correct';
-            is make-link('home').absolute, '/', 'Absolute URL is correct';
-            is make-link('home').url, 'https://foobar.com/', 'CRO-ROOT-URL was used';
-        };
-    }
-}
-
 test-route-urls route :name<main>, {
     get :name<home>, -> {
-        is make-link('main.home'), '/', 'Basic call of a generator by a qualified name is correct';
+        is abs-link('main.home'), '/', 'Basic call of a generator by a qualified name is correct';
     };
 }
 
@@ -58,9 +46,9 @@ throws-like {
 
 test-route-urls route {
     get -> {
-        is make-link('hello', 'world'), '/hello/world', 'URL is generated correctly';
-        throws-like { make-link('hello') }, Exception, message => "Not enough arguments";
-        throws-like { make-link('hello', 'a', 'b') }, Exception, message => "Extraneous arguments";
+        is abs-link('hello', 'world'), '/hello/world', 'URL is generated correctly';
+        throws-like { abs-link('hello') }, Exception, message => "Not enough arguments";
+        throws-like { abs-link('hello', 'a', 'b') }, Exception, message => "Extraneous arguments";
     }
 
     get :name<hello>, -> 'hello', $name {};
@@ -68,23 +56,23 @@ test-route-urls route {
 
 test-route-urls route {
     get :name<hello>, -> :$a, :$b {
-        is make-link('hello', :a(1), :b(2)), '/?a=1&b=2';
-        is make-link('hello', :a(1)), '/?a=1';
-        is make-link('hello', :b(2)), '/?b=2';
-        throws-like { make-link('hello', 1) }, Exception, message => "Extraneous arguments";
-        throws-like { make-link('hello', :c(3)) }, Exception, message => "Extraneous named arguments: c.";
-        throws-like { make-link('hello', :a(1), :c(3)) }, Exception, message => "Extraneous named arguments: c.";
+        is abs-link('hello', :a(1), :b(2)), '/?a=1&b=2';
+        is abs-link('hello', :a(1)), '/?a=1';
+        is abs-link('hello', :b(2)), '/?b=2';
+        throws-like { abs-link('hello', 1) }, Exception, message => "Extraneous arguments";
+        throws-like { abs-link('hello', :c(3)) }, Exception, message => "Extraneous named arguments: c.";
+        throws-like { abs-link('hello', :a(1), :c(3)) }, Exception, message => "Extraneous named arguments: c.";
     };
 }
 
 test-route-urls route {
     get -> {
-        is make-link('hello', :a(1), :b(2)), '/?a=1&b=2';
-        throws-like { make-link('hello', :a(1)) }, Exception, message => "Missing named arguments: b.";
-        throws-like { make-link('hello', :b(2)) }, Exception, message => "Missing named arguments: a.";
-        throws-like { make-link('hello', 1) }, Exception, message => "Extraneous arguments";
-        throws-like { make-link('hello', :c(3)) }, Exception, message => "Missing named arguments: a, b. Extraneous named arguments: c.";
-        throws-like { make-link('hello', :a(1), :c(3)) }, Exception, message => "Missing named arguments: b. Extraneous named arguments: c.";
+        is abs-link('hello', :a(1), :b(2)), '/?a=1&b=2';
+        throws-like { abs-link('hello', :a(1)) }, Exception, message => "Missing named arguments: b.";
+        throws-like { abs-link('hello', :b(2)) }, Exception, message => "Missing named arguments: a.";
+        throws-like { abs-link('hello', 1) }, Exception, message => "Extraneous arguments";
+        throws-like { abs-link('hello', :c(3)) }, Exception, message => "Missing named arguments: a, b. Extraneous named arguments: c.";
+        throws-like { abs-link('hello', :a(1), :c(3)) }, Exception, message => "Missing named arguments: b. Extraneous named arguments: c.";
     }
 
     get :name<hello>, -> :$a!, :$b! {};
@@ -92,8 +80,8 @@ test-route-urls route {
 
 test-route-urls route {
     get -> {
-        is make-link('css'), '/css';
-        is make-link('css', 'x', 'y', 'z'), '/css/x/y/z';
+        is abs-link('css'), '/css';
+        is abs-link('css', 'x', 'y', 'z'), '/css/x/y/z';
     }
 
     get :name<css>, -> 'css', +a { };
@@ -101,10 +89,10 @@ test-route-urls route {
 
 test-route-urls route {
     get -> {
-        is make-link('css'), '/', 'Splat with no args at all';
-        is make-link('css', 'x', 'y', 'z'), '/x/y/z', 'Splat with no named args';
-        is make-link('css', :a(1), :b(2), :c(3)), '/?a=1&b=2&c=3', 'Splat with no pos args';
-        is make-link('css', 'x', 'y', 'z', :a(1), :b(2), :où('Ÿ')), '/x/y/z?a=1&b=2&o%C3%B9=%C5%B8', 'Splat with both types of args';
+        is abs-link('css'), '/', 'Splat with no args at all';
+        is abs-link('css', 'x', 'y', 'z'), '/x/y/z', 'Splat with no named args';
+        is abs-link('css', :a(1), :b(2), :c(3)), '/?a=1&b=2&c=3', 'Splat with no pos args';
+        is abs-link('css', 'x', 'y', 'z', :a(1), :b(2), :où('Ÿ')), '/x/y/z?a=1&b=2&o%C3%B9=%C5%B8', 'Splat with both types of args';
     }
 
     get :name<css>, -> *@a, *%b { };
