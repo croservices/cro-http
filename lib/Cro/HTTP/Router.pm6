@@ -330,8 +330,6 @@ module Cro::HTTP::Router {
                     with $routing-outcome {
                         my ($handler-idx, $args) = .ast;
                         my $handler := @!handlers[$handler-idx];
-                        # my $*CRO-ROUTER-ROUTE-HANDLER = $handler;
-                        # my %*URLS = $handler ~~ DelegateHandler ?? %() !! router-plugin-get-configs($link-plugin);
                         whenever $handler.invoke($request, $args) -> $response {
                             emit $response;
                             QUIT {
@@ -444,6 +442,8 @@ module Cro::HTTP::Router {
             for @!includes -> (:@prefix, :$includee, :$name-prefix) {
                 for $includee.handlers() {
                     my $key = ($name-prefix ?? $name-prefix ~ '.' !! '') ~ ($_.name // '');
+                    # When checking all included routes in the outer route block for conflicting,
+                    # we omit anonymous ones (if $name-prefix...)
                     if $name-prefix && $key && (%urls{$key}:exists) {
                         die X::Cro::HTTP::Router::DuplicateLinkName.new(:$key);
                     }

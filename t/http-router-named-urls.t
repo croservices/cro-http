@@ -38,7 +38,7 @@ test-route-urls route :name<main->, {
 
 test-route-urls route :name<main>, {
     get :name<home>, -> {
-        is make-link('main.home'), '/', 'Basic call of a generator by a short name is correct';
+        is make-link('main.home'), '/', 'Basic call of a generator by a qualified name is correct';
     };
 }
 
@@ -56,32 +56,8 @@ throws-like {
     }
 }, X::Cro::HTTP::Router::DuplicateLinkName, message => "Conflicting link name: main.home";
 
-# XXX the test intention is bogus?
-# We basically have two sorts of cases:
-# * A route is not from include for sure, so we append its possible name to possible names of routes
-# * A route is from include, so we entrust it to settle the name for itself (because the addressing happens from each individual route bottom-top way
-# For the code below, it assumes we should squash the hierarchy when the include is anonymous, but this is forbidden because we explicitly allow:
-#         my $app = route {
-#            include route {
-#                get :name<home>, -> {}
-#            }
-#            include route {
-#                get :name<home>, -> {}
-#            }
-#        }
-# to exist, implying we do not peek into "anonymous" includes
-#{
-#    my $app = route :name<main>, {
-#        include route {
-#            get :name<home>, -> {};
-#        }
-#    }
-#    is-deeply $app.urls.keys, ('main.home',), "A named url in an include with a prefix";
-#}
-
 test-route-urls route {
     get -> {
-        say make-link('hello', 'world');
         is make-link('hello', 'world'), '/hello/world', 'URL is generated correctly';
         throws-like { make-link('hello') }, Exception, message => "Not enough arguments";
         throws-like { make-link('hello', 'a', 'b') }, Exception, message => "Extraneous arguments";
