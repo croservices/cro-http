@@ -1,11 +1,14 @@
 use Cro::Transform;
 use Cro::TCP;
+use Cro::Policy::Timeout;
+use Cro::HTTP::Exception;
 use Cro::HTTP::RawBodyParserSelector;
 use Cro::HTTP::Response;
 
 class Cro::HTTP::ResponseParser does Cro::Transform {
     has Cro::HTTP::RawBodyParserSelector $.raw-body-parser-selector =
         Cro::HTTP::RawBodyParserSelector::Default;
+    has $.body-timeout;
 
     method consumes() { Cro::TCP::Message }
     method produces() { Cro::HTTP::Response }
@@ -35,6 +38,15 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                 $leftover = Promise.new;
             }
             fresh-message;
+
+            my $started-body = Promise.new;
+            whenever $started-body {
+                with $!body-timeout {
+                    whenever Promise.in($_) {
+                        $raw-body-byte-stream.?quit(X::Cro::HTTP::Client::Timeout.new(phase => 'body', uri => $response.request.target));
+                    }
+                }
+            }
 
             whenever $in -> Cro::TCP::Message $packet {
                 $header-decoder.add-bytes($packet.data) unless $expecting == Body;
@@ -93,6 +105,7 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                         }
                     }
                     when Body {
+                        $started-body.keep if $started-body.status == Planned;
                         $raw-body-byte-stream.emit($packet.data);
                         if $leftover.status == Kept {
                             my $nothing-left = $leftover.result eq Blob.allocate(0);

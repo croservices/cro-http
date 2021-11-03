@@ -1,8 +1,10 @@
 use v6.d;
 use Base64;
 use OO::Monitors;
+use Cro::Policy::Timeout;
 use Cro::HTTP::Client::CookieJar;
 use Cro::HTTP::Internal;
+use Cro::HTTP::Exception;
 use Cro::HTTP::Header;
 use Cro::HTTP::LogTimelineSchema;
 use Cro::HTTP::Request;
@@ -96,6 +98,20 @@ class X::Cro::HTTP::Client::InvalidCookie is Exception {
     }
 }
 
+class X::Cro::HTTP::Client::InvalidTimeoutFormat is Exception {
+    has $.bad;
+    method message() {
+        "Cannot set $!bad.^name() as a timeout (expected a Map of phases or a Real value or an object doing Cro::Policy::Timeout)"
+    }
+}
+
+class Cro::HTTP::Client::Policy::Timeout does Cro::Policy::Timeout[%(
+    connection => 60,
+    headers => 60,
+    body => Inf,
+    total => Inf)] {
+}
+
 #| A HTTP client. Can be used by calling methods on the type object, or by making an
 #| instance of the client. An instance can maintain a pool of connections to re-use
 #| for multiple requests, as well as allowing configuration of common properties of
@@ -105,6 +121,7 @@ class Cro::HTTP::Client {
         has Bool $.secure;
         has Str $.host;
         has Int $.port;
+        has Real $.body-timeout;
         has Supplier $!in;
         has Tap $!tap;
         has $!next-response-vow;
@@ -152,6 +169,7 @@ class Cro::HTTP::Client {
         has Bool $.secure;
         has Str $.host;
         has Int $.port;
+        has Real $.body-timeout;
         has Supplier $!in;
         has Tap $!tap;
         has Bool $.dead = False;
@@ -212,8 +230,8 @@ class Cro::HTTP::Client {
         has %!cached-http1;
         has %!cached-http2;
 
-        method pipeline-for($secure, $host, $port, $http) {
-            my $key = self!key($secure, $host, $port);
+        method pipeline-for($secure, $host, $port, $http, $body-timeout) {
+            my $key = self!key($secure, $host, $port, $body-timeout);
             if $http eq '2' || !$http && $secure {
                 if %!cached-http2{$key} -> $pipeline {
                     if $pipeline.dead {
@@ -238,17 +256,17 @@ class Cro::HTTP::Client {
             with $pipeline {
                 unless .dead {
                     when Pipeline2 {
-                        %!cached-http2{self!key(.secure, .host, .port)} = $pipeline;
+                        %!cached-http2{self!key(.secure, .host, .port, .body-timeout)} = $pipeline;
                     }
                     default {
-                        push %!cached-http1{self!key(.secure, .host, .port)}, $pipeline;
+                        push %!cached-http1{self!key(.secure, .host, .port, .body-timeout)}, $pipeline;
                     }
                 }
             }
         }
 
-        method !key($secure, $host, $port) {
-            "{$secure ?? 'https' !! 'http'}\0$host\0$port\0"
+        method !key($secure, $host, $port, $body-timeout) {
+            "{$secure ?? 'https' !! 'http'}\0$host\0$port\0$body-timeout"
         }
     }
 
@@ -531,19 +549,25 @@ class Cro::HTTP::Client {
             $http = '';
         }
         my Cro::Uri $proxy-url = self!get-proxy-url($parsed-url);
-        my $request-object = self!assemble-request($method, $parsed-url, $proxy-url, %options);
+        my Cro::Policy::Timeout $timeout-policy;
+        my $request-object = self!assemble-request($method, $parsed-url, $proxy-url, %options, $timeout-policy);
 
         my constant $redirect-codes = set(301, 302, 303, 307, 308);
         my $enable-push = self ?? $!push-promises // %options<push-promises> !! %options<push-promises>;
 
+        my $request-start-time = now;
         Promise(supply {
-            whenever self!get-pipeline($proxy-url // $parsed-url, $http, $request-log, ca => %options<ca>, :$enable-push) -> $pipeline {
+            my $body-timeout = $timeout-policy.get-timeout($request-start-time, 'body');
+            my $conn-timeout = $timeout-policy.get-timeout($request-start-time, 'connection');
+            whenever self!get-pipeline($proxy-url // $parsed-url, $http, $conn-timeout, $body-timeout, $request-log, ca => %options<ca>, :$enable-push) -> $pipeline {
                 if $pipeline !~~ Pipeline2 {
                     unless self.persistent || $request-object.has-header('connection') {
                         $request-object.append-header('Connection', 'close');
                     }
                 }
+                my Bool $headers-kept = False;
                 whenever $pipeline.send-request($request-object) {
+                    $headers-kept = True;
                     QUIT { $request-log.end }
 
                     # Consider adding the connection back into the cache to use it
@@ -573,10 +597,10 @@ class Cro::HTTP::Client {
                                 $request-log.end;
                                 die X::Cro::HTTP::Client::TooManyRedirects.new;
                             }
-                            my $new-method = .status == 302|303 ?? 'GET' !! $method;
+                            my $new-method = .status == 302 | 303 ?? 'GET' !! $method;
                             my %new-opts = %options;
                             %new-opts<follow> = $remain;
-                            if .status == 302|303 {
+                            if .status == 302 | 303 {
                                 %new-opts<body>:delete;
                                 %new-opts<content-type>:delete;
                                 %new-opts<content-length>:delete;
@@ -589,14 +613,16 @@ class Cro::HTTP::Client {
                             whenever $req {
                                 QUIT { $request-log.end; }
                                 $request-log.end;
-                                .emit
+                                .emit;
+                                done;
                             };
                         } else {
                             if self && $.cookie-jar.defined {
                                 $.cookie-jar.add-from-response($_, $parsed-url);
                             }
                             $request-log.end;
-                            .emit
+                            .emit;
+                            done;
                         }
                     } elsif 400 <= .status < 500 {
                         my $auth;
@@ -615,6 +641,7 @@ class Cro::HTTP::Client {
                                 QUIT { $request-log.end; }
                                 $request-log.end;
                                 .emit;
+                                done;
                             };
                         } else {
                             Cro::HTTP::LogTimeline::ErrorResponse.log($request-log, :status(.status));
@@ -625,6 +652,13 @@ class Cro::HTTP::Client {
                         Cro::HTTP::LogTimeline::ErrorResponse.log($request-log, :status(.status));
                         $request-log.end;
                         die X::Cro::HTTP::Error::Server.new(response => $_);
+                    }
+                }
+
+                my $timeout = $timeout-policy.get-timeout(now - $request-start-time, 'headers');
+                if $timeout !~~ Inf {
+                    whenever Promise.in($timeout) {
+                        die X::Cro::HTTP::Client::Timeout.new(phase => 'headers', uri => $url) unless $headers-kept;
                     }
                 }
             }
@@ -673,11 +707,11 @@ class Cro::HTTP::Client {
         return False;
     }
 
-    method !get-pipeline(Cro::Uri $url, $http, $log-parent, :$ca, :$enable-push) {
+    method !get-pipeline(Cro::Uri $url, $http, $conn-timeout, $body-timeout, $log-parent, :$ca, :$enable-push) {
         my $secure = $url.scheme.lc eq 'https';
         my $host = $url.host;
         my $port = $url.port // ($secure ?? 443 !! 80);
-        if self && $!connection-cache.pipeline-for($secure, $host, $port, $http) -> $pipeline {
+        if self && $!connection-cache.pipeline-for($secure, $host, $port, $http, $body-timeout) -> $pipeline {
             Cro::HTTP::LogTimeline::ReuseConnection.log($log-parent,
                     :$host, :$port,
                     :secure($secure ?? 'Yes' !! 'No'),
@@ -685,7 +719,7 @@ class Cro::HTTP::Client {
             Promise.kept($pipeline)
         }
         else {
-            self!build-pipeline($secure, $host, $port, $http, $log-parent, :$ca, :$enable-push)
+            self!build-pipeline($secure, $host, $port, $http, $conn-timeout, $body-timeout, $log-parent, :$ca, :$enable-push)
         }
     }
 
@@ -705,7 +739,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !build-pipeline($secure, $host, $port, $http, $log-parent, :$ca, :$enable-push) {
+    method !build-pipeline($secure, $host, $port, $http, $conn-timeout, $body-timeout, $log-parent, :$ca, :$enable-push) {
         my $log-connection = Cro::HTTP::LogTimeline::EstablishConnection.start(
                 $log-parent, :$host, :$port,
                 :secure($secure ?? 'Yes' !! 'No'),
@@ -746,7 +780,7 @@ class Cro::HTTP::Client {
             push @parts, Cro::HTTP2::ResponseParser.new(:$enable-push);
         }
         elsif $http eq '1.1' || !$secure || !$supports-alpn {
-            push @parts, Cro::HTTP::ResponseParser.new;
+            push @parts, Cro::HTTP::ResponseParser.new(:$body-timeout);
         }
         else {
             push @parts, Cro::ConnectionConditional.new(
@@ -754,7 +788,7 @@ class Cro::HTTP::Client {
                     Cro::HTTP2::FrameParser.new(:client),
                     Cro::HTTP2::ResponseParser.new
                 ],
-                Cro::HTTP::ResponseParser.new
+                Cro::HTTP::ResponseParser.new(:$body-timeout)
             );
         }
         if self {
@@ -770,10 +804,10 @@ class Cro::HTTP::Client {
         my $in = Supplier::Preserving.new;
         my %ca = self ?? (self.ca // $ca // {}) !! $ca // {};
         my $out = $version-decision
-            ?? establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, |{%tls-config, %ca})
+            ?? establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |{%tls-config, %ca})
             !! do {
                 my $s = Supplier::Preserving.new;
-                establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, |{%tls-config, %ca}).tap:
+                establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |{%tls-config, %ca}).tap:
                     { $s.emit($_) },
                     done => { $s.done },
                     quit => {
@@ -789,8 +823,13 @@ class Cro::HTTP::Client {
         }
     }
 
-    sub establish(Cro::Connector $connector, Supply $incoming, $log-connection, *%options) {
+    sub establish(Cro::Connector $connector, Supply $incoming, $log-connection, :$conn-timeout, *%options) {
+        my $connection-obtained = False;
         supply {
+            whenever Promise.in($conn-timeout) {
+                die X::Cro::HTTP::Client::Timeout.new(phase => 'connection', uri => %options<host>) unless $connection-obtained;
+            }
+
             my Promise $connection = $connector.connect(|%options);
             $connection.then({ $log-connection.end });
             whenever $connection -> Cro::Transform $transform {
@@ -801,7 +840,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !assemble-request(Str $method, Cro::Uri $base-url, Cro::Uri $proxy-url, %options --> Cro::HTTP::Request) {
+    method !assemble-request(Str $method, Cro::Uri $base-url, Cro::Uri $proxy-url, %options, Cro::Policy::Timeout $timeout-policy is rw, --> Cro::HTTP::Request) {
         # Add any query string parameters.
         my $url;
         with %options<query> -> $query {
@@ -873,6 +912,30 @@ class Cro::HTTP::Client {
                     default {
                         die X::Cro::HTTP::Client::InvalidCookie.new(bad => $_);
                     }
+                }
+            }
+            when 'timeout' {
+                my $curr-timeout;
+                given $value {
+                    when Map:D {
+                        my %phases;
+                        for $_.kv -> $k, $v {
+                            %phases{$k} = Real($v);
+                        }
+                        $curr-timeout = Cro::HTTP::Client::Policy::Timeout.new(total => Inf, |%phases);
+                    }
+                    when Real:D {
+                        $curr-timeout = Cro::HTTP::Client::Policy::Timeout.new(total => Real($_));
+                    }
+                    when Cro::Policy::Timeout:D {
+                        $curr-timeout = $_;
+                    }
+                    default {
+                        die X::Cro::HTTP::Client::InvalidTimeoutFormat.new(bad => $_);
+                    }
+                }
+                with $curr-timeout {
+                    $timeout-policy = $_;
                 }
             }
         }
