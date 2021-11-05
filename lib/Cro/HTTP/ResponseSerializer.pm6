@@ -3,6 +3,7 @@ use Cro::HTTP::LogTimelineSchema;
 use Cro::HTTP::Response;
 use Cro::TCP;
 use Cro::Transform;
+use Cro::UnhandledErrorReporter;
 
 class Cro::HTTP::ResponseSerializer does Cro::Transform {
     method consumes() { Cro::HTTP::Response }
@@ -28,6 +29,7 @@ class Cro::HTTP::ResponseSerializer does Cro::Transform {
                 try {
                     CATCH {
                         when X::Cro::BodySerializerSelector::NoneApplicable {
+                            report-unhandled-error($_);
                             $response.status = 500;
                             $response.remove-header({ True });
                             $response.append-header('Content-length', 0);

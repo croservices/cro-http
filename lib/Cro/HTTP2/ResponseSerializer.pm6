@@ -5,6 +5,7 @@ use Cro::HTTP2::Frame;
 use Cro::HTTP::Response;
 use Cro::TCP;
 use Cro::Transform;
+use Cro::UnhandledErrorReporter;
 use HTTP::HPACK;
 
 class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
@@ -33,6 +34,7 @@ class Cro::HTTP2::ResponseSerializer does Cro::Transform does Cro::ConnectionSta
                     try {
                         CATCH {
                             when X::Cro::BodySerializerSelector::NoneApplicable {
+                                report-unhandled-error($_);
                                 $resp.status = 500;
                                 $resp.remove-header({ True });
                                 $resp.append-header('Content-Length', 0);
