@@ -2058,4 +2058,21 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         is $mark, '12345', 'The around blocks are called in top-to-bottom order';
     }
 }
+
+{
+    my $app = route {
+        get -> {
+            response.append-header('Content-type', 'text/plain');
+            content 'text/html', 'foo';
+        }
+    }
+    my $source = Supplier.new;
+    my $responses = $app.transformer($source.Supply).Channel;
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target</>));
+    given $responses.receive -> $r {
+        is $r.header('Content-type'), 'text/html; charset=utf-8',
+                'Content-type header set by content replaces any existing one';
+    }
+}
+
 done-testing;

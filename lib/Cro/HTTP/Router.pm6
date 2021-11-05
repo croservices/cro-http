@@ -898,9 +898,10 @@ module Cro::HTTP::Router {
     #| body. The body will be serialized using a body serializer. If no request
     #| status was set, it will be set to 200 OK.
     multi content(Str $content-type, $body, :$enc = $body ~~ Str ?? 'utf-8' !! Nil --> Nil) {
-        my $resp = $*CRO-ROUTER-RESPONSE //
+        my Cro::HTTP::Response $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<content>);
         $resp.status //= 200;
+        $resp.remove-header('content-type'); # Multiple content-type headers make no sense
         with $enc {
             $resp.append-header('Content-type', qq[$content-type; charset=$_]);
         }
