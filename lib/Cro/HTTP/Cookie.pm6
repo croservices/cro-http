@@ -15,7 +15,7 @@ my regex octet { <[\x21
                   \x2D..\x3A
                   \x3C..\x5B
                   \x5D..\x7E]>*};
-my regex cookie-value { [ <octet> || '("' <octet> '")' ] };
+my regex cookie-value { [ <octet> || '"' <octet> '"' ] };
 my subset CookieValue of Str is export where /^ <cookie-value> $/;
 
 my regex name  { <[\w\d]> (<[\w\d-]>* <[\w\d]>)* };

@@ -5,6 +5,10 @@ lives-ok { my CookieName $cn = "GoodName"; }, 'Correct cookie names are into the
 
 dies-ok { my CookieName $cn = ""; }, "Empty cookie name is now allowed";
 
+dies-ok { my CookieValue $cv = '("cookie-octet")'; }, 'No parens allowed in a cookie';
+
+lives-ok { my CookieValue $cv = '"cookie-octet"'; }, 'Cookie octet can be wrapped in double quotes';
+
 my @bad-chars = "\x00"..."\x1F", "\x7F", '(', ')',
             '<', '>', '@', ',', ';', ':', '\\',
             '"', '/', '[', ']', '?', '=', '{',
