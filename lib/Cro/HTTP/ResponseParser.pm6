@@ -30,16 +30,17 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
             my $response;
             my $raw-body-byte-stream;
             my $leftover;
+            my $started-body;
 
             my sub fresh-message() {
                 $expecting = StatusLine;
                 $response = Cro::HTTP::Response.new;
                 $header-decoder.add-bytes($leftover.result) with $leftover;
                 $leftover = Promise.new;
+                $started-body = Promise.new;
             }
             fresh-message;
 
-            my $started-body = Promise.new;
             whenever $started-body {
                 with $!body-timeout {
                     whenever Promise.in($_) {
