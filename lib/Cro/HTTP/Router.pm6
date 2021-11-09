@@ -39,7 +39,7 @@ class X::Cro::HTTP::Router::ConfusedCapture is Exception {
     has $.signature;
 
     method message() {
-        "The message body was parsed into '$!body.raku()' of type ($!body.^name()), " ~
+        "The message body was parsed into '{ my $text = $!body.raku(); $text.chars > 500 ?? $text.substr(0, 500) ~ '...' !! $text }' of type ($!body.^name()), " ~
         "but a Block's signature '$!signature.raku()' { $!content-type ?? "for '$!content-type' " !! ' ' }" ~
         "could not unpack it, check if the signature fits the body?"
     }
