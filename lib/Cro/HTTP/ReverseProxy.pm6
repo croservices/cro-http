@@ -14,8 +14,8 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
     has Str $.to-absolute;
     has ReverseProxyLink $!destination;
     has Cro::HTTP::Client $!client;
-    has Callable $.request;
-    has Callable $.response;
+    has &.request;
+    has &.response;
     has %.ca;
 
     submethod TWEAK() {
@@ -65,7 +65,7 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
                     whenever self!make-destination($request) -> $dest {
                         whenever $!client.request($request.method, $dest, |$options) -> $response {
                             my $*PROXY-STATE := $proxy-state;
-                            my $res = $!response ?? $!response($response) !! $response;
+                            my $res = &!response ?? &!response($response) !! $response;
                             $res = $response unless $res.defined && $res ~~ Cro::HTTP::Response;
                             if $res ~~ Awaitable {
                                 whenever $res { emit $_ }
@@ -83,7 +83,7 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
             }
 
             my $*PROXY-STATE := $proxy-state;
-            my $req = $!request ?? $!request($request) !! $request;
+            my $req = &!request ?? &!request($request) !! $request;
             $req = $request unless $req.defined && $req ~~ Cro::HTTP::Request;
             if $req ~~ Awaitable {
                 whenever $req { send($req) }

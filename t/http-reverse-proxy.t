@@ -23,6 +23,10 @@ my $app-a = route {
     get -> 'base' {
         content 'text/html', 'Home A';
     }
+
+    get -> 'base-body' {
+        content 'text/html', request.body-text.result;
+    }
 }
 
 my $app-b = route {
@@ -199,6 +203,28 @@ END {
             }
         }
     );
+}
+
+# Modifying request's body
+{
+    my $proxy-app = Cro::HTTP::ReverseProxy.new(
+        to => "http://localhost:{HTTP_TEST_PORT_A}/",
+        request => sub ($request) {
+            $request.set-body("body");
+        },
+        response => sub ($response) {
+            is $response.body-text.result, 'body', 'Proxy set a new body in request';
+            $response.set-body('body updated');
+        });
+
+    my $proxy = Cro::HTTP::Server.new(port => HTTP_TEST_PORT_PROXY, application => $proxy-app);
+    $proxy.start;
+    LEAVE $proxy.stop;
+
+    my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
+    given await $c.get('/base-body') -> $resp {
+        is await($resp.body-text), 'body updated', 'Proxy set a new body in response';
+    }
 }
 
 # Cross testing - case 2 to 2
