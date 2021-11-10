@@ -56,7 +56,9 @@ END {
 
 {
     dies-ok { Cro::HTTP::ReverseProxy.new }, 'Cannot create ReverseProxy without target';
-    dies-ok { Cro::HTTP::ReverseProxy.new(to => 'foo', to-absolute => 'bar') }, 'Cannot create ReverseProxy with double target';
+    dies-ok {
+        Cro::HTTP::ReverseProxy.new(to => 'foo', to-absolute => 'bar')
+    }, 'Cannot create ReverseProxy with double target';
 }
 
 # Proxying all incoming requests

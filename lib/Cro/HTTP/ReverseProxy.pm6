@@ -1,23 +1,31 @@
 use Cro;
 use Cro::HTTP::Client;
 
+class X::Cro::HTTP::ReverseProxy::InvalidSettings is Exception {
+    has $.msg;
+
+    method message { $!msg }
+}
+
 class Cro::HTTP::ReverseProxy does Cro::Transform {
-    has $.to;
-    has $.to-absolute;
-    has $!destination;
-    has $!client;
-    has $.request;
-    has $.response;
+    subset ReverseProxyLink where Str|Callable;
+
+    has ReverseProxyLink $.to;
+    has Str $.to-absolute;
+    has ReverseProxyLink $!destination;
+    has Cro::HTTP::Client $!client;
+    has Callable $.request;
+    has Callable $.response;
     has %.ca;
 
     submethod TWEAK() {
-        unless ($!to.defined ^^ $!to-absolute.defined) {
-            die 'Either `to` or `to-absolute` must be specified for ReverseProxy';
+        unless $!to.defined ^^ $!to-absolute.defined {
+            die X::Cro::HTTP::ReverseProxy::InvalidSettings.new(msg => 'Either `to` or `to-absolute` must be specified for ReverseProxy');
         }
-        $!to = self!trim-url($!to) if $!to ~~ Str;
-        $!to-absolute = self!trim-url($!to-absolute) if $!to-absolute ~~ Str;
+        $!to = self!trim-url($!to) if $!to ~~ Str:D;
+        $!to-absolute = self!trim-url($_) with $!to-absolute;
         with $!to {
-            die '`to` of ReverseProxy must be a Str or code block' unless $!to ~~ Str|Callable;
+            die X::Cro::HTTP::ReverseProxy::InvalidSettings.new(msg => '`to` of ReverseProxy must be a Str or code block') unless $!to ~~ ReverseProxyLink;
             $!destination = $!to;
         }
         else {
@@ -71,9 +79,7 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
         my $target = $request.target;
         $target .= substr(1..*) if $target.starts-with('/');
         if $!destination ~~ Str {
-            my $p = Promise.new;
-            $p.keep($!to ?? "{$!destination}/$target" !! $!to-absolute);
-            return $p;
+            return Promise.kept($!to ?? "{$!destination}/$target" !! $!to-absolute);
         } else {
             my $dest-p = $!destination($request);
             if $dest-p ~~ Awaitable {
@@ -81,10 +87,8 @@ class Cro::HTTP::ReverseProxy does Cro::Transform {
                                                               $!to ?? "$url/$target" !! "$url"
                                                             } !! die 'Failed to get URL' });
             } else {
-                my $p = Promise.new;
                 my $tmp = self!trim-url($dest-p);
-                $p.keep($!to ?? "$tmp/$target" !! $tmp);
-                return $p;
+                return Promise.kept($!to ?? "$tmp/$target" !! $tmp);
             }
         }
     }
