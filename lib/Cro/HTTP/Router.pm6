@@ -1413,7 +1413,7 @@ package Cro::HTTP::Router {
             }
             @options.push: |$links.link-generators.keys;
         }
-        warn "Called the $sub-name subroutine with $route-name but no such route defined, options are: @options.join('/')";
+        warn "Called the $sub-name subroutine with $route-name but no such route defined, options are: @options.join(', ')";
         Nil;
     }
 
