@@ -62,6 +62,15 @@ constant HTTP_TEST_PORT = 31326;
 }
 
 {
+    given await Cro::HTTP::Client.get("http://localhost:{ HTTP_TEST_PORT }/body?t=3",
+            timeout => 1) -> $resp {
+        throws-like {
+            say await $resp.body-text;
+        }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Total timeout works for body also';
+    }
+}
+
+{
     given await Cro::HTTP::Client.get("http://localhost:{ HTTP_TEST_PORT }/body?t=0",
             timeout => %( headers => Inf, body => 3 )) -> $resp {
         lives-ok { await $resp.body-text }, 'No issues if the timeout does not expire';
