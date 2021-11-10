@@ -121,13 +121,12 @@ class Cro::HTTP::Client {
         has Bool $.secure;
         has Str $.host;
         has Int $.port;
-        has Real $.body-timeout;
         has Supplier $!in;
         has Tap $!tap;
         has $!next-response-vow;
         has Bool $.dead = False;
 
-        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!, :$!body-timeout!) {
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
             $!tap = supply {
                 whenever $out {
                     my $vow = $!next-response-vow;
@@ -169,14 +168,13 @@ class Cro::HTTP::Client {
         has Bool $.secure;
         has Str $.host;
         has Int $.port;
-        has Real $.body-timeout;
         has Supplier $!in;
         has Tap $!tap;
         has Bool $.dead = False;
         has $!next-stream-id = 1;
         has %!outstanding-stream-responses{Int};
 
-        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!, :$!body-timeout!) {
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
             $!tap = supply {
                 whenever $out -> $response {
                     self.response($response);
@@ -230,8 +228,8 @@ class Cro::HTTP::Client {
         has %!cached-http1;
         has %!cached-http2;
 
-        method pipeline-for($secure, $host, $port, $http, $body-timeout) {
-            my $key = self!key($secure, $host, $port, $body-timeout);
+        method pipeline-for($secure, $host, $port, $http) {
+            my $key = self!key($secure, $host, $port);
             if $http eq '2' || !$http && $secure {
                 if %!cached-http2{$key} -> $pipeline {
                     if $pipeline.dead {
@@ -256,17 +254,17 @@ class Cro::HTTP::Client {
             with $pipeline {
                 unless .dead {
                     when Pipeline2 {
-                        %!cached-http2{self!key(.secure, .host, .port, .body-timeout)} = $pipeline;
+                        %!cached-http2{self!key(.secure, .host, .port)} = $pipeline;
                     }
                     default {
-                        push %!cached-http1{self!key(.secure, .host, .port, .body-timeout)}, $pipeline;
+                        push %!cached-http1{self!key(.secure, .host, .port)}, $pipeline;
                     }
                 }
             }
         }
 
-        method !key($secure, $host, $port, $body-timeout) {
-            "{$secure ?? 'https' !! 'http'}\0$host\0$port\0$body-timeout"
+        method !key($secure, $host, $port) {
+            "{$secure ?? 'https' !! 'http'}\0$host\0$port"
         }
     }
 
@@ -555,17 +553,27 @@ class Cro::HTTP::Client {
         my constant $redirect-codes = set(301, 302, 303, 307, 308);
         my $enable-push = self ?? $!push-promises // %options<push-promises> !! %options<push-promises>;
 
-        my $request-start-time = now;
         Promise(supply {
-            my $body-timeout = $timeout-policy.get-timeout($request-start-time, 'body');
-            my $conn-timeout = $timeout-policy.get-timeout($request-start-time, 'connection');
-            whenever self!get-pipeline($proxy-url // $parsed-url, $http, $conn-timeout, $body-timeout, $request-log, ca => %options<ca>, :$enable-push) -> $pipeline {
+            my $request-start-time = now;
+            my $conn-timeout = $timeout-policy.get-timeout(0, 'connection');
+            whenever self!get-pipeline($proxy-url // $parsed-url, $http, $conn-timeout, $request-log, ca => %options<ca>, :$enable-push) -> $pipeline {
+                # Handle connection persistence.
                 if $pipeline !~~ Pipeline2 {
                     unless self.persistent || $request-object.has-header('connection') {
                         $request-object.append-header('Connection', 'close');
                     }
                 }
+
+                # Set up any timeout for receiving the response headers.
+                my $timeout = $timeout-policy.get-timeout(now - $request-start-time, 'headers');
                 my Bool $headers-kept = False;
+                if $timeout !~~ Inf {
+                    whenever Promise.in($timeout) {
+                        die X::Cro::HTTP::Client::Timeout.new(phase => 'headers', uri => $url) unless $headers-kept;
+                    }
+                }
+
+                # Send the request.
                 whenever $pipeline.send-request($request-object) {
                     $headers-kept = True;
                     QUIT { $request-log.end }
@@ -581,9 +589,18 @@ class Cro::HTTP::Client {
                         $pipeline.close;
                     }
 
-                    # Set request object for received response regardless it's correct or not
+                    # If there's a body timeout, enforce it. Note that we need to detach
+                    # this from the current supply, since it outlives it.
+                    my $body-timeout = $timeout-policy.get-timeout(now - $request-start-time, 'body');
+                    if $body-timeout != Inf {
+                        my $response-to-timeout = $_;
+                        Promise.in($body-timeout).then: { $response-to-timeout.cancel }
+                    }
+
+                    # Set request object for received response.
                     .request = $request-object;
 
+                    # Pick next steps according to response.
                     if 200 <= .status < 400 || .status == 101 {
                         my $follow;
                         if self {
@@ -654,13 +671,6 @@ class Cro::HTTP::Client {
                         die X::Cro::HTTP::Error::Server.new(response => $_);
                     }
                 }
-
-                my $timeout = $timeout-policy.get-timeout(now - $request-start-time, 'headers');
-                if $timeout !~~ Inf {
-                    whenever Promise.in($timeout) {
-                        die X::Cro::HTTP::Client::Timeout.new(phase => 'headers', uri => $url) unless $headers-kept;
-                    }
-                }
             }
         })
     }
@@ -707,11 +717,11 @@ class Cro::HTTP::Client {
         return False;
     }
 
-    method !get-pipeline(Cro::Uri $url, $http, $conn-timeout, $body-timeout, $log-parent, :$ca, :$enable-push) {
+    method !get-pipeline(Cro::Uri $url, $http, $conn-timeout, $log-parent, :$ca, :$enable-push) {
         my $secure = $url.scheme.lc eq 'https';
         my $host = $url.host;
         my $port = $url.port // ($secure ?? 443 !! 80);
-        if self && $!connection-cache.pipeline-for($secure, $host, $port, $http, $body-timeout) -> $pipeline {
+        if self && $!connection-cache.pipeline-for($secure, $host, $port, $http) -> $pipeline {
             Cro::HTTP::LogTimeline::ReuseConnection.log($log-parent,
                     :$host, :$port,
                     :secure($secure ?? 'Yes' !! 'No'),
@@ -719,7 +729,7 @@ class Cro::HTTP::Client {
             Promise.kept($pipeline)
         }
         else {
-            self!build-pipeline($secure, $host, $port, $http, $conn-timeout, $body-timeout, $log-parent, :$ca, :$enable-push)
+            self!build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca, :$enable-push)
         }
     }
 
@@ -739,7 +749,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !build-pipeline($secure, $host, $port, $http, $conn-timeout, $body-timeout, $log-parent, :$ca, :$enable-push) {
+    method !build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca, :$enable-push) {
         my $log-connection = Cro::HTTP::LogTimeline::EstablishConnection.start(
                 $log-parent, :$host, :$port,
                 :secure($secure ?? 'Yes' !! 'No'),
@@ -780,7 +790,7 @@ class Cro::HTTP::Client {
             push @parts, Cro::HTTP2::ResponseParser.new(:$enable-push);
         }
         elsif $http eq '1.1' || !$secure || !$supports-alpn {
-            push @parts, Cro::HTTP::ResponseParser.new(:$body-timeout);
+            push @parts, Cro::HTTP::ResponseParser.new();
         }
         else {
             push @parts, Cro::ConnectionConditional.new(
@@ -788,7 +798,7 @@ class Cro::HTTP::Client {
                     Cro::HTTP2::FrameParser.new(:client),
                     Cro::HTTP2::ResponseParser.new
                 ],
-                Cro::HTTP::ResponseParser.new(:$body-timeout)
+                Cro::HTTP::ResponseParser.new()
             );
         }
         if self {
@@ -818,8 +828,8 @@ class Cro::HTTP::Client {
             };
         $version-decision.then: -> $version {
             $version.result eq '2'
-                ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out, :$body-timeout)
-                !! Pipeline.new(:$secure, :$host, :$port, :$in, :$out, :$body-timeout)
+                ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out)
+                !! Pipeline.new(:$secure, :$host, :$port, :$in, :$out)
         }
     }
 

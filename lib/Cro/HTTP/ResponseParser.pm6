@@ -8,7 +8,6 @@ use Cro::HTTP::Response;
 class Cro::HTTP::ResponseParser does Cro::Transform {
     has Cro::HTTP::RawBodyParserSelector $.raw-body-parser-selector =
         Cro::HTTP::RawBodyParserSelector::Default;
-    has $.body-timeout;
 
     method consumes() { Cro::TCP::Message }
     method produces() { Cro::HTTP::Response }
@@ -30,24 +29,26 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
             my $response;
             my $raw-body-byte-stream;
             my $leftover;
-            my $started-body;
+            my Promise $cancellation;
 
             my sub fresh-message() {
                 $expecting = StatusLine;
-                $response = Cro::HTTP::Response.new;
+                $cancellation = Promise.new;
+                $response = Cro::HTTP::Response.new(cancellation-vow => $cancellation.vow);
                 $header-decoder.add-bytes($leftover.result) with $leftover;
                 $leftover = Promise.new;
-                $started-body = Promise.new;
-            }
-            fresh-message;
 
-            whenever $started-body {
-                with $!body-timeout {
-                    whenever Promise.in($_) {
+                # We should only enforce cancellation if we are still dealing with the
+                # same response.
+                my $response-to-cancel = $response;
+                whenever $cancellation {
+                    if $response === $response-to-cancel {
                         $raw-body-byte-stream.?quit(X::Cro::HTTP::Client::Timeout.new(phase => 'body', uri => $response.request.target));
+                        done;
                     }
                 }
             }
+            fresh-message;
 
             whenever $in -> Cro::TCP::Message $packet {
                 $header-decoder.add-bytes($packet.data) unless $expecting == Body;
@@ -106,7 +107,6 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
                         }
                     }
                     when Body {
-                        $started-body.keep if $started-body.status == Planned;
                         $raw-body-byte-stream.emit($packet.data);
                         if $leftover.status == Kept {
                             my $nothing-left = $leftover.result eq Blob.allocate(0);

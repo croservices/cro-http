@@ -51,6 +51,15 @@ my constant %reason-phrases = {
     505 => "HTTP Version not supported"
 };
 
+#| Exception thrown when one tries to cancel a HTTP response (that is, downloading
+#| the body of it), but it is not a cancellable response (probably because it is a
+#| response being produced on the server side, rather than from the client).
+class X::Cro::HTTP::Response::NotCancellable is Exception {
+    method message() {
+        "This HTTP response cannot be cancelled (this feature is only available in the HTTP client)"
+    }
+}
+
 #| A HTTP response. In a client context, this is the response resulting from a
 #| HTTP request. In a server context, it is the response being produced to send
 #| back to the client.
@@ -73,6 +82,7 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     has Cro::BodySerializerSelector $.body-serializer-selector is rw =
         Cro::HTTP::BodySerializerSelector::ResponseDefault;
 
+    has $!cancellation-vow is built;
     has $!push-promises = Supplier::Preserving.new;
 
     #| The HTTP response as a string, including the response line and any
@@ -124,6 +134,17 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
     #| response
     method close-push-promises() {
         $!push-promises.done;
+    }
+
+    #| If download of the response body is still ongoing, cancel it. This may close the
+    #| underlying connection or just reset the stream, depending on HTTP version.
+    method cancel(--> Nil) {
+        with $!cancellation-vow {
+            try .keep(True); # Cope with duplicate cancel
+        }
+        else {
+            die X::Cro::HTTP::Response::NotCancellable.new;
+        }
     }
 
     method error-hint() {
