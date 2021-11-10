@@ -127,7 +127,7 @@ class Cro::HTTP::Client {
         has $!next-response-vow;
         has Bool $.dead = False;
 
-        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!, :$!body-timeout!) {
             $!tap = supply {
                 whenever $out {
                     my $vow = $!next-response-vow;
@@ -176,7 +176,7 @@ class Cro::HTTP::Client {
         has $!next-stream-id = 1;
         has %!outstanding-stream-responses{Int};
 
-        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!, :$!body-timeout!) {
             $!tap = supply {
                 whenever $out -> $response {
                     self.response($response);
@@ -818,8 +818,8 @@ class Cro::HTTP::Client {
             };
         $version-decision.then: -> $version {
             $version.result eq '2'
-                ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out)
-                !! Pipeline.new(:$secure, :$host, :$port, :$in, :$out)
+                ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out, :$body-timeout)
+                !! Pipeline.new(:$secure, :$host, :$port, :$in, :$out, :$body-timeout)
         }
     }
 
@@ -939,6 +939,8 @@ class Cro::HTTP::Client {
                 }
             }
         }
+
+        $timeout-policy = Cro::HTTP::Client::Policy::Timeout.new(:total(Inf)) without $timeout-policy;
 
         # Set User-agent, check if wasn't set already for us
         unless $request.has-header('User-agent') {
