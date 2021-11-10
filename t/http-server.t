@@ -5,8 +5,13 @@ use Cro::HTTP::Response;
 use Cro::HTTP::Client;
 use Cro::HTTP::Server;
 use Cro::Transform;
+use Cro::UnhandledErrorReporter;
 use IO::Socket::Async::SSL;
 use Test;
+
+# Suppress any unhandled errors so they don't end up in the test output and
+# confuse folks.
+set-unhandled-error-reporter -> $ {}
 
 constant TEST_PORT = 31314;
 my $base = "http://localhost:{TEST_PORT}";
