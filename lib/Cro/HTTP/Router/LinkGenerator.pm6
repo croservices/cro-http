@@ -1,21 +1,21 @@
-unit module Cro::HTTP::RouteSignatureToSub;
 use Cro::Uri :encode-percents;
 
-class RouteSignatureURLHolder {
-    has Callable $.fn is required;
-    has Str $.prefix;
+class Cro::HTP::Router::LinkGenerator {
+    has Str $.prefix is required;
+    has Signature $.signature is required;
+    has Callable $!generator;
+
+    submethod TWEAK(--> Nil) {
+        $!generator = signature-to-sub($!signature)
+    }
 
     method CALL-ME(|c) { self.absolute(|c) }
-    method relative(|c) { $!fn(|c) }
-    method absolute(|c) { '/' ~ ($!prefix ?? $!prefix ~ '/' !! '') ~ $!fn(|c) }
+    method relative(|c) { $!generator(|c) }
+    method absolute(|c) { '/' ~ ($!prefix ?? $!prefix ~ '/' !! '') ~ $!generator(|c) }
     method url(|c) {
         my $root-url = $*CRO-ROOT-URL or die 'No CRO-ROOT-URL configured';
-        $root-url ~ ($root-url.ends-with('/') ?? '' !! '/') ~ ($!prefix ?? "$!prefix/" !! '') ~ $!fn(|c)
+        $root-url ~ ($root-url.ends-with('/') ?? '' !! '/') ~ ($!prefix ?? "$!prefix/" !! '') ~ $!generator(|c)
     }
-}
-
-sub route-signature-to-sub(Str $prefix, Signature $s) is export {
-    RouteSignatureURLHolder.new(:$prefix, fn => signature-to-sub($s))
 }
 
 sub signature-to-sub(Signature $s) {

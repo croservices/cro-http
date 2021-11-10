@@ -12,7 +12,7 @@ use Cro::HTTP::Request;
 use Cro::HTTP::Response;
 use Cro::UnhandledErrorReporter;
 use IO::Path::ChildSecure;
-use Cro::HTTP::RouteSignatureToSub;
+use Cro::HTTP::Router::LinkGenerator;
 
 class X::Cro::HTTP::Router::OnlyInRouteBlock is Exception {
     has Str $.what is required;
@@ -455,11 +455,12 @@ module Cro::HTTP::Router {
                         my $link-config = $outer-handler.get-innermost-plugin-configs($link-plugin)[0];
                         # Url of included route can have a prefix which we did not know about
                         # at the generation stage, so overwrite it now when we have all the data we need
-                        $link-config.link-generators =
-                                %( |$link-config.link-generators,
-                                   $outer-handler.name => route-signature-to-sub($_.url-prefix, $_.signature),
-                                   $_.name => route-signature-to-sub($_.url-prefix, $_.signature)
-                                 );
+                        my $generator = Cro::HTP::Router::LinkGenerator.new(prefix => .url-prefix, signature => .signature);
+                        $link-config.link-generators = %(
+                            |$link-config.link-generators,
+                            $outer-handler.name => $generator,
+                            .name => $generator
+                        );
                     }
                     @!handlers.push: $outer-handler;
                 }
@@ -477,7 +478,9 @@ module Cro::HTTP::Router {
                     next if $handler.from-include and not $key.contains('.');
                     die X::Cro::HTTP::Router::DuplicateLinkName.new(:$key) if %urls{$key}:exists;
                     my $url-prefix = $handler.url-prefix;
-                    %urls{$key} = route-signature-to-sub($url-prefix, $handler.signature);
+                    %urls{$key} = Cro::HTP::Router::LinkGenerator.new:
+                            prefix => $url-prefix,
+                            signature => $handler.signature;
                 }
             }
             router-plugin-add-config($link-plugin, RouteBlockLinks.new(link-generators => %urls));
