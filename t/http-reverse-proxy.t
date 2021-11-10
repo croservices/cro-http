@@ -24,7 +24,7 @@ my $app-a = route {
         content 'text/html', 'Home A';
     }
 
-    get -> 'base-body' {
+    post -> 'base-body' {
         content 'text/html', request.body-text.result;
     }
 }
@@ -222,7 +222,7 @@ END {
     LEAVE $proxy.stop;
 
     my $c = Cro::HTTP::Client.new(base-uri => "http://localhost:{HTTP_TEST_PORT_PROXY}");
-    given await $c.get('/base-body') -> $resp {
+    given await $c.post('/base-body') -> $resp {
         is await($resp.body-text), 'body updated', 'Proxy set a new body in response';
     }
 }
