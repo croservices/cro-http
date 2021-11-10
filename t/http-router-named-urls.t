@@ -14,6 +14,19 @@ sub test-route-urls($app) {
 
 test-route-urls route {
     get -> {
+        is abs-link('qs', 'tools', query => 'abc?!'), '/search/tools?query=abc%3F%21', 'Escaped named param';
+        is abs-link('segs', 42, 'foo bar.jpg'), '/product/42/docs/foo%20bar.jpg', 'Escaped positional';
+        is abs-link('noqs'), '/baz', 'Non-path related parameters were not counted';
+    };
+
+    get :name<lit>, -> 'foo', 'bar' { }
+    get :name<segs>, -> 'product', $id, 'docs', $file { }
+    get :name<qs>, -> 'search', $category, :$query {}
+    get :name<noqs>, -> 'baz', :$foo! is cookie, :$bar! is header {}
+}
+
+test-route-urls route {
+    get -> {
         is-deeply router-plugin-get-innermost-configs($link-plugin)[0].link-generators, %(), "No named urls";
     };
 }

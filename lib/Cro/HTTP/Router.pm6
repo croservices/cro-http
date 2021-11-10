@@ -10,6 +10,7 @@ use Cro::HTTP::MimeTypes;
 use Cro::HTTP::PushPromise;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
+use Cro::HTTP::Router::Roles;
 use Cro::UnhandledErrorReporter;
 use IO::Path::ChildSecure;
 use Cro::HTTP::Router::LinkGenerator;
@@ -52,22 +53,18 @@ class X::Cro::HTTP::Router::ConfusedCapture is Exception {
     }
 }
 
-module Cro::HTTP::Router {
-    role Query {}
+package Cro::HTTP::Router {
     multi trait_mod:<is>(Parameter:D $param, :$query! --> Nil) is export {
-        $param does Query;
+        $param does Cro::HTTP::Router::Query;
     }
-    role Header {}
     multi trait_mod:<is>(Parameter:D $param, :$header! --> Nil) is export {
-        $param does Header;
+        $param does Cro::HTTP::Router::Header;
     }
-    role Cookie {}
     multi trait_mod:<is>(Parameter:D $param, :$cookie! --> Nil) is export {
-        $param does Cookie;
+        $param does Cro::HTTP::Router::Cookie;
     }
-    role Auth {}
     multi trait_mod:<is>(Parameter:D $param, :$auth! --> Nil) is export {
-        $param does Auth;
+        $param does Cro::HTTP::Router::Auth;
     }
 
     #| Router plugins register themselves using the C<router-plugin-register>
@@ -352,7 +349,7 @@ module Cro::HTTP::Router {
                                             $status = 400;
                                             last;
                                         }
-                                        elsif $param ~~ Auth || $param.type ~~ Cro::HTTP::Auth {
+                                        elsif $param ~~ Cro::HTTP::Router::Auth || $param.type ~~ Cro::HTTP::Auth {
                                             $status = 401;
                                             last;
                                         }
@@ -527,7 +524,7 @@ module Cro::HTTP::Router {
             # and it and compile the check.
             my $have-auth-param = False;
             with @positional[0] -> $param {
-                if $param ~~ Auth || $param.type ~~ Cro::HTTP::Auth {
+                if $param ~~ Cro::HTTP::Router::Auth || $param.type ~~ Cro::HTTP::Auth {
                     @positional.shift;
                     $have-auth-param = True;
                     $need-sig-bind = True;
@@ -633,11 +630,11 @@ module Cro::HTTP::Router {
             for @named -> $param {
                 my $target-name = $param.slurpy ?? $param.name !! $param.named_names[0];
                 my ($exists, $lookup) = do given $param {
-                    when Cookie {
+                    when Cro::HTTP::Router::Cookie {
                         '$req.has-cookie(Q[' ~ $target-name ~ '])',
                         '$req.cookie-value(Q[' ~ $target-name ~ '])'
                     }
-                    when Header {
+                    when Cro::HTTP::Router::Header {
                         '$req.has-header(Q[' ~ $target-name ~ '])',
                         '$req.header(Q[' ~ $target-name ~ '])'
                     }
@@ -662,10 +659,10 @@ module Cro::HTTP::Router {
                 }
                 elsif $type =:= Positional {
                     given $param {
-                        when Header {
+                        when Cro::HTTP::Router::Header {
                             push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.headers';
                         }
-                        when Cookie {
+                        when Cro::HTTP::Router::Cookie {
                             die "Cookies cannot be extracted to List. Maybe you want '%' instead of '@'";
                         }
                         default {
@@ -675,10 +672,10 @@ module Cro::HTTP::Router {
                 }
                 elsif $type =:= Associative {
                     given $param {
-                        when Cookie {
+                        when Cro::HTTP::Router::Cookie {
                             push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.cookie-hash';
                         }
-                        when Header {
+                        when Cro::HTTP::Router::Header {
                             push @make-tasks,
                             'my %result;'
                                 ~ '$req.headers.map({ %result{$_.name} = $_.value });'
