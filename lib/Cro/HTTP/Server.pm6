@@ -129,7 +129,7 @@ class Cro::HTTP::Server does Cro::Service {
         }
 
         if %tls {
-            if $http-val == <2> {
+            if $http-val.elems == 1 && $http-val[0] == <2> {
                 die 'HTTP/2 is requested, but ALPN is not supported' unless supports-alpn;
                 %tls<alpn> = <h2>;
                 return pack2(:http2-only);

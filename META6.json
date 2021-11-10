@@ -61,16 +61,17 @@
     "Cro::HTTP::RequestSerializer": "lib/Cro/HTTP/RequestSerializer.pm6",
     "Cro::HTTP::Response": "lib/Cro/HTTP/Response.pm6",
     "Cro::HTTP::ResponseParser": "lib/Cro/HTTP/ResponseParser.pm6",
-    "Cro::ResourceIdentifier::HTTP": "lib/Cro/ResourceIdentifier/HTTP.pm6",
     "Cro::HTTP::ResponseSerializer": "lib/Cro/HTTP/ResponseSerializer.pm6",
+    "Cro::HTTP::ReverseProxy": "lib/Cro/HTTP/ReverseProxy.pm6",
     "Cro::HTTP::Router": "lib/Cro/HTTP/Router.pm6",
     "Cro::HTTP::Server": "lib/Cro/HTTP/Server.pm6",
     "Cro::HTTP::Session::IdGenerator": "lib/Cro/HTTP/Session/IdGenerator.pm6",
     "Cro::HTTP::Session::InMemory": "lib/Cro/HTTP/Session/InMemory.pm6",
     "Cro::HTTP::Session::Persistent": "lib/Cro/HTTP/Session/Persistent.pm6",
     "Cro::HTTP::VersionSelector": "lib/Cro/HTTP/VersionSelector.pm6",
-    "Cro::Uri::HTTP": "lib/Cro/Uri/HTTP.pm6",
-    "Cro::Iri::HTTP": "lib/Cro/Iri/HTTP.pm6"
+    "Cro::Iri::HTTP": "lib/Cro/Iri/HTTP.pm6",
+    "Cro::ResourceIdentifier::HTTP": "lib/Cro/ResourceIdentifier/HTTP.pm6",
+    "Cro::Uri::HTTP": "lib/Cro/Uri/HTTP.pm6"
   },
   "license": "Artistic-2.0",
   "tags": [

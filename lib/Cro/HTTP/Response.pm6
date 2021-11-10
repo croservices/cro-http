@@ -82,7 +82,9 @@ class Cro::HTTP::Response does Cro::HTTP::Message {
         my $status = $!status // (self.has-body ?? 200 !! 204);
         my $reason = %reason-phrases{$status} // 'Unknown';
         my $headers = self!headers-str();
-        "HTTP/{self.http-version // '1.1'} $status $reason\r\n$headers\r\n"
+        my $ver = self.http-version // '1.1';
+        $ver = '1.1' if $ver eq '2.0';
+        "HTTP/$ver $status $reason\r\n$headers\r\n"
     }
 
     method trace-output(--> Str) {

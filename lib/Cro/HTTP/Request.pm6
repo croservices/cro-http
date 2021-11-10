@@ -83,6 +83,7 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
         die X::Cro::HTTP::Request::Incomplete.new(:missing<method>) unless $!method;
         die X::Cro::HTTP::Request::Incomplete.new(:missing<target>) unless $!target;
         my $version = self.http-version // (self.has-header('Host') ?? '1.1' !! '1.0');
+        $version = '1.1' if $version eq '2.0';
         my $headers = self!headers-str();
         "$.method $.target HTTP/$version\r\n$headers\r\n"
     }

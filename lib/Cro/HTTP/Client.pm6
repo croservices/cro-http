@@ -559,6 +559,7 @@ class Cro::HTTP::Client {
 
                     # Set request object for received response regardless it's correct or not
                     .request = $request-object;
+                    .request.http-version = $pipeline ~~ Pipeline2 ?? '2' !! '1.1';
 
                     if 200 <= .status < 400 || .status == 101 {
                         my $follow;
