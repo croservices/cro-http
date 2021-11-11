@@ -3,6 +3,13 @@ use Cro::Policy::Timeout;
 use Test;
 
 constant HTTP_TEST_PORT = 31326;
+constant HTTPS_TEST_PORT = 31327;
+
+constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
+constant %tls := {
+    private-key-file => 't/certs-and-keys/server-key.pem',
+    certificate-file => 't/certs-and-keys/server-crt.pem'
+};
 
 # Test application
 {
@@ -19,10 +26,10 @@ constant HTTP_TEST_PORT = 31326;
             response.status = 200;
             response.append-header('Content-type', 'text/html');
             response.set-body(supply {
-                    emit "<html>".encode;
-                    sleep $t;
-                    emit "</html>".encode;
-                    done;
+                emit "<html>".encode;
+                sleep $t;
+                emit "</html>".encode;
+                done;
             });
         }
     }
@@ -32,6 +39,13 @@ constant HTTP_TEST_PORT = 31326;
     );
     $http-server.start();
     END $http-server.stop();
+
+    # HTTP/2 instance
+    my $http2-server = Cro::HTTP::Server.new(
+        port => HTTPS_TEST_PORT, :$application, :%tls, :http<2>
+    );
+    $http2-server.start();
+    END $http2-server.stop();
 }
 
 {
@@ -41,6 +55,12 @@ constant HTTP_TEST_PORT = 31326;
             say await $resp.body-text;
         }
     }, X::Cro::HTTP::Client::Timeout, message => /'headers'/, 'Timeout for headers via total';
+    throws-like {
+        given await Cro::HTTP::Client.get("https://localhost:{ HTTPS_TEST_PORT }/?t=3",
+                timeout => 1, :http<2>, :%ca) -> $resp {
+            say await $resp.body-text;
+        }
+    }, X::Cro::HTTP::Client::Timeout, message => /'headers'/, 'Timeout for headers via total for HTTP/2';
 }
 
 {
@@ -58,6 +78,12 @@ constant HTTP_TEST_PORT = 31326;
             throws-like {
                  say await $resp.body-text;
             }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Timeout for body';
+    }
+    given await Cro::HTTP::Client.get("https://localhost:{ HTTPS_TEST_PORT }/body?t=3",
+            timeout => %( headers => Inf, body => 1 ), :%ca, :http<2>) -> $resp {
+        throws-like {
+            say await $resp.body-text;
+        }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Timeout for body for HTTP/2';
     }
 }
 

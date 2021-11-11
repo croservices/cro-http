@@ -2,6 +2,7 @@ use Cro::HTTP2::ConnectionState;
 use Cro::HTTP2::Frame;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
+use Cro::HTTP::Exception;
 use Cro;
 use HTTP::HPACK;
 
@@ -11,6 +12,7 @@ enum State <header-init header-c data>;
 my class Stream {
     has Int $.sid;
     has State $.state is rw;
+    has Promise $.cancellation;
     has $.message;
     has Bool $.stream-end is rw;
     has Supplier $.body;
@@ -73,14 +75,26 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     unless %streams{.stream-identifier}:exists {
                         $curr-sid = .stream-identifier;
                         my $body = Supplier::Preserving.new;
+                        my $cancellation = Promise.new;
                         %streams{$curr-sid} = Stream.new(
                             sid => $curr-sid,
                             state => header-init,
-                            message => self!get-message($curr-sid, .connection),
+                            :$cancellation,
+                            message => self!get-message($curr-sid, .connection, $cancellation),
                             stream-end => .end-stream,
                             :$body,
                             headers => Buf.new);
                         %streams{$curr-sid}.message.set-body-byte-stream($body.Supply);
+                        my $response = %streams{$curr-sid}.message;
+                        my $response-to-cancel = $response;
+                        whenever $cancellation {
+                            if $response === $response-to-cancel {
+                                my $exception = X::Cro::HTTP::Client::Timeout.new(phase => 'body', uri => $response.request.target);
+                                my $stream = %streams{$curr-sid};
+                                $stream.body.quit($exception);
+                                done;
+                            }
+                        }
                     }
 
                     my $stream = %streams{.stream-identifier};
