@@ -91,6 +91,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                         my $response-to-cancel = $response;
                         whenever $cancellation {
                             if $response === $response-to-cancel {
+                                $connection-state.stream-reset.emit: $curr-sid;
                                 my $exception = X::Cro::HTTP::Client::Timeout.new(phase => 'body', uri => $response.request.target);
                                 my $stream = %streams{$curr-sid}:delete;
                                 $stream.body.quit($exception);
