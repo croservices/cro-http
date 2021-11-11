@@ -65,10 +65,12 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
 
                 when Cro::HTTP2::Frame::Data {
                     my $stream = %streams{.stream-identifier};
-                    self!check-data($stream, .stream-identifier, $curr-sid);
-                    $stream.body.emit: .data;
-                    if .end-stream {
-                        $stream.body.done;
+                    if $stream {
+                        self!check-data($stream, .stream-identifier, $curr-sid);
+                        $stream.body.emit: .data;
+                        if .end-stream {
+                            $stream.body.done;
+                        }
                     }
                 }
                 when Cro::HTTP2::Frame::Headers {
@@ -90,7 +92,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                         whenever $cancellation {
                             if $response === $response-to-cancel {
                                 my $exception = X::Cro::HTTP::Client::Timeout.new(phase => 'body', uri => $response.request.target);
-                                my $stream = %streams{$curr-sid};
+                                my $stream = %streams{$curr-sid}:delete;
                                 $stream.body.quit($exception);
                             }
                         }
