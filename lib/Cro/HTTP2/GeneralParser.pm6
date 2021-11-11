@@ -92,7 +92,6 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                                 my $exception = X::Cro::HTTP::Client::Timeout.new(phase => 'body', uri => $response.request.target);
                                 my $stream = %streams{$curr-sid};
                                 $stream.body.quit($exception);
-                                done;
                             }
                         }
                     }
