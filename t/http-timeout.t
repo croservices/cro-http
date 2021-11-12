@@ -85,6 +85,30 @@ constant %tls := {
             say await $resp.body-text;
         }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Timeout for body for HTTP/2';
     }
+    my $c = Cro::HTTP::Client.new(:%ca, :http<2>);
+    my @promises;
+    race for 0, 0, 0, 5, 0, 0, 0 -> $timeout {
+        @promises.push: $c.get("https://localhost:{ HTTPS_TEST_PORT }/body?t=$timeout", timeout => %( body => 1 ));
+    }
+    my $count;
+    react {
+        for @promises -> $p {
+            whenever $p {
+                given $_ -> $resp {
+                    if $resp.request.target.ends-with('5') {
+                        throws-like {
+                            await $resp.body-text
+                        }, X::Cro::HTTP::Client::Timeout, message => /'body'/;
+                    } else {
+                        $count++;
+                        lives-ok { await $resp.body-text }, 'Could live in concurrent env';
+                        done if $count == 5;
+                    }
+                }
+            }
+        }
+    }
+    is $count, 5, 'Concurrent HTTP/2 test is alright';
 }
 
 {
