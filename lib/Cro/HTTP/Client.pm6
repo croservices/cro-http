@@ -321,6 +321,9 @@ class Cro::HTTP::Client {
     #| The Proxy URL for a HTTPS request.
     has Cro::Uri $.https-proxy;
 
+    #| Request timeout policy.
+    has Cro::Policy::Timeout $.timeout-policy;
+
     has $!persistent;
     has $!connection-cache = ConnectionCache.new;
 
@@ -339,7 +342,7 @@ class Cro::HTTP::Client {
                     :$http-proxy, :$https-proxy,
                     :$!follow = $DEFAULT-MAX-REDIRECTS, :%!auth, :$!http,
                     :$!persistent = True, :$!ca, :$!push-promises = False,
-                    :$!user-agent = 'Cro') {
+                    :$timeout, :$!user-agent = 'Cro') {
         if $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -356,6 +359,9 @@ class Cro::HTTP::Client {
             unless $_ eq '1.1' || $_ eq '2' || $_ eqv <1.1 2> {
                 die X::Cro::HTTP::Client::InvalidVersion.new;
             }
+        }
+        if $timeout {
+            calculate-timeout($timeout, $!timeout-policy);
         }
 
         $!base-uri = self!wrap-uri($_) with $base-uri;
@@ -850,6 +856,31 @@ class Cro::HTTP::Client {
         }
     }
 
+    sub calculate-timeout($value, Cro::Policy::Timeout $timeout-policy is rw) {
+        my $curr-timeout;
+        given $value {
+            when Map:D {
+                my %phases;
+                for $_.kv -> $k, $v {
+                    %phases{$k} = Real($v);
+                }
+                $curr-timeout = Cro::HTTP::Client::Policy::Timeout.new(total => Inf, |%phases);
+            }
+            when Real:D {
+                $curr-timeout = Cro::HTTP::Client::Policy::Timeout.new(total => Real($_));
+            }
+            when Cro::Policy::Timeout:D {
+                $curr-timeout = $_;
+            }
+            default {
+                die X::Cro::HTTP::Client::InvalidTimeoutFormat.new(bad => $_);
+            }
+        }
+        with $curr-timeout {
+            $timeout-policy = $_;
+        }
+    }
+
     method !assemble-request(Str $method, Cro::Uri $base-url, Cro::Uri $proxy-url, %options, Cro::Policy::Timeout $timeout-policy is rw, --> Cro::HTTP::Request) {
         # Add any query string parameters.
         my $url;
@@ -925,32 +956,12 @@ class Cro::HTTP::Client {
                 }
             }
             when 'timeout' {
-                my $curr-timeout;
-                given $value {
-                    when Map:D {
-                        my %phases;
-                        for $_.kv -> $k, $v {
-                            %phases{$k} = Real($v);
-                        }
-                        $curr-timeout = Cro::HTTP::Client::Policy::Timeout.new(total => Inf, |%phases);
-                    }
-                    when Real:D {
-                        $curr-timeout = Cro::HTTP::Client::Policy::Timeout.new(total => Real($_));
-                    }
-                    when Cro::Policy::Timeout:D {
-                        $curr-timeout = $_;
-                    }
-                    default {
-                        die X::Cro::HTTP::Client::InvalidTimeoutFormat.new(bad => $_);
-                    }
-                }
-                with $curr-timeout {
-                    $timeout-policy = $_;
-                }
+                calculate-timeout($value, $timeout-policy);
             }
         }
 
-        $timeout-policy = Cro::HTTP::Client::Policy::Timeout.new(:total(Inf)) without $timeout-policy;
+        my $default-timeout = Cro::HTTP::Client::Policy::Timeout.new(:total(Inf));
+        ($timeout-policy = self ?? $!timeout-policy // $default-timeout !! $default-timeout) without $timeout-policy;
 
         # Set User-agent, check if wasn't set already for us
         unless $request.has-header('User-agent') {

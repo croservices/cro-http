@@ -52,13 +52,13 @@ constant %tls := {
     throws-like {
         given await Cro::HTTP::Client.get("http://localhost:{ HTTP_TEST_PORT }/?t=3",
                 timeout => 1) -> $resp {
-            say await $resp.body-text;
+            await $resp.body-text;
         }
     }, X::Cro::HTTP::Client::Timeout, message => /'headers'/, 'Timeout for headers via total';
     throws-like {
         given await Cro::HTTP::Client.get("https://localhost:{ HTTPS_TEST_PORT }/?t=3",
                 timeout => 1, :http<2>, :%ca) -> $resp {
-            say await $resp.body-text;
+            await $resp.body-text;
         }
     }, X::Cro::HTTP::Client::Timeout, message => /'headers'/, 'Timeout for headers via total for HTTP/2';
 }
@@ -67,7 +67,7 @@ constant %tls := {
     throws-like {
         given await Cro::HTTP::Client.get("http://localhost:{ HTTP_TEST_PORT }/?t=3",
                 timeout => %( headers => 1 )) -> $resp {
-            say await $resp.body-text;
+            await $resp.body-text;
         }
     }, X::Cro::HTTP::Client::Timeout, message => /'localhost:31326'/, 'Timeout for headers via phase';
 }
@@ -76,13 +76,13 @@ constant %tls := {
     given await Cro::HTTP::Client.get("http://localhost:{ HTTP_TEST_PORT }/body?t=3",
             timeout => %( headers => Inf, body => 1 )) -> $resp {
             throws-like {
-                 say await $resp.body-text;
+                 await $resp.body-text;
             }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Timeout for body';
     }
     given await Cro::HTTP::Client.get("https://localhost:{ HTTPS_TEST_PORT }/body?t=3",
             timeout => %( headers => Inf, body => 1 ), :%ca, :http<2>) -> $resp {
         throws-like {
-            say await $resp.body-text;
+            await $resp.body-text;
         }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Timeout for body for HTTP/2';
     }
     my $c = Cro::HTTP::Client.new(:%ca, :http<2>);
@@ -112,10 +112,25 @@ constant %tls := {
 }
 
 {
+    my $c = Cro::HTTP::Client.new(timeout => %( headers => Inf, body => 1 ));
+    given await $c.get("http://localhost:{ HTTP_TEST_PORT }/body?t=2") -> $resp {
+        throws-like {
+            await $resp.body-text;
+        }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Timeout set to the client works';
+    }
+    $c = Cro::HTTP::Client.new(timeout => %( headers => Inf, body => 1 ));
+    given await $c.get("http://localhost:{ HTTP_TEST_PORT }/body?t=2", timeout => %( body => 5 )) -> $resp {
+        lives-ok {
+            await $resp.body-text;
+        }, 'Timeout set to client is overriden by request one';
+    }
+}
+
+{
     given await Cro::HTTP::Client.get("http://localhost:{ HTTP_TEST_PORT }/body?t=3",
             timeout => 1) -> $resp {
         throws-like {
-            say await $resp.body-text;
+            await $resp.body-text;
         }, X::Cro::HTTP::Client::Timeout, message => /'body'/, 'Total timeout works for body also';
     }
 }
