@@ -1,5 +1,6 @@
 use Cro::HTTP::Client;
 use Cro::Policy::Timeout;
+use Cro::UnhandledErrorReporter;
 use Test;
 
 constant HTTP_TEST_PORT = 31326;
@@ -10,6 +11,9 @@ constant %tls := {
     private-key-file => 't/certs-and-keys/server-key.pem',
     certificate-file => 't/certs-and-keys/server-crt.pem'
 };
+
+# Suppress any unhandled errors so they don't end up in the test output.
+set-unhandled-error-reporter -> $ {}
 
 # Test application
 {
