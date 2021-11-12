@@ -1,5 +1,7 @@
 use Cro::Transform;
 use Cro::TCP;
+use Cro::Policy::Timeout;
+use Cro::HTTP::Exception;
 use Cro::HTTP::RawBodyParserSelector;
 use Cro::HTTP::Response;
 
@@ -27,12 +29,24 @@ class Cro::HTTP::ResponseParser does Cro::Transform {
             my $response;
             my $raw-body-byte-stream;
             my $leftover;
+            my Promise $cancellation;
 
             my sub fresh-message() {
                 $expecting = StatusLine;
-                $response = Cro::HTTP::Response.new;
+                $cancellation = Promise.new;
+                $response = Cro::HTTP::Response.new(cancellation-vow => $cancellation.vow);
                 $header-decoder.add-bytes($leftover.result) with $leftover;
                 $leftover = Promise.new;
+
+                # We should only enforce cancellation if we are still dealing with the
+                # same response.
+                my $response-to-cancel = $response;
+                whenever $cancellation {
+                    if $response === $response-to-cancel {
+                        $raw-body-byte-stream.?quit(X::Cro::HTTP::Client::Timeout.new(phase => 'body', uri => $response.request.target));
+                        done;
+                    }
+                }
             }
             fresh-message;
 

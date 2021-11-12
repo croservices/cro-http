@@ -64,16 +64,18 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                 }
             }
 
-            enum State <Header Payload>;
-            my $buffer;
-            my $expecting = Header;
-
             with $connection-state.ping {
                 whenever $connection-state.ping.Supply {
                     my $ack = Cro::HTTP2::Frame::Ping.new(
                         :1flags, :0stream-identifier, payload => .payload
                     );
                     send-message($ack);
+                }
+            }
+            with $connection-state.stream-reset {
+                whenever $connection-state.stream-reset.Supply -> $n {
+                    my $rst-stream = Cro::HTTP2::Frame::RstStream.new(error-code => CANCEL, stream-identifier => $n, flags => 0);
+                    send-message($rst-stream);
                 }
             }
             with $connection-state.settings {
