@@ -44,13 +44,14 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
             whenever $connection-state.push-promise.Supply { emit $_ }
             whenever $connection-state.settings.Supply {
                 when Cro::HTTP2::Frame::Settings {
-                    with .settings.grep(*.key == 1) {
-                        my $pair = $_.first;
-                        $decoder.set-dynamic-table-limit($pair.value) if $pair;
+                    with .settings.first(*.key == 1) {
+                        $decoder.set-dynamic-table-limit(.value);
                     }
-                    with .settings.grep(*.key == 2) {
-                        my $pair = $_.first;
-                        $!enable-push = $pair.value != 0 if $pair;
+                    with .settings.first(*.key == 2) {
+                        $!enable-push = .value != 0;
+                    }
+                    with .settings.first(*.key == 4) {
+                        $connection-state.remote-window-change.emit: Cro::HTTP2::ConnectionState::WindowInitial.new(initial => .value);
                     }
                 }
             }
@@ -168,6 +169,9 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                 when Cro::HTTP2::Frame::GoAway {
                 }
                 when Cro::HTTP2::Frame::WindowUpdate {
+                    $connection-state.remote-window-change.emit: Cro::HTTP2::ConnectionState::WindowAdd.new:
+                        stream-identifier => .stream-identifier,
+                        increment => .increment;
                 }
                 when Cro::HTTP2::Frame::Continuation {
                     if .stream-identifier > $curr-sid
