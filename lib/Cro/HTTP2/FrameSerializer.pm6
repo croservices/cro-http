@@ -53,7 +53,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                     my $message;
                     %arg = $is-header ?? headers => $payload.subbuf(0, $sent) !! data => $payload.subbuf(0, $sent);
                     %arg<stream-identifier> = $frame.stream-identifier;
-                    %arg<flags> = $payload.elems < $MAX-FRAME-SIZE-9 ?? 1 !! 0;
+                    %arg<flags> = $frame.end-stream && $payload.elems < $MAX-FRAME-SIZE-9 ?? 1 !! 0;
                     if $is-header {
                         $message = Cro::HTTP2::Frame::Continuation.new(|%arg)
                     } else {
