@@ -304,6 +304,9 @@ class Cro::HTTP::Client {
     #| request method with override this completely)
     has Cro::Uri $.base-uri;
 
+    #| Options to be passed on to IO::Socket::Async::SSL.
+    has %.tls;
+
     #| Whether push promises are accepted by the client
     has $.push-promises;
 
@@ -342,7 +345,7 @@ class Cro::HTTP::Client {
                     :$http-proxy, :$https-proxy,
                     :$!follow = $DEFAULT-MAX-REDIRECTS, :%!auth, :$!http,
                     :$!persistent = True, :$!ca, :$!push-promises = False,
-                    :$timeout, :$!user-agent = 'Cro') {
+                    :ssl(:%!tls), :$timeout, :$!user-agent = 'Cro') {
         if $cookie-jar ~~ Bool {
             $!cookie-jar = Cro::HTTP::Client::CookieJar.new;
         }
@@ -562,7 +565,7 @@ class Cro::HTTP::Client {
         Promise(supply {
             my $request-start-time = now;
             my $conn-timeout = $timeout-policy.get-timeout(0, 'connection');
-            whenever self!get-pipeline($proxy-url // $parsed-url, $http, $conn-timeout, $request-log, ca => %options<ca>, :$enable-push) -> $pipeline {
+            whenever self!get-pipeline($proxy-url // $parsed-url, $http, $conn-timeout, $request-log, ca => %options<ca>, tls => %options<tls> // %options<ssl>, :$enable-push) -> $pipeline {
                 # Handle connection persistence.
                 if $pipeline !~~ Pipeline2 {
                     unless self.persistent || $request-object.has-header('connection') {
@@ -724,7 +727,7 @@ class Cro::HTTP::Client {
         return False;
     }
 
-    method !get-pipeline(Cro::Uri $url, $http, $conn-timeout, $log-parent, :$ca, :$enable-push) {
+    method !get-pipeline(Cro::Uri $url, $http, $conn-timeout, $log-parent, :$ca, :$tls, :$enable-push) {
         my $secure = $url.scheme.lc eq 'https';
         my $host = $url.host;
         my $port = $url.port // ($secure ?? 443 !! 80);
@@ -736,7 +739,7 @@ class Cro::HTTP::Client {
             Promise.kept($pipeline)
         }
         else {
-            self!build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca, :$enable-push)
+            self!build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca, :$tls, :$enable-push)
         }
     }
 
@@ -756,7 +759,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca, :$enable-push) {
+    method !build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca, :$tls, :$enable-push) {
         my $log-connection = Cro::HTTP::LogTimeline::EstablishConnection.start(
                 $log-parent, :$host, :$port,
                 :secure($secure ?? 'Yes' !! 'No'),
@@ -815,16 +818,20 @@ class Cro::HTTP::Client {
         }
         my $connector = Cro.compose(|@parts);
 
-        my %tls-config = $supports-alpn && $secure && $http ne '1.1'
-            ?? alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
-            !! ();
+        my %tls-config;
+        if $secure {
+            %tls-config = $tls // {};
+            %tls-config ,= %!tls if self;
+            %tls-config ,= alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
+                if $supports-alpn && $http ne '1.1';
+            %tls-config ,= self ?? (self.ca // $ca // {}) !! $ca // {};
+        }
         my $in = Supplier::Preserving.new;
-        my %ca = self ?? (self.ca // $ca // {}) !! $ca // {};
         my $out = $version-decision
-            ?? establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |{%tls-config, %ca})
+            ?? establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |%tls-config)
             !! do {
                 my $s = Supplier::Preserving.new;
-                establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |{%tls-config, %ca}).tap:
+                establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |%tls-config).tap:
                     { $s.emit($_) },
                     done => { $s.done },
                     quit => {
