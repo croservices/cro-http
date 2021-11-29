@@ -1422,8 +1422,13 @@ module Cro::HTTP::Router {
         not-found;
     }
 
+    sub get-basename(Str $path --> Str) {
+        with $path.rindex('/') { $path.substr($_ + 1) } else { $path }
+    }
+
     sub get-extension(Str $path --> Str) {
-        with $path.rindex('/') { $path.substr($_ + 1) } else { '' }
+        my $basename = get-basename($path);
+        with $basename.rindex('.') { $basename.substr($_ + 1) } else { '' }
     }
 
     #| Resolve a resource in the resources associated with the enclosing route block or the current

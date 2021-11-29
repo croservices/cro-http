@@ -1959,6 +1959,7 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         like body-text($r), rx { '<HTML></HTML>' \n }, 'Get index.html from resources';
         is $r.status, 200, 'resource sets correct status code';
+        is $r.content-type, 'text/html', 'resource sets correct content-type';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.1');
@@ -1966,6 +1967,7 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         like body-text($r), rx{ 'this is a test' \n }, 'Get folder/test.txt from resources';
         is $r.status, 200, 'Good status';
+        is $r.content-type, 'text/plain', 'Good content-type';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/test.2');
@@ -1973,6 +1975,7 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         like body-text($r), rx{ 'this is a test' \n }, 'Get <folder test.txt> from resources';
         is $r.status, 200, 'Good status';
+        is $r.content-type, 'text/plain', 'Good content-type';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/folder-indexes');
@@ -1980,6 +1983,7 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         like body-text($r), rx{ 'this is a test' \n }, 'indexes in a folder of resources';
         is $r.status, 200, 'Good status';
+        is $r.content-type, 'text/plain', 'Good content-type';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes1');
@@ -1987,6 +1991,7 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         like body-text($r), rx{ '<HTML></HTML>' \n } , 'indexes in root of resources, 1';
         is $r.status, 200, 'Good status';
+        is $r.content-type, 'text/html', 'Good content-type';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/root-indexes2');
@@ -1994,12 +1999,14 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
     given $responses.receive -> $r {
         like body-text($r), rx{ '<HTML></HTML>' \n }, 'indexes in root of resources, 2';
         is $r.status, 200, 'Good status';
+        is $r.content-type, 'text/html', 'Good content-type';
     }
 
     $req = Cro::HTTP::Request.new(method => 'GET', target => '/test-plugin');
     $source.emit($req);
     given $responses.receive -> $r {
         like body-text($r), rx { '<html></html>' \n }, 'The extension point for other plugins wanting to use resources works';
+        is $r.content-type, 'text/html; charset=utf-8', 'Good content-type';
     }
 }
 
