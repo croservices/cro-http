@@ -848,7 +848,10 @@ class Cro::HTTP::Client {
             }
 
             my Promise $connection = $connector.connect(|%options);
-            $connection.then({ $log-connection.end });
+            $connection.then({
+                $connection-obtained = True;
+                $log-connection.end;
+            });
             whenever $connection -> Cro::Transform $transform {
                 whenever $transform.transformer($incoming) -> $msg {
                     emit $msg;
