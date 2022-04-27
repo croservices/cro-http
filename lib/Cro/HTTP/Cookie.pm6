@@ -64,7 +64,7 @@ class Cro::HTTP::Cookie::CookieBuilder {
         %args.append('name',  $name);
         %args.append('value', $value);
         for $<cookie-av> -> $av {
-            %args.append($av.made);
+            quietly %args.append($av.made);
         };
         make Cro::HTTP::Cookie.new(|%args);
     }
