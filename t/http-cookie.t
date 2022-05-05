@@ -116,4 +116,9 @@ for (
     is $cookie.to-set-cookie, $cookie-str, "Valid SameSite value cookie $i can be parsed";
 }
 
+$cookie = Cro::HTTP::Cookie.from-set-cookie: q"sisapweb=6fbaab42-f066-4c03-82f9-5565c5fe2e46;Version=1;Path=/;Secure;HttpOnly";
+is $cookie.path, '/', 'Correct path after extension';
+ok $cookie.secure, 'Secure parsed after extension';
+is-deeply $cookie.extensions, { :Version('1') }, 'Extensions are parsed and extracted also';
+
 done-testing;

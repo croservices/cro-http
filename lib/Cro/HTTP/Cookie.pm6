@@ -52,22 +52,34 @@ grammar Cro::HTTP::Cookie::CookieString {
           token cookie-av:sym<secure>    { :i 'Secure' }
           token cookie-av:sym<httponly>  { :i 'HttpOnly' }
           token cookie-av:sym<samesite>  { :i 'SameSite=' @same-site-opts }
-          token cookie-av:sym<extension> { :i <path> }
+          token cookie-av:sym<extension> { <path> }
 }
 
 class Cro::HTTP::Cookie { ... }
 
 class Cro::HTTP::Cookie::CookieBuilder {
+    my class Extension {
+        has @.extension is required;
+    }
+
     method TOP($/) {
         my ($name, $value) = $<cookie-pair>.made;
-        my %args;
-        %args.append('name',  $name);
-        %args.append('value', $value);
+        my %args = :$name, :$value;
+        my %extensions;
         for $<cookie-av> -> $av {
-            %args.append($av.made);
+            given $av.made {
+                when Extension {
+                    %extensions.append(.extension);
+                }
+                default {
+                    %args.append($_);
+                }
+            }
         };
+        %args<extensions> = %extensions if %extensions;
         make Cro::HTTP::Cookie.new(|%args);
     }
+
     method cookie-pair($/) {
         make $/.split('=')
     }
@@ -98,7 +110,10 @@ class Cro::HTTP::Cookie::CookieBuilder {
     method cookie-av:sym<samesite> ($/) {
         make ('same-site', Cro::HTTP::Cookie::SameSite($/.split('=')[1].tclc));
     }
-    method cookie-av:sym<extension> ($/) {}
+    method cookie-av:sym<extension> ($/) {
+        my @parts = $/.split('=');
+        make Extension.new(:extension(@parts[0], @parts[1] // True));
+    }
 }
 
 #| Represents a HTTP cookie from the server-side perspective, including the
@@ -114,6 +129,7 @@ class Cro::HTTP::Cookie {
     has Bool $.secure;
     has Bool $.http-only;
     has Cro::HTTP::Cookie::SameSite $.same-site;
+    has %.extensions;
 
     sub rfc1123-formatter(DateTime $_ --> DateTime) is export {
         my constant %month-names = 1 => 'Jan', 2 => 'Feb', 3 => 'Mar',
@@ -136,7 +152,7 @@ class Cro::HTTP::Cookie {
                     :$!expires=Nil, :$!max-age=Nil,
                     :$!domain=Nil,:$!path=Nil,
                     :$!secure=False, :$!http-only=False,
-                    :$!same-site=Nil) {};
+                    :$!same-site=Nil, :%!extensions) {};
 
     #| Turns the cookie information into a value to used in a Set-cookie header
     method to-set-cookie(--> Str) {
