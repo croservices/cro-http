@@ -129,8 +129,8 @@ class Cro::HTTP::BodySerializer::WWWFormUrlEncoded does Cro::HTTP::BodySerialize
             $encodee eq ' '
                 ?? '+'
                 !! $encodee le "\x7F"
-                    ?? '%' ~ $encodee.ord.base(16)
-                    !! $encodee.encode('utf-8').list.map({ '%' ~ .base(16) }).join
+                    ?? '%' ~ $encodee.ord.fmt('%02X')
+                    !! $encodee.encode('utf-8').list.map({ '%' ~ .fmt('%02X') }).join
         }
     }
 }

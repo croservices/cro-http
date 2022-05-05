@@ -164,16 +164,16 @@ is-request
         my $req = Cro::HTTP::Request.new(:method<POST>, :target</foo>);
         $req.append-header('Host', 'localhost');
         $req.append-header('Content-type', 'application/x-www-form-urlencoded');
-        $req.set-body([rooms => 2, balcony => 'true', area => 'Praha 3']);
+        $req.set-body([rooms => 2, balcony => 'true', area => 'Praha 3', ab => "a\nb"]);
         emit $req;
     },
     q:to/REQUEST/.chop, 'application/x-www-form-urlencoded with list of pairs';
         POST /foo HTTP/1.1
         Host: localhost
         Content-type: application/x-www-form-urlencoded
-        Content-length: 33
+        Content-length: 42
 
-        rooms=2&balcony=true&area=Praha+3
+        rooms=2&balcony=true&area=Praha+3&ab=a%0Ab
         REQUEST
 
 is-request
