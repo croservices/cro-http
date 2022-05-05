@@ -38,7 +38,7 @@ class X::Cro::HTTP::Error is Exception {
 
     #| The response phrase in the HTTP response
     method message() {
-        "{$.response.get-response-phrase}"
+        "{$.response.get-response-phrase} ($.request.method() $.request.uri())"
     }
 
     #| The request that resulted in the unsuccessful response.
