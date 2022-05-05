@@ -121,4 +121,9 @@ is $cookie.path, '/', 'Correct path after extension';
 ok $cookie.secure, 'Secure parsed after extension';
 is-deeply $cookie.extensions, { :Version('1') }, 'Extensions are parsed and extracted also';
 
+$cookie = Cro::HTTP::Cookie.from-set-cookie: 'Authorization=Bearer xxx.xxx.xxx; path=/';
+is $cookie.name, 'Authorization', 'Correct cookie name when illegal whitespace in value';
+is $cookie.value, 'Bearer', 'Cookie value parsed up to illegal whitespace';
+is $cookie.path, '/', 'Recovered to parse path after illegal cookie value';
+
 done-testing;

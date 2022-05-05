@@ -40,7 +40,11 @@ grammar Cro::HTTP::Cookie::CookieString {
     my @same-site-opts = Cro::HTTP::Cookie::SameSite.enums.values;
 
     token TOP          { <cookie-pair> [';' ' '? <cookie-av> ]* }
-    token cookie-pair  { <cookie-name> '=' <cookie-value> }
+    token cookie-pair  { <cookie-name> '=' <cookie-value> <.drop-illegal-post-value> }
+    token drop-illegal-post-value {
+        # Cope with illegal (per-RFC) things that trail the cookie value.
+        <-[;]>*
+    }
     proto token cookie-av {*}
           token cookie-av:sym<expires>   { :i 'Expires=' [ <dt=DateTime::Parse::Grammar::rfc1123-date>    |
                                                            <dt=DateTime::Parse::Grammar::rfc850-date>     |
@@ -81,7 +85,7 @@ class Cro::HTTP::Cookie::CookieBuilder {
     }
 
     method cookie-pair($/) {
-        make $/.split('=')
+        make (~$<cookie-name>, ~$<cookie-value>)
     }
 
     method !data-deal($str) {
