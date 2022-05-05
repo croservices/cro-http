@@ -104,7 +104,7 @@ $cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
 is $cookie.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Cookie 4 can be parsed';
 
 # SameSite tests
-$cookie = quietly Cro::HTTP::Cookie.from-set-cookie: 'mycookie=raisin; SameSite=Dog';
+$cookie = Cro::HTTP::Cookie.from-set-cookie: 'mycookie=raisin; SameSite=Dog';
 is $cookie.to-set-cookie, 'mycookie=raisin', 'Invalid SameSite value discarded';
 
 for (
