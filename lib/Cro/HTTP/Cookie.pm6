@@ -120,13 +120,11 @@ class Cro::HTTP::Cookie {
                           4 => 'Apr', 5 => 'May', 6 => 'Jun',
                           7 => 'Jul', 8 => 'Aug', 9 => 'Sep',
                           10 => 'Oct', 11 => 'Nov', 12 => 'Dec';
-        my %amonth-names = %month-names.antipairs;
 
         my %weekdays = 1 => 'Mon', 2 => 'Tue',
                        3 => 'Wed', 4 => 'Thu',
                        5 => 'Fri', 6 => 'Sat',
                        7 => 'Sun';
-        my %aweekdays = %weekdays.antipairs;
 
         my $rfc1123-format = sub ($self) { sprintf "%s, %02d %s %04d %02d:%02d:%02d GMT",
                                            %weekdays{.day-of-week}, .day,
