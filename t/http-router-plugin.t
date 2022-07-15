@@ -106,4 +106,66 @@ subtest 'Access to configuration with include' => {
     }
 }
 
+my $test-before = route {
+    add-message 'b';
+
+    before {
+        if request.query-value('q') eq any(all-messages()) {
+            not-found;
+        }
+    }
+
+    get -> 'ok' {
+        content 'text/plain', 'ok';
+    }
+}
+
+subtest 'Access to configuration in before block' => {
+    my $in = Supplier.new;
+    my Channel $out = $test-before.transformer($in.Supply).Channel;
+
+    $in.emit: Cro::HTTP::Request.new(http-version => '1.1', method => 'GET', target => '/ok?q=a');
+    given $out.receive {
+        isa-ok $_, Cro::HTTP::Response, 'Got a response';
+        is .status, 200, 'Got 200 when before middleware ran and did not produce response';
+    }
+
+    $in.emit: Cro::HTTP::Request.new(http-version => '1.1', method => 'GET', target => '/ok?q=b');
+    given $out.receive {
+        isa-ok $_, Cro::HTTP::Response, 'Got a response';
+        is .status, 404, 'Got 404 when before middleware ran and changed response';
+    }
+}
+
+my $test-after = route {
+    add-message 'x';
+
+    after {
+        if response.request.query-value('q') eq any(all-messages()) {
+            not-found;
+        }
+    }
+
+    get -> 'ok' {
+        content 'text/plain', 'ok';
+    }
+}
+
+subtest 'Access to configuration in after block' => {
+    my $in = Supplier.new;
+    my Channel $out = $test-after.transformer($in.Supply).Channel;
+
+    $in.emit: Cro::HTTP::Request.new(http-version => '1.1', method => 'GET', target => '/ok?q=y');
+    given $out.receive {
+        isa-ok $_, Cro::HTTP::Response, 'Got a response';
+        is .status, 200, 'Got 200 when after middleware ran and did not change response';
+    }
+
+    $in.emit: Cro::HTTP::Request.new(http-version => '1.1', method => 'GET', target => '/ok?q=x');
+    given $out.receive {
+        isa-ok $_, Cro::HTTP::Response, 'Got a response';
+        is .status, 404, 'Got 404 when after middleware ran and changed response';
+    }
+}
+
 done-testing;

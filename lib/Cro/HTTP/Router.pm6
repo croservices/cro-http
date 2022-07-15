@@ -1113,12 +1113,14 @@ module Cro::HTTP::Router {
 
     my class BeforeMiddleTransform does Cro::HTTP::Middleware::Conditional {
         has &.block;
+        has $.route-set;
 
         method process(Supply $pipeline --> Supply) {
             supply {
                 whenever $pipeline -> $request {
                     my $*CRO-ROUTER-REQUEST := $request;
                     my $*CRO-ROUTER-RESPONSE := Cro::HTTP::Response.new(:$request);
+                    my $*CRO-MIDDLEWARE-ROUTE-SET = $!route-set;
                     &!block($request);
                     emit $*CRO-ROUTER-RESPONSE.status.defined
                         ?? $*CRO-ROUTER-RESPONSE
@@ -1130,6 +1132,7 @@ module Cro::HTTP::Router {
 
     my class AfterMiddleTransform does Cro::Transform {
         has &.block;
+        has $.route-set;
 
         method consumes() { Cro::HTTP::Response }
         method produces() { Cro::HTTP::Response }
@@ -1138,6 +1141,7 @@ module Cro::HTTP::Router {
             supply {
                 whenever $pipeline -> $response {
                     my $*CRO-ROUTER-RESPONSE := $response;
+                    my $*CRO-MIDDLEWARE-ROUTE-SET = $!route-set;
                     &!block($response);
                     emit $response;
                 }
@@ -1160,7 +1164,7 @@ module Cro::HTTP::Router {
     #| Run the specified block before any routing takes place. If it produces, a
     #| response by itself, then no routing will be performed.
     multi sub before(&middleware --> Nil) is export {
-        my $conditional = BeforeMiddleTransform.new(block => &middleware);
+        my $conditional = BeforeMiddleTransform.new(block => &middleware, route-set => $*CRO-ROUTE-SET);
         $*CRO-ROUTE-SET.add-before($conditional.request);
         $*CRO-ROUTE-SET.add-after($conditional.response);
     }
@@ -1189,7 +1193,7 @@ module Cro::HTTP::Router {
     #| regardless of any route being matched (so if no route matched, this
     #| would get the 404 response to process).
     multi sub after(&middleware --> Nil) is export {
-        my $transformer = AfterMiddleTransform.new(block => &middleware);
+        my $transformer = AfterMiddleTransform.new(block => &middleware, route-set => $*CRO-ROUTE-SET);
         $*CRO-ROUTE-SET.add-after($transformer);
     }
 
@@ -1364,9 +1368,13 @@ module Cro::HTTP::Router {
     }
 
     #| Get the configuration data added for the current route block as well as those
-    #| has been included into. This can only be called in a request handler.
+    #| has been included into. This can only be called in a request handler or a
+    #| before/after middleware block.
     sub router-plugin-get-configs(Cro::HTTP::Router::PluginKey $key, Str :$error-sub = $key.id --> List) is export(:plugin) {
         with $*CRO-ROUTER-ROUTE-HANDLER {
+            .get-plugin-configs($key)
+        }
+        orwith $*CRO-MIDDLEWARE-ROUTE-SET {
             .get-plugin-configs($key)
         }
         else {
