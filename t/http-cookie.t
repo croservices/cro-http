@@ -104,7 +104,7 @@ $cookie = Cro::HTTP::Cookie.from-set-cookie: $c.to-set-cookie;
 is $cookie.to-set-cookie, "UID=TEST; Max-Age=$d; Secure; HttpOnly", 'Cookie 4 can be parsed';
 
 # SameSite tests
-$cookie = quietly Cro::HTTP::Cookie.from-set-cookie: 'mycookie=raisin; SameSite=Dog';
+$cookie = Cro::HTTP::Cookie.from-set-cookie: 'mycookie=raisin; SameSite=Dog';
 is $cookie.to-set-cookie, 'mycookie=raisin', 'Invalid SameSite value discarded';
 
 for (
@@ -115,5 +115,15 @@ for (
     my $cookie = Cro::HTTP::Cookie.from-set-cookie: $cookie-str;
     is $cookie.to-set-cookie, $cookie-str, "Valid SameSite value cookie $i can be parsed";
 }
+
+$cookie = Cro::HTTP::Cookie.from-set-cookie: q"sisapweb=6fbaab42-f066-4c03-82f9-5565c5fe2e46;Version=1;Path=/;Secure;HttpOnly";
+is $cookie.path, '/', 'Correct path after extension';
+ok $cookie.secure, 'Secure parsed after extension';
+is-deeply $cookie.extensions, { :Version('1') }, 'Extensions are parsed and extracted also';
+
+$cookie = Cro::HTTP::Cookie.from-set-cookie: 'Authorization=Bearer xxx.xxx.xxx; path=/';
+is $cookie.name, 'Authorization', 'Correct cookie name when illegal whitespace in value';
+is $cookie.value, 'Bearer', 'Cookie value parsed up to illegal whitespace';
+is $cookie.path, '/', 'Recovered to parse path after illegal cookie value';
 
 done-testing;
