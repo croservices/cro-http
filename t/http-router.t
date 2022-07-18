@@ -609,6 +609,12 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
             response.append-header('Content-type', 'text/html');
             response.set-body("advent $day".encode('ascii'));
         }
+
+        get -> 'content', *@path where *[*-1].ends-with('.html') {
+            response.status = 200;
+            response.append-header('Content-type', 'text/html');
+            response.set-body("it is html".encode('ascii'));
+        }
     }
     my $source = Supplier.new;
     my $responses = $app.transformer($source.Supply).Channel;
@@ -621,7 +627,9 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         '/tag/pizza', 'tag pizza',
             'Segment constrained by where clause matches when it should',
         '/advent/13', 'advent 13',
-            'Segment of type Int constrained by where clause matches when it should';
+            'Segment of type Int constrained by where clause matches when it should',
+        '/content/foo/bar.html', 'it is html',
+            'Slurpy segment with where clause matches when it could';
     for @good-cases -> $target, $expected-output, $desc {
         my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);
@@ -634,7 +642,8 @@ throws-like { bad-request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'bad-r
         '/product/not-a-uuid', 404, 'Non-matching segment gives 404 error (subset, Str)',
         '/percent/1000', 404, 'Non-matching segment gives 404 error (subset, Int)',
         '/tag/not-valid', 404, 'Non-matching segment gives 404 error (where, Str)',
-        '/advent/25', 404, 'Non-matching segment gives 404 error (where, Int)';
+        '/advent/25', 404, 'Non-matching segment gives 404 error (where, Int)',
+        '/content/foo/bar.jpg', 404, 'Non-matching where clause on slurpy gives 404 error';
     for @bad-cases -> $target, $expected-status, $desc {
         my $req = Cro::HTTP::Request.new(:method<GET>, :$target);
         $source.emit($req);

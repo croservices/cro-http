@@ -530,15 +530,16 @@ module Cro::HTTP::Router {
             }
 
             for @positional.kv -> $seg-index, $param {
+                my @constraints = extract-constraints($param);
                 if $param.slurpy {
                     $segments-terminal = '{} .*:';
+                    $need-sig-bind = True if @constraints;
                 }
                 else {
                     my @matcher-target := $param.optional
                         ?? @segments-optional
                         !! @segments-required;
                     my $type := $param.type;
-                    my @constraints = extract-constraints($param);
                     if $type =:= Mu || $type =:= Any || $type =:= Str {
                         if @constraints == 1 && @constraints[0] ~~ Str:D {
                             # Literal string constraint; matches literally.
