@@ -28,6 +28,6 @@ jobs:
       - run: zef install https://github.com/croservices/cro-core/archive/master.zip
       - run: zef install https://github.com/croservices/cro-tls/archive/master.zip
       - name: Setup dependencies
-        run: raku -v && zef install --deps-only .
+        run: raku -v && zef install -v --deps-only .
       - name: Test code
-        run: zef test .
+        run: zef test -v .
