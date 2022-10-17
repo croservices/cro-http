@@ -852,6 +852,7 @@ class Cro::HTTP::Client {
             whenever $connection -> Cro::Transform $transform {
                 whenever $transform.transformer($incoming) -> $msg {
                     emit $msg;
+                    LAST done;
                 }
             }
         }

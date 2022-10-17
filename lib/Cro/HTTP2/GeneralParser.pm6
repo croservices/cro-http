@@ -199,6 +199,7 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                         %streams{.stream-identifier}.headers ~= .headers;
                     }
                 }
+                LAST done;
             }
         }
     }
