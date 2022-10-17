@@ -28,13 +28,22 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
             }
 
             my $MAX-FRAME-SIZE = 2 ** 14;
-            sub send-message($frame) {
+            sub send-message($frame, $consumes-window = False) {
+                if $consumes-window {
+                    my $promise = Promise.new;
+                    $connection-state.remote-window-change.emit: Cro::HTTP2::ConnectionState::WindowConsume.new(
+                        stream-identifier => $frame.stream-identifier,
+                        bytes => $frame.data.bytes + ($frame.padded ?? 8 + $frame.padding-length !! 0),
+                        :$promise,
+                    );
+                    await $promise;
+                }
                 my $result = self!form-header($frame);
                 self!serializer($result, $frame);
                 emit Cro::TCP::Message.new(data => $result);
             }
 
-            sub send-splitted($frame) {
+            sub send-splitted($frame, $consumes-window = False) {
                 my $is-header = $frame ~~ Cro::HTTP2::Frame::Headers|Cro::HTTP2::Frame::PushPromise;
                 my $payload = $is-header ?? $frame.headers !! $frame.data;
                 my $flag = $frame.flags == 4 ?? 0 !! 1 if $is-header;
@@ -44,7 +53,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                 my %arg = $is-header ?? headers => $first-part !! data => $first-part;
                 send-message($frame.clone(
                                     flags => $is-header ?? $flag !! 0,
-                                    |%arg));
+                                    |%arg), $consumes-window);
 
                 while $payload.elems > 0 {
                     my $sent = $payload.elems < $MAX-FRAME-SIZE-9
@@ -59,7 +68,7 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                     } else {
                         $message = Cro::HTTP2::Frame::Data.new(|%arg)
                     }
-                    send-message($message);
+                    send-message($message, $consumes-window);
                     $payload .= subbuf($sent);
                 }
             }
@@ -118,9 +127,9 @@ class Cro::HTTP2::FrameSerializer does Cro::Transform does Cro::ConnectionState[
                     }
                 } elsif $frame ~~ Cro::HTTP2::Frame::Data {
                     if $frame.data.elems + 9 > $MAX-FRAME-SIZE {
-                        send-splitted($frame);
+                        send-splitted($frame, True);
                     } else {
-                        send-message($frame);
+                        send-message($frame, True);
                     }
                 } else {
                     send-message($frame);
