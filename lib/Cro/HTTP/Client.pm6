@@ -759,7 +759,7 @@ class Cro::HTTP::Client {
         }
     }
 
-    method !build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca, :$tls, :$enable-push) {
+    method !build-pipeline($secure, $host, $port, $http, $conn-timeout, $log-parent, :$ca = {}, :$tls = {}, :$enable-push) {
         my $log-connection = Cro::HTTP::LogTimeline::EstablishConnection.start(
                 $log-parent, :$host, :$port,
                 :secure($secure ?? 'Yes' !! 'No'),
@@ -820,11 +820,12 @@ class Cro::HTTP::Client {
 
         my %tls-config;
         if $secure {
-            %tls-config = $tls // {};
-            %tls-config ,= %!tls if self;
-            %tls-config ,= alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
-                if $supports-alpn && $http ne '1.1';
-            %tls-config ,= self ?? (self.ca // $ca // {}) !! $ca // {};
+            %tls-config =
+                    (%!tls if self),
+                    %$tls,
+                    (alpn => ($http eq 'h2' ?? 'h2' !! <h2 http/1.1>)
+                        if $supports-alpn && $http ne '1.1'),
+                    ((self ?? (self.ca // %$ca) !! %$ca) // Empty);
         }
         my $in = Supplier::Preserving.new;
         my $out = $version-decision
