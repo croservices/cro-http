@@ -174,7 +174,19 @@ class Cro::HTTP::Client {
         has $!next-stream-id = 1;
         has %!outstanding-stream-responses{Int};
 
-        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
+        submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!, :$go-away-supply!) {
+            $go-away-supply.tap: -> $last-processed-sid {
+                $!dead = True;
+                $!lock.protect: {
+                    for %!outstanding-stream-responses.kv -> $sid, $vow {
+                        if $sid > $last-processed-sid {
+                            %!outstanding-stream-responses{$sid}:delete;
+                            $vow.break(X::AdHoc.new(message => 'GoAway packet received'));
+                        }
+                    }
+                }
+            }
+
             $!tap = supply {
                 whenever $out -> $response {
                     self.response($response);
@@ -795,9 +807,16 @@ class Cro::HTTP::Client {
             );
         }
         push @parts, self.choose-connector($secure);
+
+        my $go-away-supply;
+        sub create-response-parser(*%params) {
+            my $res-parser = Cro::HTTP2::ResponseParser.new(|%params);
+            $go-away-supply = $res-parser.go-away-supply;
+            return $res-parser;
+        }
         if $http eq '2' {
             push @parts, Cro::HTTP2::FrameParser.new(:client);
-            push @parts, Cro::HTTP2::ResponseParser.new(:$enable-push);
+            push @parts, create-response-parser(:$enable-push);
         }
         elsif $http eq '1.1' || !$secure || !$supports-alpn {
             push @parts, Cro::HTTP::ResponseParser.new();
@@ -806,7 +825,7 @@ class Cro::HTTP::Client {
             push @parts, Cro::ConnectionConditional.new(
                 { (.alpn-result // '') eq 'h2' } => [
                     Cro::HTTP2::FrameParser.new(:client),
-                    Cro::HTTP2::ResponseParser.new
+                    create-response-parser()
                 ],
                 Cro::HTTP::ResponseParser.new()
             );
@@ -843,7 +862,7 @@ class Cro::HTTP::Client {
             };
         $version-decision.then: -> $version {
             $version.result eq '2'
-                ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out)
+                ?? Pipeline2.new(:$secure, :$host, :$port, :$in, :$out, :$go-away-supply)
                 !! Pipeline.new(:$secure, :$host, :$port, :$in, :$out)
         }
     }

@@ -22,6 +22,9 @@ my class Stream {
 role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionState] {
     has $!pseudo-headers;
     has $.enable-push = False;
+    has Supplier $!go-away-supplier .= new;
+    # Emits the highest stream number that is still allowed to be processed.
+    has Supply $.go-away-supply = $!go-away-supplier.Supply;
 
     method transformer(Supply:D $in, Cro::HTTP2::ConnectionState :$connection-state!) {
         supply {
@@ -167,6 +170,20 @@ role Cro::HTTP2::GeneralParser does Cro::ConnectionState[Cro::HTTP2::ConnectionS
                     push %push-promises-for-stream{.stream-identifier}, $pp;
                 }
                 when Cro::HTTP2::Frame::GoAway {
+                    $!go-away-supplier.emit: .last-sid;
+                    for %push-promises-by-promised-id.kv -> $k, $v {
+                        if $k > .last-sid {
+                            %push-promises-by-promised-id{$k}:delete;
+                            $v.cancel-response();
+                        }
+                    }
+                    for %streams.kv -> $k, $v {
+                        if $k > .last-sid {
+                            %streams{$k}:delete;
+                            $v.cancel-response();
+                        }
+                    }
+                    %push-promises-for-stream{.stream-identifier}:delete;
                 }
                 when Cro::HTTP2::Frame::WindowUpdate {
                     $connection-state.remote-window-change.emit: Cro::HTTP2::ConnectionState::WindowAdd.new:
