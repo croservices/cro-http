@@ -6,10 +6,10 @@ use Test;
 constant HTTP_TEST_PORT = 31326;
 constant HTTPS_TEST_PORT = 31327;
 
-constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
+constant %ca := { ca-file => 'xt/certs-and-keys/ca-crt.pem' };
 constant %tls := {
-    private-key-file => 't/certs-and-keys/server-key.pem',
-    certificate-file => 't/certs-and-keys/server-crt.pem'
+    private-key-file => 'xt/certs-and-keys/server-key.pem',
+    certificate-file => 'xt/certs-and-keys/server-crt.pem'
 };
 
 # Suppress any unhandled errors so they don't end up in the test output.

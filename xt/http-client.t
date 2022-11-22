@@ -10,10 +10,10 @@ constant HTTP_TEST_PORT = 31316;
 constant HTTPS_TEST_PORT = 31317;
 constant PROXY_TEST_PORT = 31318;
 constant ROOT_REDIRECT_TEST_PORT = 31330;
-constant %ca := { ca-file => 't/certs-and-keys/ca-crt.pem' };
+constant %ca := { ca-file => 'xt/certs-and-keys/ca-crt.pem' };
 constant %key-cert := {
-    private-key-file => 't/certs-and-keys/server-key.pem',
-    certificate-file => 't/certs-and-keys/server-crt.pem'
+    private-key-file => 'xt/certs-and-keys/server-key.pem',
+    certificate-file => 'xt/certs-and-keys/server-crt.pem'
 };
 
 # Proxy server
