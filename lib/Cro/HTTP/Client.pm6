@@ -593,7 +593,7 @@ class Cro::HTTP::Client {
         Promise(supply {
             my $request-start-time = now;
             my $conn-timeout = $timeout-policy.get-timeout(0, 'connection');
-            my $goaway-retries = $!http2-goaway-retries;
+            my $goaway-retries = self ?? $!http2-goaway-retries !! %options<http2-goaway-retries> // 1;
             my Supplier $retry-supplier .= new;
             my $retry-supply = $retry-supplier.Supply;
             sub do-request-on-pipeline() {
