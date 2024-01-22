@@ -716,6 +716,19 @@ parses 'A _charset_ in application/x-www-form-urlencoded overrides configured de
             'Values were decoded as utf-8, not latin-1 default, due to _charset_';
     };
 
+parses 'No errors on keys with empty value or missing value',
+        q:to/REQUEST/.chop,
+    POST /bar HTTP/1.1
+    Content-type: application/x-www-form-urlencoded; charset=UTF-8
+    Content-length: 4
+
+    a=&b
+    REQUEST
+    tests => {
+            my $body = .body.result;
+            is-deeply $body.list, (a => '', b => '');
+        };
+
 parses 'Simple multipart/form-data',
     q:to/REQUEST/, :body-crlf,
     POST /bar HTTP/1.1

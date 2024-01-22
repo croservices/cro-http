@@ -59,7 +59,7 @@ class Cro::HTTP::BodyParser::WWWFormUrlEncoded does Cro::BodyParser {
                 my $encoding = self.default-encoding;
                 for $payload.split('&') -> Str $string {
                     my Str $string-sp = $string.subst('+', ' ', :g);
-                    my int $eq-idx = $string-sp.index('=');
+                    my int $eq-idx = $string-sp.index('=') // -1;
                     my Str $name = $eq-idx >= 0
                         ?? $string-sp.substr(0, $eq-idx)
                         !! $string-sp;
