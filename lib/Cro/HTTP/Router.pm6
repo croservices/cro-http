@@ -1068,6 +1068,36 @@ module Cro::HTTP::Router {
         content $content-type, $body, |%options;
     }
 
+    proto server-error(|) is export {*}
+
+    #| Produce a HTTP 500 Server Error response
+    multi server-error(--> Nil) {
+        set-status(500, :action<server-errror>);
+    }
+
+    #| Produce a HTTP 500 Server Error response. The remaining arguments will be
+    #| passed to the content function, setting the media type, response body, and
+    #| other options.
+    multi server-error($content-type, $body, *%options --> Nil) {
+        set-status(500, :action<server-error>);
+        content $content-type, $body, |%options;
+    }
+
+    proto not-supported(|) is export {*}
+
+    #| Produce a HTTP 505 Not Supported response
+    multi not-supported(--> Nil) {
+        set-status(505, :action<not-supported>);
+    }
+
+    #| Produce a HTTP 505 Not Supported response. The remaining arguments will be
+    #| passed to the content function, setting the media type, response body, and
+    #| other options.
+    multi not-supported($content-type, $body, *%options --> Nil) {
+        set-status(505, :action<not-supported>);
+        content $content-type, $body, |%options;
+    }
+
     #| Add a cookie to the response
     sub set-cookie($name, $value, *%opts) is export {
         my $resp = $*CRO-ROUTER-RESPONSE //
