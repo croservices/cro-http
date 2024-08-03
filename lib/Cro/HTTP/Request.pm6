@@ -162,7 +162,9 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
     method !unpack-cookie(--> List) {
         my @str = self.headers.grep({ .name.lc eq 'cookie' });
         return () if @str.elems == 0;
-        @str = @str[0].value.split(/';' ' '?/).List;
+	@str = self.http-version.defined && self.http-version eq '2.0'
+		?? @str.map({ .value.split(/';' ' '?/).List })[*;*]
+		!! @str[0].value.split(/';' ' '?/).List;
         my @res;
         for @str {
             my ($name, $value) = $_.split('=');

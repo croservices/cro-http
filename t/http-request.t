@@ -200,6 +200,14 @@ use Test;
     dies-ok { $req.add-cookie('', '') }, 'Empty names are not permitted';
     $req.add-cookie('Heaven', 'Valhalla');
     like $req.Str, /"GET / HTTP/1.0\r\nCookie: " ['Foo=Bar' || 'Heaven=Valhalla' || 'Lang=US'] ** 3 % '; '  "\r\n\r\n"/, 'Cookie header looks good';
+
+    # Default behavior for HTTP 1.1
+    $req.remove-cookie('lang');
+    $req.append-header(Cro::HTTP::Header.new(name => 'cookie', value => 'lang=us'));
+    is $req.has-cookie('lang'), False, 'lang cookie header should not be parsed for HTTP 1.1';
+
+    $req.http-version = '2.0';
+    is $req.has-cookie('lang'), True, 'lang cookie header should be parsed for HTTP 2';
 }
 
 {
