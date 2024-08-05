@@ -10,8 +10,10 @@ use Cro::HTTP::MimeTypes;
 use Cro::HTTP::PushPromise;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
+use Cro::HTTP::Router::Roles;
 use Cro::UnhandledErrorReporter;
 use IO::Path::ChildSecure;
+use Cro::HTTP::Router::LinkGenerator;
 
 class X::Cro::HTTP::Router::OnlyInRouteBlock is Exception {
     has Str $.what is required;
@@ -32,6 +34,12 @@ class X::Cro::HTTP::Router::NoRequestBodyMatch is Exception {
         "error; if you're seeing it, you may have an over-general error handling)"
     }
 }
+class X::Cro::HTTP::Router::DuplicateLinkName is Exception {
+    has Str $.key is required;
+    method message() {
+        "Conflicting link name: $.key"
+    }
+}
 
 class X::Cro::HTTP::Router::ConfusedCapture is Exception {
     has $.body;
@@ -45,22 +53,18 @@ class X::Cro::HTTP::Router::ConfusedCapture is Exception {
     }
 }
 
-module Cro::HTTP::Router {
-    role Query {}
+package Cro::HTTP::Router {
     multi trait_mod:<is>(Parameter:D $param, :$query! --> Nil) is export {
-        $param does Query;
+        $param does Cro::HTTP::Router::Query;
     }
-    role Header {}
     multi trait_mod:<is>(Parameter:D $param, :$header! --> Nil) is export {
-        $param does Header;
+        $param does Cro::HTTP::Router::Header;
     }
-    role Cookie {}
     multi trait_mod:<is>(Parameter:D $param, :$cookie! --> Nil) is export {
-        $param does Cookie;
+        $param does Cro::HTTP::Router::Cookie;
     }
-    role Auth {}
     multi trait_mod:<is>(Parameter:D $param, :$auth! --> Nil) is export {
-        $param does Auth;
+        $param does Cro::HTTP::Router::Auth;
     }
 
     #| Router plugins register themselves using the C<router-plugin-register>
@@ -68,6 +72,12 @@ module Cro::HTTP::Router {
     #| identify the plugin in further interactions with the plugin API.
     class PluginKey {
        has Str $.id is required;
+    }
+
+    our $link-plugin is export(:link) = router-plugin-register('link');
+
+    class RouteBlockLinks {
+        has %.link-generators;
     }
 
     #| A C<Cro::Transform> that consumes HTTP requests and produces HTTP
@@ -134,16 +144,21 @@ module Cro::HTTP::Router {
             }
         }
 
+
+
         my class RouteHandler does Handler {
             has Str $.method;
+            has Str $.name;
             has &.implementation;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.plugin-config;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.flattened-plugin-config;
+            has Bool $.from-include;
+            has Str $.url-prefix is rw = '';
 
             method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!,
-                               Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config) {
+                               Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config, :$name-prefix, :$from-include!) {
                 self.bless:
-                    :$!method, :&!implementation,
+                    :$!method, :&!implementation, |(name => ($name-prefix ?? "$name-prefix." !! '') ~ $!name with $!name),
                     :prefix[flat @prefix, @!prefix],
                     :body-parsers[flat @!body-parsers, @body-parsers],
                     :body-serializers[flat @!body-serializers, @body-serializers],
@@ -151,7 +166,8 @@ module Cro::HTTP::Router {
                     :after-matched[flat @!after-matched, @after-matched],
                     :around[flat @!around, @around],
                     :$!plugin-config,
-                    :flattened-plugin-config(merge-plugin-config($plugin-config, $!flattened-plugin-config // $!plugin-config))
+                    :flattened-plugin-config(merge-plugin-config($plugin-config, $!flattened-plugin-config // $!plugin-config)),
+                    :$from-include, :$!url-prefix
             }
 
             sub merge-plugin-config($outer, $inner) {
@@ -280,6 +296,7 @@ module Cro::HTTP::Router {
             }
         }
 
+        has Str $.name;
         has Handler @.handlers;
         has Cro::BodyParser @.body-parsers;
         has Cro::BodySerializer @.body-serializers;
@@ -332,7 +349,7 @@ module Cro::HTTP::Router {
                                             $status = 400;
                                             last;
                                         }
-                                        elsif $param ~~ Auth || $param.type ~~ Cro::HTTP::Auth {
+                                        elsif $param ~~ Cro::HTTP::Router::Auth || $param.type ~~ Cro::HTTP::Auth {
                                             $status = 401;
                                             last;
                                         }
@@ -353,10 +370,10 @@ module Cro::HTTP::Router {
             }
         }
 
-        method add-handler(Str $method, &implementation --> Nil) {
+        method add-handler(Str $method, &implementation, Str :$name --> Nil) {
             @!handlers-to-add.push: {
                 @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched,
-                        :@!around, :%!plugin-config));
+                        :@!around, :%!plugin-config, :$name, :!from-include));
             }
         }
 
@@ -368,8 +385,8 @@ module Cro::HTTP::Router {
             @!body-serializers.push($serializer);
         }
 
-        method add-include(@prefix, RouteSet $includee) {
-            @!includes.push({ :@prefix, :$includee });
+        method add-include(@prefix, RouteSet $includee, Str :$name-prefix) {
+            @!includes.push({ :@prefix, :$includee, :$name-prefix });
         }
 
         method add-before($middleware) {
@@ -417,13 +434,53 @@ module Cro::HTTP::Router {
                 .body-parsers = @!body-parsers;
                 .body-serializers = @!body-serializers;
             }
-            for @!includes -> (:@prefix, :$includee) {
+            self!generate-urls();
+            my %urls;
+            for @!includes -> (:@prefix, :$includee, :$name-prefix) {
                 for $includee.handlers() {
-                    @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
-                        :@!before-matched, :@!after-matched, :@!around, :%!plugin-config);
+                    my $key = ($name-prefix ?? $name-prefix ~ '.' !! '') ~ ($_.name // '');
+                    # When checking all included routes in the outer route block for conflicting,
+                    # we omit anonymous ones (if $name-prefix...)
+                    if $name-prefix && $key && (%urls{$key}:exists) {
+                        die X::Cro::HTTP::Router::DuplicateLinkName.new(:$key);
+                    }
+                    %urls{$key} = True;
+                    $_.url-prefix = @prefix.join('/') ~ ($_.url-prefix ?? '/' ~ $_.url-prefix !! '');
+                    my $outer-handler = .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
+                        :@!before-matched, :@!after-matched, :@!around, :%!plugin-config, :$name-prefix, :from-include);
+                    if $outer-handler.name {
+                        my $link-config = $outer-handler.get-innermost-plugin-configs($link-plugin)[0];
+                        # Url of included route can have a prefix which we did not know about
+                        # at the generation stage, so overwrite it now when we have all the data we need
+                        my $generator = Cro::HTP::Router::LinkGenerator.new(prefix => .url-prefix, signature => .signature);
+                        $link-config.link-generators = %(
+                            |$link-config.link-generators,
+                            $outer-handler.name => $generator,
+                            .name => $generator
+                        );
+                    }
+                    @!handlers.push: $outer-handler;
                 }
             }
             self!generate-route-matcher();
+        }
+
+        method !generate-urls() {
+            my %urls;
+            my $prefix = $.name // "";
+            $prefix ~= '.' if $prefix;
+            for @.handlers -> $handler {
+                if $handler ~~ RouteHandler && $handler.name.defined {
+                    my $key = $prefix ~ $handler.name;
+                    next if $handler.from-include and not $key.contains('.');
+                    die X::Cro::HTTP::Router::DuplicateLinkName.new(:$key) if %urls{$key}:exists;
+                    my $url-prefix = $handler.url-prefix;
+                    %urls{$key} = Cro::HTP::Router::LinkGenerator.new:
+                            prefix => $url-prefix,
+                            signature => $handler.signature;
+                }
+            }
+            router-plugin-add-config($link-plugin, RouteBlockLinks.new(link-generators => %urls));
         }
 
         method !generate-route-matcher(--> Nil) {
@@ -467,7 +524,7 @@ module Cro::HTTP::Router {
             # and it and compile the check.
             my $have-auth-param = False;
             with @positional[0] -> $param {
-                if $param ~~ Auth || $param.type ~~ Cro::HTTP::Auth {
+                if $param ~~ Cro::HTTP::Router::Auth || $param.type ~~ Cro::HTTP::Auth {
                     @positional.shift;
                     $have-auth-param = True;
                     $need-sig-bind = True;
@@ -572,13 +629,13 @@ module Cro::HTTP::Router {
 
             # Turned nameds into unpacks.
             for @named -> $param {
-                my $target-name = $param.named_names[0];
+                my $target-name = $param.slurpy ?? $param.name !! $param.named_names[0];
                 my ($exists, $lookup) = do given $param {
-                    when Cookie {
+                    when Cro::HTTP::Router::Cookie {
                         '$req.has-cookie(Q[' ~ $target-name ~ '])',
                         '$req.cookie-value(Q[' ~ $target-name ~ '])'
                     }
-                    when Header {
+                    when Cro::HTTP::Router::Header {
                         '$req.has-header(Q[' ~ $target-name ~ '])',
                         '$req.header(Q[' ~ $target-name ~ '])'
                     }
@@ -603,10 +660,10 @@ module Cro::HTTP::Router {
                 }
                 elsif $type =:= Positional {
                     given $param {
-                        when Header {
+                        when Cro::HTTP::Router::Header {
                             push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.headers';
                         }
-                        when Cookie {
+                        when Cro::HTTP::Router::Cookie {
                             die "Cookies cannot be extracted to List. Maybe you want '%' instead of '@'";
                         }
                         default {
@@ -616,10 +673,10 @@ module Cro::HTTP::Router {
                 }
                 elsif $type =:= Associative {
                     given $param {
-                        when Cookie {
+                        when Cro::HTTP::Router::Cookie {
                             push @make-tasks, '%unpacks{Q[' ~ $target-name ~ ']} = $req.cookie-hash';
                         }
-                        when Header {
+                        when Cro::HTTP::Router::Header {
                             push @make-tasks,
                             'my %result;'
                                 ~ '$req.headers.map({ %result{$_.name} = $_.value });'
@@ -690,14 +747,16 @@ module Cro::HTTP::Router {
 
     #| Define a set of routes. Expects to receive a block, which will be evaluated
     #| to set up the routing definition.
-    sub route(&route-definition) is export {
-        my $*CRO-ROUTE-SET = RouteSet.new;
+    multi route(&route-definition, Str :$name) is export {
+        my $*CRO-ROUTE-SET = RouteSet.new(:$name);
         route-definition();
         $*CRO-ROUTE-SET.definition-complete();
         my @before = $*CRO-ROUTE-SET.before;
         my @after = $*CRO-ROUTE-SET.after;
         if @before || @after {
-            return Cro.compose(|@before, $*CRO-ROUTE-SET, |@after, :for-connection);
+            return Cro.compose(|@before, $*CRO-ROUTE-SET, |@after, :for-connection) but role {
+                method route-prefix { $name }
+            };
         } else {
             $*CRO-ROUTE-SET;
         }
@@ -705,14 +764,14 @@ module Cro::HTTP::Router {
 
     #| Add a handler for a HTTP GET request. The signature of the handler will be
     #| used to determine the routing.
-    multi get(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('GET', &handler);
+    multi sub get(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('GET', &handler, :$name);
     }
 
     #| Add a handler for a HTTP POST request. The signature of the handler will be
     #| used to determine the routing.
-    multi post(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('POST', &handler);
+    multi post(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('POST', &handler, :$name);
     }
 
     #| Add a handler for a HTTP PUT request. The signature of the handler will be
@@ -750,17 +809,17 @@ module Cro::HTTP::Router {
     sub include(*@includees, *%includees --> Nil) is export {
         for @includees {
             when RouteSet  {
-                $*CRO-ROUTE-SET.add-include([], $_);
+                $*CRO-ROUTE-SET.add-include([], $_, name-prefix => $_.name);
             }
             when Pair {
                 my ($prefix, $routes) = .kv;
                 if $routes ~~ RouteSet {
                     given $prefix {
                         when Str {
-                            $*CRO-ROUTE-SET.add-include([$prefix], $routes);
+                            $*CRO-ROUTE-SET.add-include([$prefix], $routes, name-prefix => $routes.name);
                         }
                         when Iterable {
-                            $*CRO-ROUTE-SET.add-include($prefix, $routes);
+                            $*CRO-ROUTE-SET.add-include($prefix, $routes, name-prefix => $routes.name);
                         }
                         default {
                             die "An 'include' prefix may be a Str or Iterable, but not " ~ .^name;
@@ -780,7 +839,7 @@ module Cro::HTTP::Router {
         }
         for %includees.kv -> $prefix, $routes {
             if $routes ~~ RouteSet {
-                $*CRO-ROUTE-SET.add-include([$prefix], $routes);
+                $*CRO-ROUTE-SET.add-include([$prefix], $routes, name-prefix => $routes.name);
             }
             else {
                 die "Can only use 'include' with `route` block, not a $routes.^name()";
@@ -1284,7 +1343,13 @@ module Cro::HTTP::Router {
 
     #| Add a request handler for the specified HTTP method. This is useful
     #| when there is no shortcut function available for the HTTP method.
-    sub http($method, &handler --> Nil) is export {
+    multi http($name, $method, &handler --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler($method, &handler, :$name);
+    }
+
+    #| Add a request handler for the specified HTTP method. This is useful
+    #| when there is no shortcut function available for the HTTP method.
+    multi http($method, &handler --> Nil) is export {
         $*CRO-ROUTE-SET.add-handler($method, &handler);
     }
 
@@ -1358,6 +1423,33 @@ module Cro::HTTP::Router {
                 $resp.status = 403;
             }
         }
+    }
+
+    sub rel-link($route-name, *@params, *%params) is export {
+        with get-link($route-name, 'rel-link') {
+            return $_.relative(|@params, |%params);
+        }
+        "";
+    }
+
+    sub abs-link($route-name, *@params, *%params) is export {
+        with get-link($route-name, 'abs-link') {
+            return $_.absolute(|@params, |%params);
+        }
+        "";
+    }
+
+    my sub get-link($route-name, $sub-name) {
+        my $maker = router-plugin-get-configs($link-plugin);
+        my @options;
+        for @$maker -> $links {
+            with $links.link-generators{$route-name} {
+                return $_;
+            }
+            @options.push: |$links.link-generators.keys;
+        }
+        warn "Called the $sub-name subroutine with $route-name but no such route defined, options are: @options.join(', ')";
+        Nil;
     }
 
     #| Register a router plugin. The provided ID is for debugging purposes.
