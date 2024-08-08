@@ -264,7 +264,7 @@ class Cro::HTTP::Client {
                     }
                 }
             }
-            if $http ne '1.1' && %!cached-http1{$key} -> @available {
+            if $http ne '2' && %!cached-http1{$key} -> @available {
                 while @available {
                     my $pipeline = @available.shift;
                     return $pipeline unless $pipeline.dead;
