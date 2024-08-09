@@ -167,6 +167,14 @@ class Cro::HTTP::Request does Cro::HTTP::Message {
 		!! @str[0].value.split(/';' ' '?/).List;
         my @res;
         for @str {
+            CATCH {
+                when X::TypeCheck::Assignment {
+                    # Skip cookies with invalid name or value. Since they're received from a client we must not die. But
+                    # neither we're obliged to maintain them.
+                    .rethrow unless .symbol eq '$!value' | '$!name';
+                    next
+                }
+            }
             my ($name, $value) = $_.split('=');
             @res.push: Cro::HTTP::Cookie.new(:$name, :$value) if $name;
         }
