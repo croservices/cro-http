@@ -76,7 +76,7 @@ class Cro::HTTP::Cookie::CookieBuilder {
                     %extensions.append(.extension);
                 }
                 default {
-                    %args.append($_);
+                    %args{$_[0]} //= $_[1];
                 }
             }
         };
