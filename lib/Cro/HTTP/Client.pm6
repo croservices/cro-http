@@ -119,6 +119,7 @@ class Cro::HTTP::Client::Policy::Timeout does Cro::Policy::Timeout[%(
 #| for multiple requests, as well as allowing configuration of common properties of
 #| many requests at construction time.
 class Cro::HTTP::Client {
+    my class PipelineClosedBeforeHeaders is Exception { }
     my class Pipeline {
         has Bool $.secure;
         has Str $.host;
@@ -127,6 +128,7 @@ class Cro::HTTP::Client {
         has Tap $!tap;
         has $!next-response-vow;
         has Bool $.dead = False;
+        has Lock::Async $!lock .= new;
 
         submethod BUILD(:$!secure!, :$!host!, :$!port!, :$!in!, :$out!) {
             $!tap = supply {
@@ -136,18 +138,22 @@ class Cro::HTTP::Client {
                     $vow.keep($_);
                     LAST {
                         $!dead = True;
-                        if $!next-response-vow {
-                            $!next-response-vow.break:
-                                'Connection unexpectedly closed before response headers received';
-                            $!next-response-vow = Nil;
+                        $!lock.protect: {
+                            if $!next-response-vow {
+                                $!next-response-vow.break:
+                                    PipelineClosedBeforeHeaders.new;
+                                $!next-response-vow = Nil;
+                            }
                         }
                     }
                     QUIT {
                         default {
                             $!dead = True;
-                            if $!next-response-vow {
-                                $!next-response-vow.break($_);
-                                $!next-response-vow = Nil;
+                            $!lock.protect: {
+                                if $!next-response-vow {
+                                    $!next-response-vow.break($_);
+                                    $!next-response-vow = Nil;
+                                }
                             }
                         }
                     }
@@ -156,8 +162,21 @@ class Cro::HTTP::Client {
         }
 
         method send-request($request --> Promise) {
-            my $next-response-promise = Promise.new;
-            $!next-response-vow = $next-response-promise.vow;
+            my $next-response-promise;
+            my $broken = False;
+            $!lock.protect: {
+                if $!dead {
+                    # Without https://github.com/MoarVM/MoarVM/pull/1782 merged,
+                    # we can't put the below return here.
+                    $broken = True;
+                }
+                else {
+                    $next-response-promise = Promise.new;
+                    $!next-response-vow = $next-response-promise.vow;
+                }
+            }
+            return Promise.broken(PipelineClosedBeforeHeaders.new) if $broken;
+
             $!in.emit($request);
             return $next-response-promise;
         }
@@ -217,13 +236,22 @@ class Cro::HTTP::Client {
 
         method send-request(Cro::HTTP::Request $request --> Promise) {
             my $p = Promise.new;
+            my $broken = False;
             $!lock.protect: {
-                my $stream-id = $!next-stream-id;
-                $!next-stream-id += 2;
-                $request.http2-stream-id = $stream-id;
-                $request.http-version = '2.0';
-                %!outstanding-stream-responses{$stream-id} = $p.vow;
+                if $!dead {
+                    # Without https://github.com/MoarVM/MoarVM/pull/1782 merged,
+                    # we can't put the below return here.
+                    $broken = True;
+                }
+                else {
+                    my $stream-id = $!next-stream-id;
+                    $!next-stream-id += 2;
+                    $request.http2-stream-id = $stream-id;
+                    $request.http-version = '2.0';
+                    %!outstanding-stream-responses{$stream-id} = $p.vow;
+                }
             }
+            return Promise.broken(PipelineClosedBeforeHeaders.new) if $broken;
             $!in.emit($request);
             $p
         }
@@ -617,7 +645,6 @@ class Cro::HTTP::Client {
 
                     # Send the request.
                     whenever $pipeline.send-request($request-object) {
-                        $headers-kept = True;
                         QUIT {
                             $request-log.end;
                             when GoAwayRetry {
@@ -628,7 +655,16 @@ class Cro::HTTP::Client {
                                     .goaway-exception.rethrow;
                                 }
                             }
+                            when PipelineClosedBeforeHeaders {
+                                if $goaway-retries > 0 && !$headers-kept {
+                                    $retry-supplier.emit: True;
+                                }
+                                else {
+                                    .rethrow;
+                                }
+                            }
                         }
+                        $headers-kept = True;
 
                         # Consider adding the connection back into the cache to use it
                         # again.
