@@ -6,7 +6,7 @@
     "Jonathan Worthington <jnthn@jnthn.net>"
   ],
   "provides": {
-    "TestModule": "lib/TestModule.pm6"
+    "TestModule": "lib/TestModule.rakumod"
   },
   "resources": [
     "index.html",
