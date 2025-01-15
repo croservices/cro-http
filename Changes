@@ -1,6 +1,6 @@
 Revision history for Cro::HTTP
 
-{{NEXT}}
+0.8.10
     - Add two `Response` convenience methods: `not-supported` (500) and
       `server-error` (505).
     - Add support for HTTP/2 cookie headers.
