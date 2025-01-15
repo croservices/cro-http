@@ -5,3 +5,7 @@ Revision history for Cro::HTTP
       `server-error` (505).
     - Add support for HTTP/2 cookie headers.
     - Be more lenient when receiving Cookies with duplicate parameters.
+    - Fix HTTP1.1 connection caching when explicitly passing the HTTP version.
+    - Fix HTTP2 connections with multiple streams stalling.
+    - Change dependency management to allow individual Cro modules to be
+      updated individually.
