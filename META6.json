@@ -13,7 +13,7 @@
     "OO::Monitors",
     "IO::Path::ChildSecure",
     "Base64",
-    "HTTP::HPACK:ver<1.0.1>",
+    "HTTP::HPACK:ver<1.0.1+>",
     "Cro::Core:ver<0.8.10+>:api<0>:auth<zef:cro>",
     "Cro::TLS:ver<0.8.10+>:api<0>:auth<zef:cro>",
     "JSON::Fast",
