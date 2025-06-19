@@ -1,5 +1,8 @@
 Revision history for Cro::HTTP
 
+{{$NEXT}}
+    - Permit use of updated HTTP::Pack module, Samuel Gillespie++
+
 0.8.10
     - Add two `Response` convenience methods: `not-supported` (500) and
       `server-error` (505).
