@@ -67,10 +67,12 @@ class Cro::HTTP2::FrameParser does Cro::Transform does Cro::ConnectionState[Cro:
                                 if $result.end-stream {
                                     start {
                                         my $bytes = $result.data.bytes;
-                                        $connection-state.window-size.emit:
-                                            Cro::HTTP2::Frame::WindowUpdate.new:
-                                                stream-identifier => 0,
-                                                flags => 0, increment => $bytes;
+                                        if $bytes > 0 {
+                                          $connection-state.window-size.emit:
+                                              Cro::HTTP2::Frame::WindowUpdate.new:
+                                                  stream-identifier => 0,
+                                                  flags => 0, increment => $bytes;
+                                        }
                                     }
                                 }
                                 else {
