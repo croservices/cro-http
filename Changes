@@ -1,6 +1,6 @@
 Revision history for Cro::HTTP
 
-{{$NEXT}}
+0.8.11
     - Avoid sending a 0-byte WINDOW_UPDATE frame.
     - Permit use of updated HTTP::Pack module, Samuel Gillespie++
 

@@ -1,7 +1,7 @@
 {
   "name": "Cro::HTTP",
   "description": "Asynchronous HTTP, both client and server side. Includes HTTP/2.0 support.",
-  "version": "0.8.10",
+  "version": "0.8.11",
   "api": "0",
   "auth": "zef:cro",
   "perl": "6.*",
