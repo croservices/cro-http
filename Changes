@@ -2,6 +2,7 @@ Revision history for Cro::HTTP
 
 {{NEXT}}
     - Support link generation
+    - Make http function accept a list of http methods
 
 0.8.11
     - Avoid sending a 0-byte WINDOW_UPDATE frame.
