@@ -1,0 +1,79 @@
+use Cro::HTTP::Router;
+use Test;
+use lib 't/TestModule';
+use TestModule;
+
+my $app = route {
+    get :name<ep1>, -> Int $number {
+        content 'text/plain', "Int: $number";
+    }
+    post :name<ep2>, -> "bla", Str $string {
+        redirect "ep1", :params{ :number($string.Int) };
+    }
+    get :name<ep3>, -> "bla", "ble", "bli" {
+        content 'text/plain', "OK"
+    }
+    get -> Cro::HTTP::Auth $session {
+        content 'text/plain', 'You are ' ~ $session.username;
+    }
+    post -> Cro::HTTP::Auth $session {
+        content 'text/plain', "POST";
+    }
+
+    include test => resourcey-routes();
+}
+
+is-deeply $*ROUTE-ROOT, $app;
+
+is-deeply $app.named-routes.keys.sort, <ep1 ep2 ep3>;
+is-deeply $app.generated-named-routes.keys.sort, <
+    GET_Cro::HTTP::Auth GET_Int GET_bla_ble_bli
+    GET_folder-indexes GET_index.html GET_root-indexes1
+    GET_root-indexes2 GET_test-plugin GET_test.1
+    GET_test.2 GET_test_folder-indexes GET_test_index.html
+    GET_test_root-indexes1 GET_test_root-indexes2
+    GET_test_test-plugin GET_test_test.1 GET_test_test.2
+    POST_Cro::HTTP::Auth POST_bla_Str
+>;
+
+is endpoint("ep1").path-template, '/<Int $number>';
+is endpoint("ep2").path-template, '/bla/<Str $string>';
+
+is list-routes, Q:to/END/.chomp;
+/<Cro::HTTP::Auth $session>:
+    - GET    - GET_Cro::HTTP::Auth
+    - POST   - POST_Cro::HTTP::Auth
+/<Int $number>:
+    - GET    - ep1
+/bla/<Str $string>:
+    - POST   - ep2
+/bla/ble/bli:
+    - GET    - ep3
+/test/folder-indexes:
+    - GET    - GET_folder-indexes
+/test/index.html:
+    - GET    - GET_index.html
+/test/root-indexes1:
+    - GET    - GET_root-indexes1
+/test/root-indexes2:
+    - GET    - GET_root-indexes2
+/test/test-plugin:
+    - GET    - GET_test-plugin
+/test/test.1:
+    - GET    - GET_test.1
+/test/test.2:
+    - GET    - GET_test.2
+END
+
+my $source = Supplier.new;
+my $responses = $app.transformer($source.Supply).Channel;
+
+my $req = Cro::HTTP::Request.new(:method<POST>, :target</bla/42>);
+$source.emit($req);
+is $responses.receive.header('Location'), "/42", "location";
+
+$req = Cro::HTTP::Request.new(:method<POST>, :target</bla/13>);
+$source.emit($req);
+is $responses.receive.header('Location'), "/13", "location";
+
+done-testing;

@@ -139,6 +139,48 @@ module Cro::HTTP::Router {
             has &.implementation;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.plugin-config;
             has Hash[Array, Cro::HTTP::Router::PluginKey] $.flattened-plugin-config;
+            has Str $.name;
+
+            method generate-name {
+                my @params = $.signature.params.grep: { !.named };
+                @params .= map: {
+                    when .constraint_list.elems == 1 && !.?name {
+                        .constraint_list.head.Str
+                    }
+                    default { .type.^name }
+                }
+                @params.join: "_"
+            }
+
+            method path-template {
+                my @params = $.signature.params.grep: { !.named };
+                @params .= map: {
+                    when .constraint_list.elems == 1 && !.?name {
+                        .constraint_list.head.Str
+                    }
+                    when .?type ~~ Any {
+                        "<{ .type.^name } { .name }>"
+                    }
+                    default { "<{ .name }>" }
+                }
+                "/" ~ @params.join: "/"
+            }
+
+            method path(*%values) {
+                my @params = $.signature.params.grep: { !.named };
+                @params .= map: {
+                    when .constraint_list.elems == 1 {
+                        .constraint_list.head
+                    }
+                    default {
+                        my $attr = $_;
+                        my $val = %values{ $attr.name.substr: 1 };
+                        die "Value '{ $val }' for '{ $attr.raku }' does not match" unless $val ~~ $attr.type && $val ~~ $attr.constraints;
+                        $val.Str
+                    }
+                }
+                "/" ~ @params.join: "/"
+            }
 
             method copy-adding(:@prefix, :@body-parsers!, :@body-serializers!, :@before-matched!, :@after-matched!, :@around!,
                                Hash[Array, Cro::HTTP::Router::PluginKey] :$plugin-config) {
@@ -292,6 +334,8 @@ module Cro::HTTP::Router {
         has $!path-matcher;
         has @!handlers-to-add;  # Closures to defer adding, so they get all the middleware
         has Array %!plugin-config{Cro::HTTP::Router::PluginKey};
+        has Handler %.named-routes;
+        has Handler %.generated-named-routes;
 
         method consumes() { Cro::HTTP::Request }
         method produces() { Cro::HTTP::Response }
@@ -353,10 +397,10 @@ module Cro::HTTP::Router {
             }
         }
 
-        method add-handler(Str $method, &implementation --> Nil) {
+        method add-handler(Str $method, &implementation, Str :$name --> Nil) {
             @!handlers-to-add.push: {
                 @!handlers.push(RouteHandler.new(:$method, :&implementation, :@!before-matched, :@!after-matched,
-                        :@!around, :%!plugin-config));
+                        :@!around, :%!plugin-config, |(:$name with $name)));
             }
         }
 
@@ -416,11 +460,22 @@ module Cro::HTTP::Router {
             for @!handlers {
                 .body-parsers = @!body-parsers;
                 .body-serializers = @!body-serializers;
+                with .?name -> $name {
+                    %!named-routes{$name} = $_;
+                }
+                %!generated-named-routes{"{ .method.uc }_{ .generate-name }"} = $_ if .^can: "method";
             }
             for @!includes -> (:@prefix, :$includee) {
                 for $includee.handlers() {
                     @!handlers.push: .copy-adding(:@prefix, :@!body-parsers, :@!body-serializers,
                         :@!before-matched, :@!after-matched, :@!around, :%!plugin-config);
+                    with .?name -> $name {
+                        %.named-routes{$name} = $_;
+                    }
+                    if .^can: "method" {
+                        %!generated-named-routes{"{ .method.uc }_{ .generate-name }"} = $_;
+                        %!generated-named-routes{[.method.uc, |@prefix, .generate-name].join: "_"} = $_;
+                    }
                 }
             }
             self!generate-route-matcher();
@@ -688,10 +743,30 @@ module Cro::HTTP::Router {
         }
     }
 
+    sub endpoint($name, $routes = $*ROUTE-ROOT) is export {
+        $routes.named-routes{$name} // $routes.generated-named-routes{$name}
+    }
+
+    sub list-routes($routes = $*ROUTE-ROOT) is export {
+        my %paths = $routes.handlers.classify: {("/" ~ .prefix.join("/") if .prefix) ~ .path-template};
+
+        %paths.keys.sort.map(-> Str $path {
+            my @handlers := %paths{$path};
+            (
+                "{ $path }:",
+                @handlers.map({
+                    "- { .method.uc.fmt("% -6s") }{ " - { .name // .method ~ "_" ~ .generate-name }" }"
+                }).join("\n").indent: 4
+            ).join: "\n"
+        }).join: "\n"
+
+    }
+
     #| Define a set of routes. Expects to receive a block, which will be evaluated
     #| to set up the routing definition.
     sub route(&route-definition) is export {
         my $*CRO-ROUTE-SET = RouteSet.new;
+        PROCESS::<$ROUTE-ROOT> //= $*CRO-ROUTE-SET;
         route-definition();
         $*CRO-ROUTE-SET.definition-complete();
         my @before = $*CRO-ROUTE-SET.before;
@@ -705,32 +780,32 @@ module Cro::HTTP::Router {
 
     #| Add a handler for a HTTP GET request. The signature of the handler will be
     #| used to determine the routing.
-    multi get(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('GET', &handler);
+    multi get(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('GET', &handler, |(:$name with $name));
     }
 
     #| Add a handler for a HTTP POST request. The signature of the handler will be
     #| used to determine the routing.
-    multi post(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('POST', &handler);
+    multi post(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('POST', &handler, |(:$name with $name));
     }
 
     #| Add a handler for a HTTP PUT request. The signature of the handler will be
     #| used to determine the routing.
-    multi put(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('PUT', &handler);
+    multi put(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('PUT', &handler, |(:$name with $name));
     }
 
     #| Add a handler for a HTTP DELETE request. The signature of the handler will be
     #| used to determine the routing.
-    multi delete(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('DELETE', &handler);
+    multi delete(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('DELETE', &handler, |(:$name with $name));
     }
 
     #| Add a handler for a HTTP PATCH request. The signature of the handler will be
     #| used to determine the routing.
-    multi patch(&handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler('PATCH', &handler);
+    multi patch(&handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler('PATCH', &handler, |(:$name with $name));
     }
 
     #| Add a body parser, which will be considered for use when parsing the body of
@@ -972,7 +1047,10 @@ module Cro::HTTP::Router {
 
     #| Produce a HTTP redirect response, defaulting to a temporary redirect (HTTP 307).
     #| The location is the address to redirect to.
-    multi redirect(Str() $location, :$temporary, :$permanent, :$see-other --> Nil) {
+    multi redirect(Str() $location is copy, :%params, :$temporary, :$permanent, :$see-other, :$named-endpoint = True --> Nil) {
+        if $named-endpoint {
+            $location = .path: |%params with endpoint $location;
+        }
         my $resp = $*CRO-ROUTER-RESPONSE //
             die X::Cro::HTTP::Router::OnlyInHandler.new(:what<redirected>);
         if $permanent {
@@ -991,9 +1069,9 @@ module Cro::HTTP::Router {
     #| The location is the address to redirect to. The remaining arguments will be
     #| passed to the content function, setting the media type, response body, and
     #| other options.
-    multi redirect(Str() $location, $content-type, $body, :$temporary,
+    multi redirect(Str() $location, $content-type, $body, :%params, :$temporary,
                    :$permanent, :$see-other, *%options --> Nil) {
-        redirect $location, :$permanent, :$see-other;
+        redirect $location, :%params, :$permanent, :$see-other;
         content $content-type, $body, |%options;
     }
 
@@ -1284,8 +1362,8 @@ module Cro::HTTP::Router {
 
     #| Add a request handler for the specified HTTP method. This is useful
     #| when there is no shortcut function available for the HTTP method.
-    sub http($method, &handler --> Nil) is export {
-        $*CRO-ROUTE-SET.add-handler($method, &handler);
+    sub http($method, &handler, Str :$name --> Nil) is export {
+        $*CRO-ROUTE-SET.add-handler($method, &handler, |(:$name with $name));
     }
 
     #| Set a cache control header on the response according to the provided
