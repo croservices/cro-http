@@ -66,6 +66,8 @@
     "Cro::HTTP::ResponseSerializer": "lib/Cro/HTTP/ResponseSerializer.rakumod",
     "Cro::HTTP::ReverseProxy": "lib/Cro/HTTP/ReverseProxy.rakumod",
     "Cro::HTTP::Router": "lib/Cro/HTTP/Router.rakumod",
+    "Cro::HTTP::Router::LinkGenerator": "lib/Cro/HTTP/Router/LinkGenerator.rakumod",
+    "Cro::HTTP::Router::Roles": "lib/Cro/HTTP/Router/Roles.rakumod",
     "Cro::HTTP::Server": "lib/Cro/HTTP/Server.rakumod",
     "Cro::HTTP::Session::IdGenerator": "lib/Cro/HTTP/Session/IdGenerator.rakumod",
     "Cro::HTTP::Session::InMemory": "lib/Cro/HTTP/Session/InMemory.rakumod",
