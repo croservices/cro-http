@@ -19,6 +19,10 @@ test-route-urls route {
         is abs-link('noqs'), '/baz', 'Non-path related parameters were not counted';
         is abs-link('auth'), '/auth', "Auth parameter is ignored when creating uri";
         is abs-link('auth-type'), '/auth-type', "Parameter with type that does Auth is ignored when creating uri";
+        is abs-link('get-multi'), '/multi', "GET option to multi method named endpoint";
+        is abs-link('post-multi'), '/multi', "POST option to multi method named endpoint";
+        is abs-link('put-multi'), '/multi', "PUT option to multi method named endpoint";
+        is abs-link('delete-multi'), '/multi', "DELETE option to multi method named endpoint";
     };
 
     get :name<lit>, -> 'foo', 'bar' { }
@@ -28,6 +32,7 @@ test-route-urls route {
     get :name<auth>, -> $auth is auth, 'auth' { }
     class AuthType does Cro::HTTP::Auth { }
     get :name<auth-type>, -> AuthType $a, 'auth-type' { }
+    http -> $method { "{ $method.lc }-multi" }, <GET POST PUT DELETE>, -> 'multi' { }
 }
 
 test-route-urls route {

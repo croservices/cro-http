@@ -1342,6 +1342,22 @@ module Cro::HTTP::Router {
         $*CRO-ROUTE-SET.add-around(&cb);
     }
 
+    #| Add a request handler for a list of HTTP methods. This is useful
+    #| when there is the need to add a handler to multiple http methods
+    multi http(@methods, &handler --> Nil) is export {
+        for @methods -> Str $method {
+            http $method, &handler
+        }
+    }
+
+    #| Add a request handler for a list of HTTP methods. This is useful
+    #| when there is the need to add a handler to multiple http methods
+    multi http(&name, @methods, &handler --> Nil) is export {
+        for @methods -> Str $method {
+            http name($method), $method, &handler
+        }
+    }
+
     #| Add a request handler for the specified HTTP method. This is useful
     #| when there is no shortcut function available for the HTTP method.
     multi http($name, $method, &handler --> Nil) is export {
