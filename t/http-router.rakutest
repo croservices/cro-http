@@ -19,6 +19,12 @@ sub body-text(Cro::HTTP::Response $r) {
         ok $r ~~ Cro::HTTP::Response, 'Empty route set gives a response';
         is $r.status, '404', 'Status code from empty route set is 404';
     }
+
+    $source.emit(Cro::HTTP::Request.new(:method<GET>, :target<example[1].jpg>));
+    given $responses.receive -> $r {
+        ok $r ~~ Cro::HTTP::Response, 'No matching route gets a HTTP response';
+        is $r.status, '400', 'Status code uri is invalid is 400';
+    }
 }
 
 throws-like { request }, X::Cro::HTTP::Router::OnlyInHandler, what => 'request',
