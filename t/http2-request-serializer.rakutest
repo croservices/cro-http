@@ -1,4 +1,5 @@
 use Cro::HTTP2::Frame;
+use Cro::HTTP2::RequestParser;
 use Cro::HTTP2::RequestSerializer;
 use Cro::HTTP::Request;
 use Cro::HTTP::Response;
@@ -117,5 +118,39 @@ test $req, 3, 'Header + Data with unknown Content-Length',
       (*.flags == 1),
       (*.stream-identifier == 5),
       (*.data eq Buf.new)]];
+
+# Round-trip test: a POST request with set-body should be fully recoverable after
+# serialization and parsing. In particular, the content-length header must be present
+# and correct so the parser can reconstruct the body.
+{
+    my $body-text = 'hello world';
+    $req = Cro::HTTP::Request.new(:method<POST>, :target</resource>, :5http2-stream-id);
+    $req.append-header('host' => 'example.org');
+    $req.set-body($body-text);
+
+    my $done = Promise.new;
+    my $serializer = Cro::HTTP2::RequestSerializer;
+    my $parser     = Cro::HTTP2::RequestParser.new;
+    my $frames-in  = Supplier.new;
+    my $connection-state = Cro::HTTP2::ConnectionState.new;
+
+    $parser.transformer($serializer.transformer($frames-in.Supply), :$connection-state).tap:
+        -> $parsed {
+            start {
+                is $parsed.method,  'POST',       'round-trip: method';
+                is $parsed.target,  '/resource',  'round-trip: target';
+                is $parsed.header('Content-length'), $body-text.encode.bytes.Str,
+                    'round-trip: content-length header present and correct';
+                is await($parsed.body-text), $body-text, 'round-trip: body text';
+                $done.keep;
+                CATCH { default { $done.break($_) } }
+            }
+        },
+        quit => { $done.break };
+
+    start { $frames-in.emit($req); $frames-in.done }
+    await Promise.anyof($done, Promise.in(5));
+    ok $done.status ~~ Kept, 'POST with set-body round-trips correctly over HTTP/2';
+}
 
 done-testing;
