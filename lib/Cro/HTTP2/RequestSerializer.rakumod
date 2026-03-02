@@ -12,6 +12,11 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
             whenever $in -> Cro::HTTP::Request $req {
                 my $encoder = HTTP::HPACK::Encoder.new;
 
+                my $body-byte-stream;
+                if $req.has-body {
+                    $body-byte-stream = $req.body-byte-stream;
+                }
+
                 my $host;
                 my @headers = $req.headers.map: {
                     my $name = .name.lc;
@@ -46,7 +51,7 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
                 if $req.has-body {
                     with $req.header('Content-Length') {
                         my $counter = $_;
-                        whenever $req.body-byte-stream {
+                        whenever $body-byte-stream {
                             $counter -= .elems;
                             die 'Content-Length settings is incorrect: too small' if $counter < 0;
                             emit Cro::HTTP2::Frame::Data.new(
@@ -60,7 +65,7 @@ class Cro::HTTP2::RequestSerializer does Cro::Transform {
                         }
                     }
                     else {
-                        whenever $req.body-byte-stream {
+                        whenever $body-byte-stream {
                             emit Cro::HTTP2::Frame::Data.new(
                                 flags => 0,
                                 stream-identifier => $req.http2-stream-id,
