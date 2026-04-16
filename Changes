@@ -1,6 +1,6 @@
 Revision history for Cro::HTTP
 
-{{NEXT}}
+0.8.12
     - Fix content-length header in HTTP/2
     - Support link generation
     - Make http function accept a list of http methods
