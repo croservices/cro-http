@@ -132,6 +132,7 @@ role Cro::HTTP::Middleware::Conditional does Cro::HTTP::Middleware::Pair {
                 }
                 whenever $pipeline -> $response {
                     emit $response;
+                    LAST $connection-state.early-responses.done;
                 }
             }
         }
