@@ -1,6 +1,6 @@
 Revision history for Cro::HTTP
 
-{{NEXT}}
+0.8.13
     - fix unbounded memory growth with $connection-state.early-responses.done;
 
 0.8.12
