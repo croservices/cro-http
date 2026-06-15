@@ -22,6 +22,7 @@ use Cro::Uri;
 use Cro::Iri;
 use Cro::Iri::HTTP;
 use Cro;
+use URI::Encode;
 
 my class ResponseParserExtension is ParserExtension {
     method consumes() { Cro::HTTP::Response }
@@ -135,7 +136,7 @@ class Cro::HTTP::Client {
                 whenever $out {
                     my $vow = $!next-response-vow;
                     $!next-response-vow = Nil;
-                    $vow.keep($_);
+                    $vow.keep($_) if $vow;
                     LAST {
                         $!dead = True;
                         $!lock.protect: {
@@ -711,7 +712,7 @@ class Cro::HTTP::Client {
                                     %new-opts<content-type>:delete;
                                     %new-opts<content-length>:delete;
                                 }
-                                my $new-url = $parsed-url.add(Cro::Uri::HTTP.parse-ref(.header('location')));
+                                my $new-url = $parsed-url.add(Cro::Uri::HTTP.parse-ref(uri_encode(uri_decode(.header('location')))));
                                 %new-opts<PARENT-REQUEST-LOG> = $request-log;
                                 Cro::HTTP::LogTimeline::Redirected.log($request-log, :status(.status), :url($new-url));
                                 my $req = self.request($new-method, $new-url, %new-opts);
@@ -916,10 +917,10 @@ class Cro::HTTP::Client {
         }
         my $in = Supplier::Preserving.new;
         my $out = $version-decision
-            ?? establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |%tls-config)
+            ?? establish($connector, $in.Supply, $log-connection, :!nodelay, :$host, :$port, :$conn-timeout, |%tls-config)
             !! do {
                 my $s = Supplier::Preserving.new;
-                establish($connector, $in.Supply, $log-connection, :nodelay, :$host, :$port, :$conn-timeout, |%tls-config).tap:
+                establish($connector, $in.Supply, $log-connection, :!nodelay, :$host, :$port, :$conn-timeout, |%tls-config).tap:
                     { $s.emit($_) },
                     done => { $s.done },
                     quit => {
