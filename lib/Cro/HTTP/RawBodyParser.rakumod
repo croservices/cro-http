@@ -70,7 +70,7 @@ class Cro::HTTP::RawBodyParser::Chunked does Cro::HTTP::RawBodyParser {
                         loop (my int $i = 0; $i < $buffer.elems - 1; $i++) {
                             if $buffer[$i] == ord("\r") && $buffer[$i + 1] == ord("\n") {
                                 my $length-buf = $buffer.subbuf(0, $i);
-                                $length-awaited = :16($length-buf.decode('ascii'));
+                                $length-awaited = :16($length-buf.decode('ascii').subst(" ",:g));
                                 $buffer .= subbuf($i + 2);
                                 $state = AwaitingChunkEnd;
                                 last;
