@@ -21,14 +21,22 @@ sub test(@frames, $count, $desc, @checks, :$fail, :$test-supplies) {
     my $parser = Cro::HTTP2::RequestParser.new;
     my $fake-in = Supplier.new;
     my $counter = 0;
+    # The checks run off the main thread, and Test is not thread safe: emitting
+    # `ok` from there interleaves the TAP output of concurrent requests, and can
+    # even leak a test past the `pass`/`done-testing` that should follow it. So
+    # each request only records its check results here; they are reported below,
+    # on the main thread, in request order.
+    my @check-results = Promise.new xx $count;
+    my $all-checks-recorded = Promise.allof(|@check-results);
     $parser.transformer($fake-in.Supply, :$connection-state).tap:
             -> $request {
                 my $current-counter = $counter++;
                 start {
-                    for @checks[$current-counter].kv -> $i, $check {
-                        ok $check($request), "check {$i + 1}";
+                    my @results;
+                    for @checks[$current-counter].list -> $check {
+                        @results.push($check($request));
                     }
-                    $test-completed.keep if $current-counter + 1 == $count;
+                    @check-results[$current-counter].keep(@results);
                     CATCH {
                         default {
                             $test-completed.break($_);
@@ -45,8 +53,15 @@ sub test(@frames, $count, $desc, @checks, :$fail, :$test-supplies) {
         }
         $fake-in.done;
     }
-    await Promise.anyof($test-completed, Promise.in(5));
+    await Promise.anyof($test-completed, $all-checks-recorded, Promise.in(5));
     if $test-completed.status ~~ Kept {
+        pass $desc;
+    } elsif $all-checks-recorded.status ~~ Kept {
+        for @check-results -> $recorded {
+            for $recorded.result.kv -> $i, $result {
+                ok $result, "check {$i + 1}";
+            }
+        }
         pass $desc;
     } else {
         die X::Cro::HTTP2::Error.new(code => PROTOCOL_ERROR) if $fail;
